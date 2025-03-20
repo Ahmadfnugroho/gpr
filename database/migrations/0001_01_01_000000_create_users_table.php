@@ -28,6 +28,7 @@ return new class extends Migration
             $table->enum('gender', ['male', 'female'])->nullable();
             $table->string('source_info')->nullable();
             $table->enum('status', ['active', 'blacklist'])->default('active');
+
             $table->index('name');
             $table->index('email');
             $table->index('status');
