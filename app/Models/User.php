@@ -63,14 +63,6 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             ]);
     }
 
-    // public function setPasswordAttribute($value)
-    // {
-    //     do {
-    //         $password = mt_rand(1000000, 9999999);
-    //     } while (self::where('password', Hash::make($password))->exists());
-
-    //     return $password;
-    // }
 
     /**
      * The attributes that should be hidden for serialization.
@@ -97,9 +89,9 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         ];
     }
 
-    public function canAccessFilament(): bool
+    public function canAccessPanel(\Filament\Panel $panel): bool
     {
-        return true;
+        return true; // Atur logika akses panel sesuai kebutuhan
     }
 
 
