@@ -1,18 +1,20 @@
 {
+    "version": 2,
     "functions": {
         "api/index.php": {
             "runtime": "vercel-php@0.7.3"
         }
     },
-    "version": 2,
+    "buildCommand": "npm install",
+    "installCommand": "composer install --no-dev --optimize-autoloader",
     "routes": [
         {
             "src": "/(.*)",
             "dest": "api/index.php"
         },
         {
-            "src": "/(css|js)/(.*)$",
-            "dest": "/api/assets.php?type=$1&file=$2"
+            "src": "/(css|js|images|fonts|vendor)/(.*)$",
+            "dest": "public/$1/$2"
         }
     ],
     "env": {
@@ -20,7 +22,6 @@
         "APP_DEBUG": "true",
         "APP_URL": "https://gpr-id.vercel.app",
         "ASSET_URL": "https://gpr-id.vercel.app",
-
         "APP_CONFIG_CACHE": "/tmp/config.php",
         "APP_EVENTS_CACHE": "/tmp/events.php",
         "APP_PACKAGES_CACHE": "/tmp/packages.php",
@@ -30,7 +31,6 @@
         "CACHE_DRIVER": "array",
         "LOG_CHANNEL": "stderr",
         "SESSION_DRIVER": "cookie",
-
         "DB_CONNECTION": "pgsql",
         "DB_HOST": "ep-blue-bird-a7twfxgj.ap-southeast-2.aws.neon.tech",
         "DB_PORT": "5432",
@@ -39,13 +39,11 @@
         "DB_PASSWORD": "npg_VugLwM5vmY6i",
         "DB_SSLMODE": "require",
         "DATABASE_URL": "postgres://neondb_owner:npg_VugLwM5vmY6i@ep-blue-bird-a7twfxgj-pooler.ap-southeast-2.aws.neon.tech/neondb?sslmode=require",
-
         "PGHOST": "ep-blue-bird-a7twfxgj-pooler.ap-southeast-2.aws.neon.tech",
         "PGHOST_UNPOOLED": "ep-blue-bird-a7twfxgj.ap-southeast-2.aws.neon.tech",
         "PGUSER": "neondb_owner",
         "PGDATABASE": "neondb",
         "PGPASSWORD": "npg_VugLwM5vmY6i",
-
         "POSTGRES_URL": "postgres://neondb_owner:npg_VugLwM5vmY6i@ep-blue-bird-a7twfxgj-pooler.ap-southeast-2.aws.neon.tech/neondb?sslmode=require",
         "POSTGRES_URL_NON_POOLING": "postgres://neondb_owner:npg_VugLwM5vmY6i@ep-blue-bird-a7twfxgj.ap-southeast-2.aws.neon.tech/neondb?sslmode=require",
         "POSTGRES_USER": "neondb_owner",
@@ -54,6 +52,5 @@
         "POSTGRES_DATABASE": "neondb",
         "POSTGRES_URL_NO_SSL": "postgres://neondb_owner:npg_VugLwM5vmY6i@ep-blue-bird-a7twfxgj-pooler.ap-southeast-2.aws.neon.tech/neondb",
         "POSTGRES_PRISMA_URL": "postgres://neondb_owner:npg_VugLwM5vmY6i@ep-blue-bird-a7twfxgj-pooler.ap-southeast-2.aws.neon.tech/neondb?pgbouncer=true&connect_timeout=15&sslmode=require"
-    },
-    "outputDirectory": "public"
+    }
 }
