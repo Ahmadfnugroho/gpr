@@ -2,11 +2,10 @@
     "version": 2,
     "functions": {
         "api/index.php": {
-            "runtime": "vercel-php@0.7.3"
+            "runtime": "vercel-php@0.7.3",
+            "includeFiles": "public/css/filament/forms/forms.css"
         }
     },
-    "buildCommand": "npm install",
-    "installCommand": "composer install --no-dev --optimize-autoloader",
     "routes": [
         {
             "src": "/(.*)",
