@@ -2,8 +2,8 @@
 set -e
 
 # Skip cache clearing if cache table doesn't exist
-php artisan tinker --execute="try { DB::select('SELECT 1 FROM cache LIMIT 1'); } catch (\Exception \$e) { exit(0); }" || true
-
+mkdir -p bootstrap/cache
+chmod -R 775 bootstrap/cache
 # Install dependencies
 composer install --optimize-autoloader --no-dev
 
