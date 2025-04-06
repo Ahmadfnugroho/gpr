@@ -13,6 +13,7 @@ use Filament\Forms\Components\Section;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserPhoneNumber;
+use App\Services\WhatsAppService;
 use BezhanSalleh\FilamentShield\Support\Utils;
 use Carbon\Carbon;
 use Dompdf\FrameDecorator\Text;
@@ -1314,6 +1315,17 @@ class TransactionResource extends Resource
                     ->url(fn(Transaction $record) => route('pdf', $record))
                     ->openUrlInNewTab()
                     ->size(ActionSize::ExtraSmall),
+                Tables\Actions\Action::make('kirim_whatsapp')
+                    ->label('Kirim WhatsApp')
+                    ->action(function ($record) {
+                        $wa = new WhatsAppService();
+                        $wa->sendTextMessage($record->phone, "Halo, ini pesan dari sistem!");
+                        Notification::make()
+                            ->title('Pesan berhasil dikirim.')
+                            ->success()
+                            ->send();
+                    }),
+
 
 
 
