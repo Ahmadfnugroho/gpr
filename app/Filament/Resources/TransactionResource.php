@@ -932,6 +932,17 @@ class TransactionResource extends Resource
                                 Forms\Components\Hidden::make('remaining_payment')
                                     ->default(fn(Get $get): string => (string) $get('remaining_payment')),
 
+
+
+
+
+
+
+                            ])
+                            ->columnSpan(1)
+                            ->columns(3),
+                        Section::make('Status dan Note')
+                            ->schema([
                                 ToggleButtons::make('booking_status')
                                     ->options([
                                         'pending' => 'pending',
@@ -978,19 +989,13 @@ class TransactionResource extends Resource
                                                 return new \Illuminate\Support\HtmlString('<strong style="color:green">sudah selesai disewa dan barang sudah diterima.</strong>');
                                         }
                                     }),
-
-
-
-
-
-
+                                Forms\Components\TextInput::make('note')
+                                    ->label('Catatan Sewa'),
 
                             ])
-                            ->columnSpan(1)
-                            ->columns(3),
+                            ->columnSpan(1),
 
-                        Forms\Components\Markdowneditor::make('note')
-                            ->label('Catatan Sewa'),
+
 
 
                     ])->columns(2),
