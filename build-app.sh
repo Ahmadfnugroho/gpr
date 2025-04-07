@@ -12,16 +12,14 @@ if [ -f "package.json" ]; then
     npm install && npm run build
 fi
 
-# Hapus cache lama
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
-php artisan cache:clear
+# Hanya bersihkan cache lokal, tanpa akses database
+php artisan config:clear || true
+php artisan route:clear || true
+php artisan view:clear || true
 
-# Buat cache baru
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+php artisan config:cache || true
+php artisan route:cache || true
+php artisan view:cache || true
 
-# (Opsional) Optimalkan autoloader
+# Hanya dump autoload
 composer dump-autoload
