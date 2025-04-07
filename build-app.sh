@@ -5,6 +5,9 @@ set -e
 mkdir -p bootstrap/cache
 chmod -R 775 bootstrap/cache
 # Install dependencies
+rm -f public/storage
+ln -s ../storage/app/public public/storage
+composer require symfony/filesystem
 composer install --optimize-autoloader --no-dev
 
 # Build assets
