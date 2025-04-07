@@ -41,6 +41,11 @@ class CategoryResource extends Resource
                     ->maxLength(255),
 
                 Forms\Components\FileUpload::make('photo')
+                    ->disk('public')
+                    ->directory('categories')
+                    ->visibility('public')
+                    ->maxSize(1024) // optional: 1MB
+
                     ->label('Photo')
                     ->required()
                     ->image(),
