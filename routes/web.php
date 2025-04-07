@@ -14,3 +14,11 @@ Route::post('/', [SessionController::class, 'login']);
 Route::get('pdf/{order}', PdfController::class)->name('pdf');
 Route::get('/auth/google/callback', [GoogleSheetSyncController::class, 'handleCallback'])->name('google.callback');
 Route::get('/sync', [GoogleSheetSyncController::class, 'sync'])->name('sync');
+
+Route::post('/test-upload', function (Illuminate\Http\Request $request) {
+    if ($request->hasFile('file')) {
+        $path = $request->file('file')->store('categories', 'public');
+        return response()->json(['path' => $path]);
+    }
+    return response()->json(['error' => 'No file uploaded'], 400);
+});
