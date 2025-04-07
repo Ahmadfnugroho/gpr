@@ -41,4 +41,12 @@ Route::middleware('api_key')->group(function () {
     Route::post('/transaction', [TransactionController::class, 'store']);
 
     Route::post('/check-transaction', [TransactionController::class, 'DetailTransaction']);
+
+    Route::post('/test-upload', function (Illuminate\Http\Request $request) {
+        if ($request->hasFile('file')) {
+            $path = $request->file('file')->store('categories', 'public');
+            return response()->json(['path' => $path]);
+        }
+        return response()->json(['error' => 'No file uploaded'], 400);
+    });
 });
