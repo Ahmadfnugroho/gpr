@@ -22,7 +22,4 @@ composer dump-autoload
 
 php artisan livewire:publish --config
 php artisan livewire:publish --assets
-php artisan livewire:publish --routes
-
-
 php artisan migrate --force
