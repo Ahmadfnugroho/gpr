@@ -4,6 +4,7 @@ set -e
 # Skip cache clearing if cache table doesn't exist
 mkdir -p bootstrap/cache
 chmod -R 775 bootstrap/cache
+composer require livewire/livewire
 # Install dependencies
 composer install --optimize-autoloader --no-dev
 

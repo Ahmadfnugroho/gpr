@@ -22,6 +22,7 @@
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^2.9",
         "league/flysystem-aws-s3-v3": "3.0",
+        "livewire/livewire": "*",
         "pxlrbt/filament-activity-log": "^1.1",
         "revolution/laravel-google-sheets": "^7.0",
         "rmsramos/activitylog": "^1.0",
