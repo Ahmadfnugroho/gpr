@@ -45,7 +45,6 @@ class CategoryResource extends Resource
                     ->directory('categories')
                     ->visibility('public')
                     ->maxSize(1024) // optional: 1MB
-
                     ->label('Photo')
                     ->required()
                     ->image(),

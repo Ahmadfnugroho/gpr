@@ -15,4 +15,6 @@ php artisan view:cache
 # (Opsional) Optimalkan autoloader
 composer dump-autoload
 
+php artisan route:list | grep livewire
+
 php artisan migrate --force
