@@ -15,6 +15,3 @@ Route::post('/', [SessionController::class, 'login']);
 Route::get('pdf/{order}', PdfController::class)->name('pdf');
 Route::get('/auth/google/callback', [GoogleSheetSyncController::class, 'handleCallback'])->name('google.callback');
 Route::get('/sync', [GoogleSheetSyncController::class, 'sync'])->name('sync');
-Route::post('/livewire/upload-file', function () {
-    return response()->json(['status' => 'ok']);
-})->middleware(['web', 'auth']);
