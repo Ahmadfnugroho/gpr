@@ -20,4 +20,9 @@ composer dump-autoload
 
 # php artisan filament:upgrade
 
+php artisan livewire:publish --config
+php artisan livewire:publish --assets
+php artisan livewire:publish --routes
+
+
 php artisan migrate --force
