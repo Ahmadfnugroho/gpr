@@ -16,5 +16,8 @@ php artisan view:cache
 composer dump-autoload
 
 php artisan route:list | grep livewire
+php artisan storage:link
+
+php artisan filament:upgrade
 
 php artisan migrate --force
