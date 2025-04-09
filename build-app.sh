@@ -14,14 +14,20 @@ if [ -f "package.json" ]; then
 fi
 
 # Hanya bersihkan cache lokal, tanpa akses database
-php artisan config:clear || true
-php artisan route:clear || true
-php artisan view:clear || true
 
 php artisan config:cache || true
 php artisan route:cache || true
 php artisan view:cache || true
 php artisan vendor:publish --force --tag=livewire:assets
+php artisan vendor:publish --force --tag=livewire:assets
+php artisan filament:assets
+php artisan filament:cache-components
+
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+php artisan optimize:clear
 
 # Hanya dump autoload
 composer dump-autoload
