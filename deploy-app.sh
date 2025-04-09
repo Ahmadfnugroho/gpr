@@ -1,25 +1,31 @@
 #!/bin/bash
 set -e
 
-# Hapus cache lama
+# Set permission
+chmod -R 775 storage bootstrap/cache
+
+# Clear caches
 php artisan config:clear
 php artisan route:clear
 php artisan view:clear
 php artisan cache:clear
 
-# Buat cache baru
+# Migrate database
+php artisan migrate --force
+
+# Rebuild cache
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
-# (Opsional) Optimalkan autoloader
-composer dump-autoload
+# Link storage
+php artisan storage:link || true
 
-# php artisan route:list | grep livewire
-# php artisan storage:link
-
-# php artisan filament:upgrade
-
+# Publish Livewire and Filament assets
 php artisan livewire:publish --config
 php artisan livewire:publish --assets
-php artisan migrate --force
+php artisan filament:assets
+php artisan filament:cache-components
+
+# Optional: dump autoload
+composer dump-autoload
