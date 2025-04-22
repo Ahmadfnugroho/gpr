@@ -244,7 +244,7 @@
 
                     @else
                     <br /> {{ $detail->bundling->quantity}}
-                        {{ Log::info($detail->bundling->quantity)}}
+                        {{-- {{ Log::info($detail->bundling->quantity)}} --}}
                     @endif
 
 
