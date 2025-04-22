@@ -24,15 +24,16 @@ class TopProductsThisYearTable extends BaseWidget
         return $table
             ->query(
                 DetailTransaction::query()
-                    ->selectRaw('product_id, bundling_id, id, COUNT(*) as count')
+                    ->selectRaw('product_id, bundling_id, COUNT(*) as count')
                     ->whereHas('transaction', function ($query) {
                         $query
+                            ->whereMonth('created_at', now()->month)
                             ->whereYear('created_at', now()->year);
                     })
-                    ->groupBy('product_id', 'bundling_id') // Group by both columns
+                    ->groupBy('product_id', 'bundling_id', 'id') // PostgreSQL requires all non-aggregated columns
                     ->orderByDesc('count')
                     ->limit(10)
-                    ->with(['product', 'bundling']) // Load related models
+                    ->with(['product', 'bundling'])
             )
             ->columns([
                 Tables\Columns\TextColumn::make('id')
