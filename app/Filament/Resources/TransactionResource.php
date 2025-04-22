@@ -234,7 +234,7 @@ class TransactionResource extends Resource
                                                             })
                                                             ->sum('quantity');
                                                         $availableQuantity = $product->quantity - $rentedQuantity;
-                                                        log::info('rentedQuantity: ' . $rentedQuantity);
+                                                        // log::info('rentedQuantity: ' . $rentedQuantity);
                                                         if ($availableQuantity <= 0) {
 
                                                             return "Produk {$productName} tidak tersedia pada rentang tanggal {$startDate->format('d M Y, H:i')} hingga {$endDate}.";
@@ -526,15 +526,15 @@ class TransactionResource extends Resource
                                                     ->label('Tersedia')
                                                     ->reactive()
                                                     ->content(function (Get $get, Set $set, $record) {
-                                                        log::info('record: ' . $record);
+                                                        // log::info('record: ' . $record);
                                                         $customId = (int) $get('is_bundling') === 1 ? $get('bundling_id') : $get('product_id');
-                                                        log::info('customId: ' . $customId);
+                                                        // log::info('customId: ' . $customId);
                                                         $startDate = Carbon::parse($get('../../start_date'));
-                                                        log::info('startDate: ' . $startDate);
+                                                        // log::info('startDate: ' . $startDate);
                                                         $endDate = Carbon::parse($get('../../end_date'));
-                                                        log::info('endDate: ' . $endDate);
+                                                        // log::info('endDate: ' . $endDate);
                                                         $transactionId = $get('id');
-                                                        log::info('transactionId: ' . $transactionId);
+                                                        // log::info('transactionId: ' . $transactionId);
                                                         if (!$customId) {
                                                             $detailTransaction = DetailTransaction::where('id', $transactionId)
                                                                 ->select(['available_quantity'])
@@ -547,7 +547,7 @@ class TransactionResource extends Resource
                                                             foreach ($bundling->products as $product) {
                                                                 $productName = $product->name;
                                                                 $includedStatuses = ['rented', 'paid', 'pending'];
-                                                                Log::info('Included Statuses: ' . implode(', ', $includedStatuses));
+                                                                // Log::info('Included Statuses: ' . implode(', ', $includedStatuses));
 
                                                                 $rentedQuantity = \App\Models\DetailTransaction::where('product_id', $product->id)
 
@@ -587,11 +587,11 @@ class TransactionResource extends Resource
                                                                             ->where('end_date', '>=', $startDate);
                                                                     })
                                                                     ->sum('quantity');
-                                                                log::info((string) \App\Models\DetailTransaction::where('product_id', $customId)->toSql());
+                                                                // log::info((string) \App\Models\DetailTransaction::where('product_id', $customId)->toSql());
                                                                 // Jika tidak ada data yang cocok, $rentedQuantity akan bernilai 0
-                                                                Log::info('Rented Quantity: ' . $rentedQuantity);
+                                                                // Log::info('Rented Quantity: ' . $rentedQuantity);
                                                                 $availableQuantity = $product->quantity - $rentedQuantity;
-                                                                log::info('rentedQuantity: ' . $rentedQuantity);
+                                                                // log::info('rentedQuantity: ' . $rentedQuantity);
                                                                 if ($availableQuantity <= 0) {
                                                                     return new \Illuminate\Support\HtmlString("<span style='color:red'>Produk {$productName} tidak tersedia pada rentang tanggal {$startDate->format('Y-m-d')} hingga {$endDate->format('Y-m-d')}.</span><br>");
                                                                 }

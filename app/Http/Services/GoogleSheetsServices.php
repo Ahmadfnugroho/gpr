@@ -15,7 +15,7 @@ class GoogleSheetsServices
     public function __construct()
     {
         $this->client = $this->importUsers();
-        Log::info('Importing users from Google Sheets spreadsheet');
+        // Log::info('Importing users from Google Sheets spreadsheet');
 
         // Cek apakah spreadsheet_id terbaca
         $this->spreadsheetId = config('google.spreadsheet_id');
@@ -24,8 +24,8 @@ class GoogleSheetsServices
             throw new Exception('Spreadsheet ID is missing.');
         }
 
-        Log::info('Using spreadsheet ID: ' . $this->spreadsheetId);
-        Log::info('Using range: A:N');
+        // Log::info('Using spreadsheet ID: ' . $this->spreadsheetId);
+        // Log::info('Using range: A:N');
 
         $this->service = new Sheets($this->client);
         $this->range = 'A:N';
