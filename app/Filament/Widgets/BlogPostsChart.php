@@ -23,12 +23,11 @@ class BlogPostsChart extends ChartWidget
 
     protected function getData(): array
     {
-        $monthlyEarnings = Transaction::selectRaw('MONTH(created_at) as month, SUM(round(grand_total/100000,2)) as total')
+        $monthlyEarnings = Transaction::selectRaw('EXTRACT(MONTH FROM created_at) as month, SUM(round(grand_total/100000,2)) as total')
             ->whereYear('created_at', now()->year)
             ->whereIn('booking_status', ['pending', 'paid', 'rented', 'finished'])
             ->groupBy('month')
-            ->orderBy('month') // Pastikan data diurutkan berdasarkan bulan
-
+            ->orderBy('month')
             ->pluck('total', 'month');
 
         // Inisialisasi data bulan (1-12) dengan nilai 0
