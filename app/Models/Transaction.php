@@ -81,6 +81,9 @@ class Transaction extends Model
         static::creating(function ($transaction) {
             // Pastikan booking_transaction_id di-set sebelum data disimpan
             $transaction->booking_transaction_id = $transaction->generateUniqueBookingTrxId();
+            if (is_null($transaction->booking_status)) {
+                $transaction->booking_status = 'draft'; // atau status default sesuai kebutuhan
+            }
         });
         static::saving(function ($transaction) {
 
