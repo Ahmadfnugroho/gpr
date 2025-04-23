@@ -951,6 +951,7 @@ class TransactionResource extends Resource
                                         'rented' => 'rented',
                                         'finished' => 'finished',
                                     ])
+                                    ->default('pending')
                                     ->icons([
                                         'pending' => 'heroicon-o-clock',
                                         'cancelled' => 'heroicon-o-x-circle',
