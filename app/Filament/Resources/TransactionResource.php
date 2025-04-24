@@ -1339,6 +1339,7 @@ class TransactionResource extends Resource
                         $phone = preg_replace('/[^0-9]/', '', $phone);
                         $phone = ltrim($phone, '0');
                         $phone = '62' . $phone;
+                        Log::info("CEK NOMOR $phone");
 
                         $wa = new FonnteService();
                         $wa->sendMessage($phone, "Halo $user->name, ini pesan dari sistem!");
