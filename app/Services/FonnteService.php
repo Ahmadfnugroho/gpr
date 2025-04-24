@@ -11,7 +11,7 @@ class FonnteService
 
     public function __construct()
     {
-        $this->token = env('ACCOUNT_TOKEN'); // atau FONNTE_TOKEN
+        $this->token = config('services.fonnte.token');
     }
 
     public function sendMessage(string $target, string $message): void
