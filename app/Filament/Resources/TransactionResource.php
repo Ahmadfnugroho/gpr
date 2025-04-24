@@ -1322,7 +1322,7 @@ class TransactionResource extends Resource
                     ->url(fn(Transaction $record) => route('pdf', $record))
                     ->openUrlInNewTab()
                     ->size(ActionSize::ExtraSmall),
-                Action::make('kirim_whatsapp')
+                Tables\Actions\Action::make('kirim_whatsapp')
                     ->label('Kirim WhatsApp')
                     ->action(function ($record) {
                         $user = $record->user;
