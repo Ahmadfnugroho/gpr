@@ -26,6 +26,14 @@ class TransactionObserver
 
     protected function sendTransactionNotification(Transaction $transaction, string $eventType)
     {
+        // Load semua relasi yang diperlukan
+        $transaction->load([
+            'user.userPhoneNumbers',
+            'DetailTransactions.product',
+            'DetailTransactions.bundling',
+            'promo'
+        ]);
+
         $user = $transaction->user;
         $phone = $user->userPhoneNumbers->first()?->phone_number;
 
@@ -40,6 +48,8 @@ class TransactionObserver
 
     protected function sendStatusChangeNotification(Transaction $transaction)
     {
+        $transaction->load(['user.userPhoneNumbers']);
+
         $user = $transaction->user;
         $phone = $user->userPhoneNumbers->first()?->phone_number;
 
@@ -63,20 +73,22 @@ class TransactionObserver
         $message = "Hai $userName! 👋\n";
         $message .= "Transaksi sewa kamu (No: $transactionId) berhasil $verb dengan status: *$status*.\n\n";
         $message .= "📝 *Detail Transaksi:*\n";
-        $message .= "- Tanggal Sewa: " . $transaction->start_date . " s.d. " . $transaction->end_date . "\n";
+        $message .= "- Tanggal Sewa: " . $transaction->start_date->format('d M Y') . " s.d. " . $transaction->end_date->format('d M Y') . "\n";
 
         $message .= "- Barang yang Disewa:\n";
-        if ($transaction->products->isNotEmpty()) {
-            foreach ($transaction->products as $product) {
-                $message .= "  • " . $product->name . "\n";
+
+        // Loop melalui DetailTransactions untuk mendapatkan produk/bundling
+        foreach ($transaction->DetailTransactions as $detail) {
+            if ($detail->product) {
+                $message .= "  • " . $detail->product->name . " (" . $detail->quantity . "x)\n";
+            } elseif ($detail->bundling) {
+                $message .= "  • Paket: " . $detail->bundling->name . "\n";
             }
-        } elseif ($transaction->bundling) {
-            $message .= "  • Paket: " . $transaction->bundling->name . "\n";
         }
 
         $message .= "- Total: Rp " . number_format($transaction->grand_total, 0, ',', '.') . "\n";
 
-        if ($transaction->promo_id) {
+        if ($transaction->promo_id && $transaction->promo) {
             $message .= "- Promo: " . $transaction->promo->name . "\n";
         }
 
