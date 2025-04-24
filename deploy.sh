@@ -4,7 +4,7 @@ echo "🚀 Mulai proses sinkronisasi..."
 
 echo "📥 Mengambil update dari GitHub..."
 cd /var/www/gpr
-sudo -u ubuntu git pull origin main
+sudo -u ubuntu git pull origin production
 
 echo "🔐 Mengatur permission dan ownership..."
 sudo chown -R ubuntu:www-data /var/www/gpr
