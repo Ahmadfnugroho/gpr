@@ -115,6 +115,9 @@ class Transaction extends Model
             $user = $transaction->user;
             $name = $user->name ?? 'Pelanggan';
             $phone = $user->userPhoneNumbers->first()?->number;
+            $phone = preg_replace('/[^0-9]/', '', $phone); // hilangkan karakter non-digit
+            $phone = ltrim($phone, '0'); // hilangkan nol depan
+            $phone = '62' . $phone;
 
             if (!$phone) {
                 Log::warning("Nomor WA tidak ditemukan untuk user ID {$user->id}");
