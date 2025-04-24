@@ -13,12 +13,11 @@ class TransactionCheckController extends Controller
     {
         $transaction = Transaction::with([
             'user',
-            'DetailTransactions',
+            'detailTransactions',
             'rentalIncludes'
-            
+
         ])->get();
 
         return CheckTransactionResource::collection($transaction);
     }
-
 }

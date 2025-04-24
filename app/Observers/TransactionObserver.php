@@ -17,9 +17,13 @@ class TransactionObserver
 
     public function updated(Transaction $transaction)
     {
+        Log::info('Transaction updated observer triggered for ID: ' . $transaction->id);
+
         if ($transaction->wasChanged('booking_status')) {
+            Log::info('booking_status changed for ID: ' . $transaction->id);
             $this->sendStatusChangeNotification($transaction);
         } else {
+            Log::info('booking_status NOT changed for ID: ' . $transaction->id);
             $this->sendTransactionNotification($transaction, 'updated');
         }
     }
@@ -29,8 +33,8 @@ class TransactionObserver
         // Load semua relasi yang diperlukan
         $transaction->load([
             'user.userPhoneNumbers',
-            'DetailTransactions.product',
-            'DetailTransactions.bundling',
+            'detailTransactions.product',
+            'detailTransactions.bundling',
             'promo'
         ]);
 
@@ -49,8 +53,8 @@ class TransactionObserver
     protected function sendStatusChangeNotification(Transaction $transaction)
     {
         $transaction->load([
-            'DetailTransactions.product',
-            'DetailTransactions.bundling',
+            'detailTransactions.product',
+            'detailTransactions.bundling',
             'user.userPhoneNumbers'
         ]);
 
@@ -81,8 +85,8 @@ class TransactionObserver
 
         $message .= "- Barang yang Disewa:\n";
 
-        // Loop melalui DetailTransactions untuk mendapatkan produk/bundling
-        foreach ($transaction->DetailTransactions as $detail) {
+        // Loop melalui detailTransactions untuk mendapatkan produk/bundling
+        foreach ($transaction->detailTransactions as $detail) {
             if ($detail->product) {
                 $message .= "  • " . $detail->product->name . " (" . $detail->quantity . "x)\n";
             } elseif ($detail->bundling) {

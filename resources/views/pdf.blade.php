@@ -194,7 +194,7 @@
                 </tr>
               </thead>
               <tbody>
-                @foreach($record->DetailTransactions as $detail)
+                @foreach($record->detailTransactions as $detail)
                 <tr style="font-size: 10px">
                   <td style="text-align: center;">{{ $loop->iteration }}</td>
                   <td style="text-align: left;">
@@ -285,7 +285,7 @@
                 @php
     $totalPrice = 0;
 
-    foreach ($record->DetailTransactions as $detail) {
+    foreach ($record->detailTransactions as $detail) {
       $totalPrice += $detail->bundling_id ? $detail->bundling->price * $detail->bundling->quantity : $detail->product->price * $detail->product->quantity;
 
     }
@@ -303,7 +303,7 @@
                       $diskon = 0;
                       $totalPrice = 0;
 
-                      foreach ($record->DetailTransactions as $detail) {
+                      foreach ($record->detailTransactions as $detail) {
       $totalPrice += $detail->bundling_id ? $detail->bundling->price * $detail->bundling->quantity : $detail->product->price * $detail->product->quantity;
 
     }
