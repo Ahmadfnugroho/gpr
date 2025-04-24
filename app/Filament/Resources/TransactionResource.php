@@ -1324,8 +1324,10 @@ class TransactionResource extends Resource
                 Tables\Actions\Action::make('kirim_whatsapp')
                     ->label('Kirim WhatsApp')
                     ->action(function ($record) {
+                        $record->load('user.userPhoneNumbers');
                         $user = $record->user;
-                        $phone = $user->userPhoneNumbers->first()?->number;
+
+                        $phone = $user->userPhoneNumbers->first()?->phone_number;
 
                         if (!$phone) {
                             Notification::make()
@@ -1335,17 +1337,11 @@ class TransactionResource extends Resource
                             return;
                         }
 
-                        // Opsional: Normalisasi nomor
-                        $phone = preg_replace('/[^0-9]/', '', $phone);
-                        $phone = ltrim($phone, '0');
-                        $phone = '62' . $phone;
-                        Log::info("CEK NOMOR $phone");
-
                         $wa = new FonnteService();
                         $wa->sendMessage($phone, "Halo $user->name, ini pesan dari sistem!");
 
                         Notification::make()
-                            ->title('Pesan berhasil dikirim ke WhatsApp.')
+                            ->title('Pesan berhasil dikirim ke WhatsApp (jika nomor aktif).')
                             ->success()
                             ->send();
                     })
