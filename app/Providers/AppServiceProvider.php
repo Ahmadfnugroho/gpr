@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\DetailTransaction;
+use App\Models\Transaction;
 use App\Observers\DetailTransactionObserver;
+use App\Observers\TransactionObserver;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,6 +23,6 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        DetailTransaction::observe(DetailTransactionObserver::class);
+        Transaction::observe(TransactionObserver::class);
     }
 }
