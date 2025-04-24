@@ -7,7 +7,7 @@
 /storage/pail
 /vendor
 !storage/certs/isrgrootx1.pem
-/storage/logs/
+/storage/logs/*.log
 
 .env
 .env.backup
