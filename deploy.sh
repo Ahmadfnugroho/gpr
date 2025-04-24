@@ -14,9 +14,6 @@ git fetch origin
 git reset --hard origin/production
 
 # Set file permission (opsional tergantung konfigurasi server)
-echo "🔐 Mengatur permission storage dan bootstrap/cache..."
-chmod -R 775 storage
-chmod -R 775 bootstrap/cache
 
 # Install dependency dengan Composer
 echo "⚡ Optimisasi konfigurasi Laravel..."
