@@ -3,27 +3,36 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class FonnteService
 {
-    protected $token;
+    protected string $token;
 
     public function __construct()
-
     {
-        $this->token = env('FONNTE_TOKEN'); // pastikan FONNTE_TOKEN ada di .env
+        $this->token = env('ACCOUNT_TOKEN'); // atau FONNTE_TOKEN
     }
 
-    public function sendMessage($to, $message)
+    public function sendMessage(string $target, string $message): void
     {
-        $response = Http::withHeaders([
-            'Authorization' => $this->token
-        ])->post('https://api.fonnte.com/send', [
-            'target' => $to,
-            'message' => $message,
-            'countryCode' => '62' // opsional, default 62
-        ]);
+        $target = preg_replace('/[^0-9]/', '', $target); // Hapus simbol
+        $target = ltrim($target, '0'); // Hapus nol depan
+        $target = '62' . $target;
 
-        return $response->json();
+        $response = Http::asForm()
+            ->withHeaders([
+                'Authorization' => $this->token,
+            ])
+            ->post('https://api.fonnte.com/send', [
+                'target' => $target,
+                'message' => $message,
+                'countryCode' => '62',
+            ]);
+
+        Log::info('Fonnte API response', [
+            'status' => $response->status(),
+            'body' => $response->body(),
+        ]);
     }
 }
