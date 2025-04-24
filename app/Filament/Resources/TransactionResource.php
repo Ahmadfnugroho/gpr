@@ -183,7 +183,7 @@ class TransactionResource extends Resource
 
                                             $set('end_date', $endDate);
 
-                                            $detailTransactions = $get('DetailTransactions') ?? [];
+                                            $detailTransactions = $get('detailTransactions') ?? [];
                                             foreach ($detailTransactions as $detailTransaction) {
 
                                                 $productId = $detailTransaction['product_id'] ?? null;
@@ -262,7 +262,7 @@ class TransactionResource extends Resource
                 Section::make('Daftar Produk')
 
                     ->schema([
-                        Forms\Components\Repeater::make('DetailTransactions')
+                        Forms\Components\Repeater::make('detailTransactions')
                             ->relationship()
                             ->label('Daftar Produk')
                             ->schema([
@@ -801,15 +801,15 @@ class TransactionResource extends Resource
                                         $total = 0;
                                         $duration = (int) ($get('duration') ?? 1);
 
-                                        $repeaters = $get('DetailTransactions');
+                                        $repeaters = $get('detailTransactions');
                                         $record = $get('record');
                                         if (!$repeaters) {
                                             return Number::currency($total, 'IDR');
                                         }
 
                                         foreach ($repeaters as $key => $repeater) {
-                                            $total += (int) $get('DetailTransactions.' . $key . '.total') +
-                                                (int) $get('DetailTransactions.' . $key . '.total_price');
+                                            $total += (int) $get('detailTransactions.' . $key . '.total') +
+                                                (int) $get('detailTransactions.' . $key . '.total_price');
                                         }
 
                                         return Number::currency($total * $duration, 'IDR');
@@ -820,15 +820,15 @@ class TransactionResource extends Resource
                                         $total = 0;
                                         $promoId = $get('promo_id');
                                         $duration = (int) ($get('duration') ?? 1);
-                                        $repeaters = $get('DetailTransactions');
+                                        $repeaters = $get('detailTransactions');
 
                                         if (!$repeaters) {
                                             return Number::currency(0, 'IDR');
                                         }
 
                                         foreach ($repeaters as $key => $repeater) {
-                                            $total += (int) $get('DetailTransactions.' . $key . '.total') +
-                                                (int) $get('DetailTransactions.' . $key . '.total_price');
+                                            $total += (int) $get('detailTransactions.' . $key . '.total') +
+                                                (int) $get('detailTransactions.' . $key . '.total_price');
                                         }
 
                                         $promo = \App\Models\Promo::find($promoId);
@@ -864,11 +864,11 @@ class TransactionResource extends Resource
                                         $total = 0;
                                         $promoId = $get('promo_id');
                                         $duration = (int) ($get('duration') ?? 1);
-                                        $repeaters = $get('DetailTransactions') ?? [];
+                                        $repeaters = $get('detailTransactions') ?? [];
 
                                         foreach ($repeaters as $key => $repeater) {
-                                            $total += (int) ($get('DetailTransactions.' . $key . '.total') ?? 0) +
-                                                (int) ($get('DetailTransactions.' . $key . '.total_price') ?? 0);
+                                            $total += (int) ($get('detailTransactions.' . $key . '.total') ?? 0) +
+                                                (int) ($get('detailTransactions.' . $key . '.total_price') ?? 0);
                                         }
 
                                         $promo = \App\Models\Promo::find($promoId);
@@ -1066,18 +1066,18 @@ class TransactionResource extends Resource
                     ->searchable(),
 
 
-                Tables\Columns\TextColumn::make('DetailTransactions.id')
+                Tables\Columns\TextColumn::make('detailTransactions.id')
                     ->label('Produk')
                     ->wrap()
                     ->size(TextColumnSize::ExtraSmall)
 
 
                     ->formatStateUsing(function ($record) {
-                        if (!$record->DetailTransactions || $record->DetailTransactions->isEmpty()) {
+                        if (!$record->detailTransactions || $record->detailTransactions->isEmpty()) {
                             return new HtmlString('-');
                         }
 
-                        $detailTransactions = $record->DetailTransactions;
+                        $detailTransactions = $record->detailTransactions;
 
                         $productNames = []; // Untuk menyimpan nama produk
                         $bundlingNames = []; // Untuk menyimpan nama bundling dan produknya
