@@ -48,7 +48,11 @@ class TransactionObserver
 
     protected function sendStatusChangeNotification(Transaction $transaction)
     {
-        $transaction->load(['user.userPhoneNumbers']);
+        $transaction->load([
+            'DetailTransactions.product',
+            'DetailTransactions.bundling',
+            'user.userPhoneNumbers'
+        ]);
 
         $user = $transaction->user;
         $phone = $user->userPhoneNumbers->first()?->phone_number;
