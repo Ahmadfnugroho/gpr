@@ -13,6 +13,7 @@ use Filament\Forms\Components\Section;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\UserPhoneNumber;
+use App\Services\FonnteService;
 use App\Services\WhatsAppService;
 use BezhanSalleh\FilamentShield\Support\Utils;
 use Carbon\Carbon;
@@ -1321,16 +1322,36 @@ class TransactionResource extends Resource
                     ->url(fn(Transaction $record) => route('pdf', $record))
                     ->openUrlInNewTab()
                     ->size(ActionSize::ExtraSmall),
-                Tables\Actions\Action::make('kirim_whatsapp')
+                Action::make('kirim_whatsapp')
                     ->label('Kirim WhatsApp')
                     ->action(function ($record) {
-                        $wa = new WhatsAppService();
-                        $wa->sendTextMessage($record->phone, "Halo, ini pesan dari sistem!");
+                        $user = $record->user;
+                        $phone = $user->userPhoneNumbers->first()?->number;
+
+                        if (!$phone) {
+                            Notification::make()
+                                ->title('Nomor WhatsApp tidak ditemukan.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+
+                        // Opsional: Normalisasi nomor
+                        $phone = preg_replace('/[^0-9]/', '', $phone);
+                        $phone = ltrim($phone, '0');
+                        $phone = '62' . $phone;
+
+                        $wa = new FonnteService();
+                        $wa->sendMessage($phone, "Halo $user->name, ini pesan dari sistem!");
+
                         Notification::make()
-                            ->title('Pesan berhasil dikirim.')
+                            ->title('Pesan berhasil dikirim ke WhatsApp.')
                             ->success()
                             ->send();
-                    }),
+                    })
+                    ->requiresConfirmation()
+                    ->color('success')
+                    ->icon('heroicon-o-chat-bubble-left'),
 
 
 
