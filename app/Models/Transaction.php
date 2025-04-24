@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\MoneyCast;
+use App\Events\TransactionUpdated;
 use App\Services\FonnteService;
 use Carbon\Carbon;
 use Filament\Forms\Get;
@@ -98,39 +99,8 @@ class Transaction extends Model
             }
             // Validasi promo_id
         });
-        static::created(function ($transaction) {
-            self::sendWhatsAppNotification($transaction, 'ditambahkan');
-        });
-
-        static::updated(function ($transaction) {
-            self::sendWhatsAppNotification($transaction, 'diubah');
-        });
     }
 
-    protected static function sendWhatsAppNotification($transaction, $status)
-    {
-        try {
-            $fonnte = new FonnteService();
-
-            $user = $transaction->user;
-            $name = $user->name ?? 'Pelanggan';
-            $phone = $user->userPhoneNumbers->first()?->number;
-            $phone = preg_replace('/[^0-9]/', '', $phone); // hilangkan karakter non-digit
-            $phone = ltrim($phone, '0'); // hilangkan nol depan
-            $phone = '62' . $phone;
-
-            if (!$phone) {
-                Log::warning("Nomor WA tidak ditemukan untuk user ID {$user->id}");
-                return;
-            }
-
-            $message = "Halo $name, transaksi Anda telah *$status*.\n\n📄 Booking ID: *{$transaction->booking_transaction_id}*\n💰 Total: Rp " . number_format($transaction->grand_total, 0, ',', '.') . "\n📅 Tanggal mulai: " . $transaction->start_date->format('d-m-Y H:i');
-
-            $fonnte->sendMessage($phone, $message);
-        } catch (\Throwable $e) {
-            Log::error('Gagal kirim WhatsApp via Fonnte: ' . $e->getMessage());
-        }
-    }
 
 
 
