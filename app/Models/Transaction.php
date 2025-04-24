@@ -112,11 +112,14 @@ class Transaction extends Model
         try {
             $fonnte = new FonnteService();
 
-            // Pastikan kamu punya field seperti `customer_name` dan `customer_phone`
-            $name = $transaction->user->name ?? 'Pelanggan';
-            $phone = $transaction->user->phone ?? null;
+            $user = $transaction->user;
+            $name = $user->name ?? 'Pelanggan';
+            $phone = $user->userPhoneNumbers->first()?->number;
 
-            if (!$phone) return;
+            if (!$phone) {
+                Log::warning("Nomor WA tidak ditemukan untuk user ID {$user->id}");
+                return;
+            }
 
             $message = "Halo $name, transaksi Anda telah *$status*.\n\n📄 Booking ID: *{$transaction->booking_transaction_id}*\n💰 Total: Rp " . number_format($transaction->grand_total, 0, ',', '.') . "\n📅 Tanggal mulai: " . $transaction->start_date->format('d-m-Y H:i');
 
