@@ -1,25 +1,24 @@
 #!/bin/bash
 
-# Deploy script for Laravel app on server
-# Jalankan dari direktori project: /var/www/gpr
-
 echo "🚀 Mulai proses sinkronisasi..."
 
-# Masuk ke direktori project
-cd /var/www/gpr || exit
+# Menjadi root untuk operasi yang membutuhkan permission
+sudo su <<EOF
 
-# Tarik update terbaru dari GitHub (force sinkron dengan branch production)
 echo "📥 Mengambil update dari GitHub..."
-git fetch origin
-git reset --hard origin/production
+cd /var/www/gpr
+sudo -u ubuntu git pull origin main
 
-# Set file permission (opsional tergantung konfigurasi server)
+echo "🔐 Mengatur permission storage dan bootstrap/cache..."
+chown -R ubuntu:www-data /var/www/gpr
+chmod -R 775 /var/www/gpr/storage
+chmod -R 775 /var/www/gpr/bootstrap/cache
 
-# Install dependency dengan Composer
 echo "⚡ Optimisasi konfigurasi Laravel..."
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+sudo -u ubuntu php artisan optimize:clear
+sudo -u ubuntu php artisan optimize
+sudo -u ubuntu php artisan view:cache
 
-# Selesai
+EOF
+
 echo "✅ Deploy selesai!"
