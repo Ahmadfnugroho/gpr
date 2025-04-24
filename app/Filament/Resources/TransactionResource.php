@@ -915,15 +915,38 @@ class TransactionResource extends Resource
                                     ->numeric()
                                     ->reactive()
                                     ->default(fn(Get $get): int => $get('grand_total') ? intval($get('grand_total') * 0.5) : 0)
-
                                     ->minValue(fn(Get $get) => $get('grand_total') ? intval($get('grand_total') * 0.5) : 0)
-                                    ->maxValue(fn(Get $get) => $get('grand_total') ? intval($get('grand_total')) : 0),
+                                    ->maxValue(fn(Get $get) => $get('grand_total') ? intval($get('grand_total')) : 0)
+                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                        $grandTotal = (int) $get('grand_total');
+                                        $downPayment = (int) $state;
+
+                                        // Jika DP sama dengan grand total, set status ke paid
+                                        if ($downPayment === $grandTotal) {
+                                            $set('booking_status', 'paid');
+                                            $set('remaining_payment', 0);
+                                        }
+                                        // Jika DP kurang dari grand total, set status ke pending
+                                        else if ($downPayment < $grandTotal) {
+                                            $set('booking_status', 'pending');
+                                            $set('remaining_payment', $grandTotal - $downPayment);
+                                        }
+                                    }),
+
 
                                 Forms\Components\Placeholder::make('remaining_payment')
                                     ->label('Pelunasan')
                                     ->content(function (Get $get, Set $set) {
                                         $remainingPayment = (int) $get('grand_total') - (int) $get('down_payment');
                                         $set('remaining_payment', $remainingPayment);
+
+                                        // Update status berdasarkan perbandingan DP dan grand total
+                                        if ((int) $get('down_payment') === (int) $get('grand_total')) {
+                                            $set('booking_status', 'paid');
+                                        } else {
+                                            $set('booking_status', 'pending');
+                                        }
+
                                         return $remainingPayment === 0 ? 'LUNAS' : Number::currency($remainingPayment, 'IDR');
                                     }),
 
@@ -967,9 +990,12 @@ class TransactionResource extends Resource
                                         'paid' => 'success',
 
                                     ])
-                                    ->afterStateUpdated(fn(Set $set, Get $get, string $state) => match ($state) {
-                                        'paid', 'rented', 'finished' => $set('down_payment', $get('grand_total')),
-                                        default => null,
+                                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                        // Jika status diubah ke paid, rented, atau finished, set DP ke grand total
+                                        if (in_array($state, ['paid', 'rented', 'finished'])) {
+                                            $set('down_payment', $get('grand_total'));
+                                            $set('remaining_payment', 0);
+                                        }
                                     })
                                     ->inline()
                                     ->columnSpanFull()
