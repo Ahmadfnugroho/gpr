@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\MoneyCast;
+use App\Services\FonnteService;
 use Carbon\Carbon;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
@@ -79,7 +80,6 @@ class Transaction extends Model
     protected static function booted()
     {
         static::creating(function ($transaction) {
-            // Pastikan booking_transaction_id di-set sebelum data disimpan
             $transaction->booking_transaction_id = $transaction->generateUniqueBookingTrxId();
         });
         static::saving(function ($transaction) {
@@ -98,7 +98,34 @@ class Transaction extends Model
             }
             // Validasi promo_id
         });
+        static::created(function ($transaction) {
+            self::sendWhatsAppNotification($transaction, 'ditambahkan');
+        });
+
+        static::updated(function ($transaction) {
+            self::sendWhatsAppNotification($transaction, 'diubah');
+        });
     }
+
+    protected static function sendWhatsAppNotification($transaction, $status)
+    {
+        try {
+            $fonnte = new FonnteService();
+
+            // Pastikan kamu punya field seperti `customer_name` dan `customer_phone`
+            $name = $transaction->user->name ?? 'Pelanggan';
+            $phone = $transaction->user->phone ?? null;
+
+            if (!$phone) return;
+
+            $message = "Halo $name, transaksi Anda telah *$status*.\n\n📄 Booking ID: *{$transaction->booking_transaction_id}*\n💰 Total: Rp " . number_format($transaction->grand_total, 0, ',', '.') . "\n📅 Tanggal mulai: " . $transaction->start_date->format('d-m-Y H:i');
+
+            $fonnte->sendMessage($phone, $message);
+        } catch (\Throwable $e) {
+            Log::error('Gagal kirim WhatsApp via Fonnte: ' . $e->getMessage());
+        }
+    }
+
 
 
     public function user(): BelongsTo
