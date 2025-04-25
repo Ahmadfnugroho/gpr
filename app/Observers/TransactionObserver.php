@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Transaction;
+use App\Notifications\TransactionNotification;
 use App\Services\FonnteService;
 use Illuminate\Support\Facades\Log;
 
@@ -13,6 +14,9 @@ class TransactionObserver
     public function created(Transaction $transaction)
     {
         $this->sendTransactionNotification($transaction, 'created');
+        if ($transaction->user?->email) {
+            $transaction->user->notify(new TransactionNotification($transaction, 'created'));
+        }
     }
 
     public function updated(Transaction $transaction)
@@ -68,6 +72,9 @@ class TransactionObserver
 
         $message = $this->buildStatusChangeMessage($transaction);
         $this->fonnteService->sendMessage($phone, $message);
+        if ($transaction->user?->email) {
+            $transaction->user->notify(new TransactionNotification($transaction, 'updated'));
+        }
     }
 
     protected function buildTransactionMessage(Transaction $transaction, string $eventType): string
@@ -88,7 +95,7 @@ class TransactionObserver
         // Loop melalui detailTransactions untuk mendapatkan produk/bundling
         foreach ($transaction->detailTransactions as $detail) {
             if ($detail->product) {
-                $message .= "  • " . $detail->product->name . " (" . $detail->quantity . "x)\n";
+                $message .= "  • " . $detail->product->name . " (" . $detail->quantity . "Buah)\n";
             } elseif ($detail->bundling) {
                 $message .= "  • Paket: " . $detail->bundling->name . "\n";
             }
