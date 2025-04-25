@@ -1040,15 +1040,6 @@ class TransactionResource extends Resource
         return $table
             ->columns([
 
-                Tables\Columns\TextColumn::make('id')
-                    ->size(TextColumnSize::ExtraSmall)
-
-
-                    ->label('No')
-                    ->wrap()
-
-                    ->searchable()
-                    ->sortable(),
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('User')
                     ->wrap()
@@ -1057,14 +1048,12 @@ class TransactionResource extends Resource
 
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('user.phone_number')
+                Tables\Columns\TextColumn::make('user.userPhoneNumbers')
                     ->label('Phone')
                     ->wrap()
-                    ->size(TextColumnSize::ExtraSmall)
-
-
-                    ->searchable(),
-
+                    ->extraAttributes(['class' => 'text-[.5px]']) // misalnya 10px
+                    ->searchable()
+                    ->formatStateUsing(fn($record) => optional($record->user?->userPhoneNumbers?->first())->phone_number),
 
                 Tables\Columns\TextColumn::make('detailTransactions.id')
                     ->label('Produk')
@@ -1151,16 +1140,9 @@ class TransactionResource extends Resource
                     ->formatStateUsing(fn(string $state): string => Number::currency((int) $state / 1000, 'IDR') . 'K')
                     ->sortable()
                     ->searchable(),
-                TextInputColumn::make('down_payment')
+                TextColumn::make('down_payment')
                     ->label('DP')
-                    ->default(
-                        function (Get $get, Set $set): int {
-                            $downPayment = $get('grand_total') * 0.5;
-                            $set('down_payment', $downPayment);
-
-                            return $downPayment;
-                        }
-                    )
+                    ->formatStateUsing(fn(string $state): string => Number::currency((int) $state / 1000, 'IDR') . 'K')
                     ->sortable(),
                 TextColumn::make('remaining_payment')
                     ->label('Sisa')
@@ -1318,27 +1300,34 @@ class TransactionResource extends Resource
                                 ->send();
                         })
                 ])
-                    ->label('status')
-                    ->size(ActionSize::ExtraSmall),
-
-
-
-                Tables\Actions\ViewAction::make()
-                    ->icon('heroicon-o-eye')
                     ->label('')
+
+                    ->icon('heroicon-o-banknotes')
                     ->size(ActionSize::ExtraSmall),
 
-                Tables\Actions\EditAction::make()
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\ViewAction::make()
+                        ->icon('heroicon-o-eye')
+                        ->label('')
+                        ->size(ActionSize::ExtraSmall),
+
+                    Tables\Actions\EditAction::make()
+                        ->icon('heroicon-o-pencil')
+                        ->label('')
+
+                        ->size(ActionSize::ExtraSmall),
+
+                    Tables\Actions\DeleteAction::make()
+                        ->icon('heroicon-o-trash')
+                        ->label('')
+                        ->size(ActionSize::ExtraSmall),
+
+                ])
+                    ->label('')
                     ->icon('heroicon-o-pencil')
-                    ->label('')
-
                     ->size(ActionSize::ExtraSmall),
 
-                Tables\Actions\DeleteAction::make()
-                    ->icon('heroicon-o-trash')
-                    ->label('')
 
-                    ->size(ActionSize::ExtraSmall),
                 Tables\Actions\Action::make('Invoice')
                     ->color('success')
                     ->icon('heroicon-o-arrow-down-tray')
@@ -1347,33 +1336,33 @@ class TransactionResource extends Resource
                     ->url(fn(Transaction $record) => route('pdf', $record))
                     ->openUrlInNewTab()
                     ->size(ActionSize::ExtraSmall),
-                Tables\Actions\Action::make('kirim_whatsapp')
-                    ->label('Kirim WhatsApp')
-                    ->action(function ($record) {
-                        $record->load('user.userPhoneNumbers');
-                        $user = $record->user;
+                // Tables\Actions\Action::make('kirim_whatsapp')
+                //     ->label('Kirim WhatsApp')
+                //     ->action(function ($record) {
+                //         $record->load('user.userPhoneNumbers');
+                //         $user = $record->user;
 
-                        $phone = $user->userPhoneNumbers->first()?->phone_number;
+                //         $phone = $user->userPhoneNumbers->first()?->phone_number;
 
-                        if (!$phone) {
-                            Notification::make()
-                                ->title('Nomor WhatsApp tidak ditemukan.')
-                                ->danger()
-                                ->send();
-                            return;
-                        }
+                //         if (!$phone) {
+                //             Notification::make()
+                //                 ->title('Nomor WhatsApp tidak ditemukan.')
+                //                 ->danger()
+                //                 ->send();
+                //             return;
+                //         }
 
-                        $wa = new FonnteService();
-                        $wa->sendMessage($phone, "Halo $user->name, ini pesan dari sistem!");
+                //         $wa = new FonnteService();
+                //         $wa->sendMessage($phone, "Halo $user->name, ini pesan dari sistem!");
 
-                        Notification::make()
-                            ->title('Pesan berhasil dikirim ke WhatsApp (jika nomor aktif).')
-                            ->success()
-                            ->send();
-                    })
-                    ->requiresConfirmation()
-                    ->color('success')
-                    ->icon('heroicon-o-chat-bubble-left'),
+                //         Notification::make()
+                //             ->title('Pesan berhasil dikirim ke WhatsApp (jika nomor aktif).')
+                //             ->success()
+                //             ->send();
+                //     })
+                //     ->requiresConfirmation()
+                //     ->color('success')
+                //     ->icon('heroicon-o-chat-bubble-left'),
 
 
 

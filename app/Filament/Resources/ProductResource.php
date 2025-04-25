@@ -228,11 +228,6 @@ class ProductResource extends Resource
                 ColumnGroup::make(
                     '',
                     [
-                        Tables\Columns\TextColumn::make('custom_id')
-                            ->label('id')
-                            ->searchable()
-                            ->alignCenter()
-                            ->sortable(),
                         Tables\Columns\TextColumn::make('name')
                             ->searchable()
                             ->wrap()
@@ -264,22 +259,6 @@ class ProductResource extends Resource
                         //     ->trueColor('success')
                         //     ->falseColor('danger'),
 
-                        Tables\Columns\TextColumn::make('category.name')
-                            ->label('Kategori')
-
-                            ->searchable()
-                            ->sortable(),
-                        Tables\Columns\TextColumn::make('brand.name')
-                            ->label('Brand')
-                            ->searchable()
-                            ->sortable(),
-
-                        // Sub-Category Name Column
-                        Tables\Columns\TextColumn::make('subCategory.name')
-                            ->label('Sub Kategori')
-                            ->searchable()
-                            ->sortable()
-                            ->alignCenter(),
 
                     ]
                 ),

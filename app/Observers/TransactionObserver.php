@@ -14,20 +14,13 @@ class TransactionObserver
     public function created(Transaction $transaction)
     {
         $this->sendTransactionNotification($transaction, 'created');
-        if ($transaction->user?->email) {
-            $transaction->user->notify(new TransactionNotification($transaction, 'created'));
-        }
     }
 
     public function updated(Transaction $transaction)
     {
-        Log::info('Transaction updated observer triggered for ID: ' . $transaction->id);
-
         if ($transaction->wasChanged('booking_status')) {
-            Log::info('booking_status changed for ID: ' . $transaction->id);
             $this->sendStatusChangeNotification($transaction);
         } else {
-            Log::info('booking_status NOT changed for ID: ' . $transaction->id);
             $this->sendTransactionNotification($transaction, 'updated');
         }
     }
@@ -37,17 +30,23 @@ class TransactionObserver
         // Load semua relasi yang diperlukan
         $transaction->load([
             'user.userPhoneNumbers',
-            'detailTransactions.product',
-            'detailTransactions.bundling',
+            'detailTransactions.product.rentalIncludes.includedProduct',
+            'detailTransactions.bundling.products.rentalIncludes.includedProduct',
             'promo'
         ]);
+
+        Log::info('Detail transaksi setelah load:', $transaction->toArray());
+
 
         $user = $transaction->user;
         $phone = $user->userPhoneNumbers->first()?->phone_number;
 
         if (!$phone) {
-            Log::warning('Nomor WhatsApp tidak ditemukan untuk transaksi ID: ' . $transaction->id);
             return;
+        }
+
+        if ($user->email) {
+            $user->notify(new TransactionNotification($transaction, $eventType));
         }
 
         $message = $this->buildTransactionMessage($transaction, $eventType);
@@ -57,24 +56,28 @@ class TransactionObserver
     protected function sendStatusChangeNotification(Transaction $transaction)
     {
         $transaction->load([
-            'detailTransactions.product',
-            'detailTransactions.bundling',
-            'user.userPhoneNumbers'
+            'user.userPhoneNumbers',
+            'detailTransactions.product.rentalIncludes.includedProduct',
+            'detailTransactions.bundling.products.rentalIncludes.includedProduct',
+            'promo'
         ]);
+
+        Log::info('Detail transaksi setelah load:', $transaction->toArray());
+
 
         $user = $transaction->user;
         $phone = $user->userPhoneNumbers->first()?->phone_number;
 
         if (!$phone) {
-            Log::warning('Nomor WhatsApp tidak ditemukan untuk transaksi ID: ' . $transaction->id);
             return;
+        }
+
+        if ($user->email) {
+            $user->notify(new TransactionNotification($transaction, 'updated'));
         }
 
         $message = $this->buildStatusChangeMessage($transaction);
         $this->fonnteService->sendMessage($phone, $message);
-        if ($transaction->user?->email) {
-            $transaction->user->notify(new TransactionNotification($transaction, 'updated'));
-        }
     }
 
     protected function buildTransactionMessage(Transaction $transaction, string $eventType): string
@@ -89,18 +92,6 @@ class TransactionObserver
         $message .= "Transaksi sewa kamu (No: $transactionId) berhasil $verb dengan status: *$status*.\n\n";
         $message .= "📝 *Detail Transaksi:*\n";
         $message .= "- Tanggal Sewa: " . $transaction->start_date->format('d M Y') . " s.d. " . $transaction->end_date->format('d M Y') . "\n";
-
-        $message .= "- Barang yang Disewa:\n";
-
-        // Loop melalui detailTransactions untuk mendapatkan produk/bundling
-        foreach ($transaction->detailTransactions as $detail) {
-            if ($detail->product) {
-                $message .= "  • " . $detail->product->name . " (" . $detail->quantity . "Buah)\n";
-            } elseif ($detail->bundling) {
-                $message .= "  • Paket: " . $detail->bundling->name . "\n";
-            }
-        }
-
         $message .= "- Total: Rp " . number_format($transaction->grand_total, 0, ',', '.') . "\n";
 
         if ($transaction->promo_id && $transaction->promo) {
@@ -118,6 +109,12 @@ class TransactionObserver
         } elseif ($status === 'paid') {
             $message .= "\n✅ Barang bisa diambil di counter sesuai jadwal.";
         }
+        // Tampilkan link invoice jika transaksi baru dengan status pending atau paid
+        if ($eventType === 'created' && in_array($status, ['pending', 'paid'])) {
+            $message .= "\n\n📄 *Invoice dapat dilihat di sini:*\n" . url('/pdf/' . $transaction->id);
+        }
+
+
 
         if ($eventType === 'updated') {
             $message .= "\n\n❗Jika kamu merasa tidak melakukan perubahan ini, segera hubungi admin ya.";
@@ -136,7 +133,7 @@ class TransactionObserver
         $message = "Hai $userName! 👋\n";
 
         switch ($newStatus) {
-            case 'cancel':
+            case 'canceled':
                 $message .= "Transaksi sewa kamu (No: $transactionId) *dibatalkan*. Kalau kamu nggak merasa melakukan ini, segera hubungi admin ya.";
                 break;
             case 'paid':

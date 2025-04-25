@@ -62,8 +62,6 @@ class ProductPhotoResource extends Resource
                 Tables\Columns\TextColumn::make('product.name')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\ImageColumn::make('photo')
-                    ->width(100),
 
             ])
             ->filters([

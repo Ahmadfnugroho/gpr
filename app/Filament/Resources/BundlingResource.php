@@ -132,8 +132,6 @@ class BundlingResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('custom_id')
-                    ->label('ID'),
 
                 Tables\Columns\TextColumn::make('name')
                     ->label('Bundling Name'),

@@ -61,12 +61,6 @@ class BrandResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\ImageColumn::make('logo')
-                    ->width(50)
-                    ->height('auto'),
-                Tables\Columns\TextColumn::make('slug')
-                    ->searchable()
-                    ->sortable(),
                 Tables\Columns\ToggleColumn::make('premiere')
                     ->label('Brand Premiere'),
             ])
