@@ -49,6 +49,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextColumn\TextColumnSize;
 use Filament\Tables\Columns\TextInputColumn;
 use FontLib\Table\Type\post;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HtmlString;
 use NunoMaduro\Collision\Adapters\Phpunit\State;
@@ -1038,6 +1039,8 @@ class TransactionResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultSort('id', 'desc')
+
             ->columns([
 
                 Tables\Columns\TextColumn::make('user.name')
@@ -1186,6 +1189,14 @@ class TransactionResource extends Resource
                         'finished' => 'finished',
                         'paid' => 'paid',
                     ]),
+                Tables\Filters\Filter::make('status_filter')
+                    ->label('Aktif')
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query) {
+                        $query->whereIn('booking_status', ['pending', 'paid', 'rented']);
+                    })
+                    ->default(true)
+                    ->toggle(), // agar bisa diaktif/nonaktifkan di UI
+
             ])
             ->actions([
                 Tables\Actions\BulkActionGroup::make([
