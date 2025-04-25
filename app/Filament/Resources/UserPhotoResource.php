@@ -79,8 +79,6 @@ class UserPhotoResource extends Resource
                     ->label('User')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\ImageColumn::make('photo'),
-                Tables\Columns\TextColumn::make('photo_type'),
 
             ])
             ->filters([

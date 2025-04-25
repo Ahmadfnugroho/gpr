@@ -7,6 +7,13 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
 
+namespace App\Notifications;
+
+use App\Models\Transaction;
+use Illuminate\Bus\Queueable;
+use Illuminate\Notifications\Notification;
+use Illuminate\Notifications\Messages\MailMessage;
+
 class TransactionNotification extends Notification
 {
     use Queueable;
@@ -29,23 +36,78 @@ class TransactionNotification extends Notification
     {
         $t = $this->transaction;
         $status = $t->booking_status;
-        $verb = $this->eventType === 'created' ? 'dibuat' : 'diupdate';
+        $transactionId = $t->booking_transaction_id;
+
+        [$subject, $intro] = $this->buildSubjectAndIntro($transactionId, $status, $this->eventType, $notifiable->name);
+
+        $invoiceUrl = url("/pdf/{$t->id}");
 
         $mail = (new MailMessage)
-            ->subject("Transaksi {$verb}: {$t->booking_transaction_id}")
+            ->subject($subject)
             ->greeting("Hai {$notifiable->name},")
-            ->line("Transaksi kamu dengan ID {$t->booking_transaction_id} berhasil {$verb} dengan status *{$status}*.")
-            ->line("Tanggal Sewa: {$t->start_date->format('d M Y')} s.d. {$t->end_date->format('d M Y')}")
-            ->line("Total: Rp " . number_format($t->grand_total, 0, ',', '.'));
+            ->line($intro)
+            ->line("🗓️ Tanggal Sewa: {$t->start_date->format('d M Y')} s.d. {$t->end_date->format('d M Y')}")
+            ->line("💰 Total: Rp " . number_format($t->grand_total, 0, ',', '.'));
 
         if ($t->promo?->name) {
-            $mail->line("Promo: {$t->promo->name}");
+            $mail->line("🎁 Promo: {$t->promo->name}");
         }
 
         if ($t->note) {
-            $mail->line("Catatan: {$t->note}");
+            $mail->line("📝 Catatan: {$t->note}");
         }
 
-        return $mail->line('Terima kasih telah menggunakan layanan kami.');
+        // Tambahkan link invoice hanya untuk kondisi tertentu
+        if (
+            ($this->eventType === 'created' && in_array($status, ['pending', 'paid'])) ||
+            ($this->eventType === 'updated' && $t->getOriginal('booking_status') === 'pending' && $status === 'paid')
+        ) {
+            $mail->line('🧾 Klik tombol di bawah untuk melihat invoice transaksi kamu:')
+                ->action('Lihat Invoice', $invoiceUrl);
+        }
+
+        $mail->line('Terima kasih telah menggunakan layanan kami.');
+
+        return $mail;
+    }
+
+    protected function buildSubjectAndIntro(string $transactionId, string $status, string $eventType, string $userName): array
+    {
+        $subject = '';
+        $intro = '';
+
+        if ($eventType === 'created') {
+            if ($status === 'pending') {
+                $subject = "Transaksi {$transactionId} berhasil dibuat";
+                $intro = "Transaksi kamu dengan ID {$transactionId} berhasil dibuat dan sedang menunggu pembayaran.";
+            } elseif ($status === 'paid') {
+                $subject = "Transaksi {$transactionId} berhasil dan telah dibayar";
+                $intro = "Transaksi kamu dengan ID {$transactionId} berhasil dibuat dan pembayaran sudah kami terima.";
+            }
+        } elseif ($eventType === 'updated') {
+            switch ($status) {
+                case 'paid':
+                    $subject = "Transaksi {$transactionId} telah lunas";
+                    $intro = "Pembayaran untuk transaksi kamu dengan ID {$transactionId} telah kami terima.";
+                    break;
+                case 'rented':
+                    $subject = "Transaksi {$transactionId} telah diambil";
+                    $intro = "Barang untuk transaksi kamu dengan ID {$transactionId} telah diambil. Selamat menggunakan!";
+                    break;
+                case 'finished':
+                    $subject = "Transaksi {$transactionId} selesai";
+                    $intro = "Transaksi sewa kamu dengan ID {$transactionId} telah selesai. Terima kasih telah menggunakan layanan kami.";
+                    break;
+                case 'cancelled':
+                    $subject = "Transaksi {$transactionId} dibatalkan";
+                    $intro = "Transaksi kamu dengan ID {$transactionId} telah dibatalkan. Jika kamu merasa tidak melakukan ini, segera hubungi admin.";
+                    break;
+                default:
+                    $subject = "Transaksi {$transactionId} diperbarui";
+                    $intro = "Ada pembaruan pada transaksi kamu dengan ID {$transactionId}. Status sekarang: *{$status}*.";
+            }
+        }
+
+        return [$subject, $intro];
     }
 }
