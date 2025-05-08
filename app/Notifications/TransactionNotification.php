@@ -29,6 +29,10 @@ class TransactionNotification extends Notification
 
     public function via(object $notifiable): array
     {
+        if (config('notifications.disable_transaction_email')) {
+            return []; // Tidak kirim notifikasi
+        }
+
         return ['mail'];
     }
 

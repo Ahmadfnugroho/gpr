@@ -29,6 +29,8 @@ Route::middleware('api_key')->group(function () {
     Route::get('/brands-premiere', [BrandController::class, 'getPremiereBrands']);
 
     Route::post('/google-sheet-sync', [GoogleSheetSyncController::class, 'sync']);
+    Route::get('/google-sheet-export', [GoogleSheetSyncController::class, 'export']);
+
 
 
     Route::get('/product/{product:slug}', [ProductController::class, 'show']);

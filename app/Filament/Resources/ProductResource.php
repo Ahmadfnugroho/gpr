@@ -2,19 +2,14 @@
 
 namespace App\Filament\Resources;
 
-use App\Casts\MoneyCast;
 
 use App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource\RelationManagers;
 use App\Filament\Exports\ProductExporter;
 use App\Filament\Imports\ProductImporter;
-use App\Filament\Imorts\ProductPhotoImporter;
-use App\Filament\Imports\ProductSpecificationImporter;
 use App\Models\Category;
 use App\Models\Brand;
 use App\Models\SubCategory;
-use App\Models\ProductPhoto;
-use App\Models\RentalInclude;
 
 use App\Models\Product;
 use Carbon\Carbon;
@@ -27,17 +22,15 @@ use Filament\Tables\Actions\ExportAction;
 use Filament\Tables\Actions\ImportAction;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Actions\Exports\Enums\ExportFormat;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\Alignment;
 use Filament\Tables\Columns\ColumnGroup;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Log;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
-use Nette\Utils\Html;
 
 class ProductResource extends Resource
 {
@@ -57,31 +50,12 @@ class ProductResource extends Resource
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         // Optimize query by eagerly loading related models
-        return parent::getGlobalSearchEloquentQuery()->with(['transactions', 'detailTransactions']);
+        return parent::getGlobalSearchEloquentQuery()->with(['transactions', 'detailTransactions', 'items']);
     }
     public static function getGlobalSearchResultDetails(\Illuminate\Database\Eloquent\Model $record): array
     {
-
-
-
-
-
-
         // Ambil data transaksi terkait (jika ada)
         return [
-            // 'jumlah barang' => $record->quantity ?? 'N/A',
-            // 'Booking ID' => $record->transactions->map(function ($transaction) {
-            //     return "{$transaction->booking_transaction_id}";
-            // })->implode("\n"),
-            // 'Booking Status' => $record->transactions->map(function ($transaction) {
-            //     return "{$transaction->booking_status}";
-            // })->implode("\n"),
-            // 'Durasi' => $record->transactions->map(function ($transaction) {
-            //     return "{$transaction->duration} Hari, " . $transaction->start_date->format('d M Y H:i') . " - " . $transaction->end_date->format('d M Y H:i');
-            // })->implode("\n"),
-            // 'jml' => $record->detailTransactions->map(function ($detailTransactions) {
-            //     return "{$detailTransactions->quantity}";
-            // })->implode("\n"),
             '(status' => (function () use ($record) {
                 // Jumlah barang yang tersedia
                 $jumlahBarang = $record->quantity ?? 0;
@@ -125,16 +99,7 @@ class ProductResource extends Resource
                 $jumlahTersedia = $record->quantity - $rentedQuantity;
                 $status = $jumlahTersedia > 0 ? $record->status : 'unavailable';
                 return "{$status}, Tersedia: {$jumlahTersedia})";
-
-
-
-                // Pastikan tidak negatif dan kembalikan sebagai string
             })(), // Eksekusi Closure dan kembalikan nilainya
-
-
-
-
-
         ];
     }
 
@@ -156,11 +121,6 @@ class ProductResource extends Resource
                     ->label('Nama Produk')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('quantity')
-                    ->label('Jumlah Produk')
-                    ->required()
-                    ->numeric()
-                    ->reactive(),
 
 
                 Forms\Components\TextInput::make('price')
@@ -172,12 +132,17 @@ class ProductResource extends Resource
                     ->label('Foto Produk')
                     ->image()
                     ->nullable(),
-                Forms\Components\Select::make('status')
+                Select::make('status')
                     ->label('Status')
                     ->options([
-                        'available' => 'available',
-                        'unavailable' => 'unavailable',
+                        'available' => 'Tersedia',
+                        'unavailable' => 'Tidak Tersedia',
                     ])
+                    ->formatStateUsing(function (Product $record) {
+                        return $record->items()->where('is_available', true)->count() > 0
+                            ? 'available'
+                            : 'unavailable';
+                    })
                     ->required()
                     ->reactive(),
                 Forms\Components\Select::make('category_id')
@@ -203,6 +168,45 @@ class ProductResource extends Resource
                     ->label('Brand Premiere')
                     ->default(false),
 
+                Forms\Components\Repeater::make('items')
+                    ->label('Nomor Seri Produk')
+                    ->relationship('items')
+                    ->schema([
+                        Forms\Components\TextInput::make('serial_number')
+                            ->label('Nomor Seri')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\Toggle::make('is_available')
+                            ->label('Tersedia')
+                            ->default(true),
+                    ])
+                    ->columns(2)
+                    ->minItems(0)
+                    ->reactive()
+                    ->addActionLabel('Tambah Nomor Seri'),
+
+                Forms\Components\Placeholder::make('available_serial_numbers')
+                    ->label('Serial Number Tersedia')
+                    ->content(function ($record) {
+                        if (! $record) return '-';
+
+                        $tersedia = $record->items->where('is_available', true)->pluck('serial_number')->toArray();
+                        $tidakTersedia = $record->items->where('is_available', false)->pluck('serial_number')->toArray();
+
+                        $tersediaHtml = count($tersedia)
+                            ? '<span style="color:green">Tersedia: ' . implode(', ', array_map('e', $tersedia)) . '</span>'
+                            : '<span style="color:red">Tidak ada serial number tersedia</span>';
+
+                        $tidakTersediaHtml = count($tidakTersedia)
+                            ? '<br><span style="color:gray">Tidak Tersedia: ' . implode(', ', array_map('e', $tidakTersedia)) . '</span>'
+                            : '';
+
+                        return new HtmlString($tersediaHtml . $tidakTersediaHtml);
+                    })
+                    ->visible(fn($record) => $record !== null)
+                    ->columnSpanFull()
+                    ->extraAttributes(['class' => 'prose'])
+
             ]);
     }
     public static function table(Table $table): Table
@@ -215,7 +219,6 @@ class ProductResource extends Resource
                     ->formats([
                         ExportFormat::Xlsx,
                     ]),
-
 
                 // Tombol Import Produk
                 ImportAction::make()
@@ -232,43 +235,35 @@ class ProductResource extends Resource
                             ->searchable()
                             ->wrap()
                             ->alignCenter()
-
-
+                            ->sortable(),
+                        Tables\Columns\TextColumn::make('items_count')
+                            ->label('Qty')
+                            ->counts('items')
+                            ->alignCenter()
                             ->sortable(),
 
 
-                        Tables\Columns\TextColumn::make('quantity')
-                            ->label('Qty')
-                            ->wrap()
-                            ->alignCenter()
-                            ->wrapHeader()
-
-
+                        Tables\Columns\TextColumn::make('items.serial_number')
+                            ->label('Nomor Seri')
+                            ->formatStateUsing(fn($record) => $record->items->pluck('serial_number')->implode(', '))
                             ->searchable()
                             ->sortable(),
+
                         Tables\Columns\TextColumn::make('price')
                             ->formatStateUsing(fn($state) => 'Rp' . number_format($state, 0, ',', '.'))
                             ->searchable()
                             ->sortable(),
-                        // Tables\Columns\IconColumn::make('status')
-                        //     ->label('Status Ketersediaan')
-                        //     ->sortable()
-                        //     ->getStateUsing(fn ($record) => $record->status === 'available')
-                        //     ->trueIcon('heroicon-o-check-circle')  // Ikon untuk status 'available'
-                        //     ->falseIcon('heroicon-o-x-circle')    // Ikon untuk status 'unavailable'
-                        //     ->trueColor('success')
-                        //     ->falseColor('danger'),
-
-
                     ]
                 ),
 
-
                 ColumnGroup::make('Status', [
-                    Tables\Columns\ToggleColumn::make('status')
-                        ->label('status')
-                        ->sortable()
-                        ->getStateUsing(fn($record) => $record->status === 'available'),
+                    Tables\Columns\SelectColumn::make('status')
+                        ->options([
+                            'available' => 'Available',
+                            'unavailable' => 'Unavailable',
+                            'maintenance' => 'Maintenance',
+                        ])
+                        ->sortable(),
 
                     Tables\Columns\ToggleColumn::make('premiere')
                         ->label('Featured')
@@ -278,14 +273,9 @@ class ProductResource extends Resource
                     ->alignment(Alignment::Center)
                     ->wrapHeader()
 
-
-
-
-
-
-                // Product Slug Column
-
             ])
+            ->modifyQueryUsing(fn(Builder $query) => $query->withCount('items'))
+
 
 
             ->filters([
@@ -320,33 +310,6 @@ class ProductResource extends Resource
 
             ->actions([
                 Tables\Actions\BulkActionGroup::make([
-                    // Tables\Actions\BulkActionGroup::make([
-                    //     Tables\Actions\Action::make('available')
-                    //     ->icon('heroicon-o-check-circle')
-                    //     ->color('success')
-                    //     ->label('available')
-                    //     ->requiresConfirmation()
-                    //     ->action(function (Product $record) {
-                    //         $record->update(['status' => 'available']);
-                    //         Notification::make()
-                    //             ->success()
-                    //             ->title('Berhasil Mengubah Status Produk')
-                    //             ->send();
-                    //     }),
-                    //     Tables\Actions\Action::make('unavailable')
-                    //     ->icon('heroicon-o-x-circle')
-                    //     ->color('danger')
-                    //     ->label('unavailable')
-                    //     ->requiresConfirmation()
-                    //     ->action(function (Product $record) {
-                    //         $record->update(['status' => 'unavailable']);
-                    //         Notification::make()
-                    //             ->success()
-                    //             ->title('Berhasil Mengubah Status Product')
-                    //             ->send();
-                    //     })
-                    // ])
-                    // ->label('Ubah Status Produk'),
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
@@ -362,46 +325,38 @@ class ProductResource extends Resource
                 ])
                     ->label('Lihat/Ubah Produk')
                     ->icon('heroicon-o-eye'),
-
-
             ])
-
 
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkActionGroup::make([
-                        Tables\Actions\Action::make('available')
-                            ->icon('heroicon-o-check-circle')
-                            ->color('success')
-                            ->label('available')
-                            ->requiresConfirmation()
-                            ->action(function (Product $record) {
-                                $record->update(['status' => 'available']);
-                                Notification::make()
-                                    ->success()
-                                    ->title('Berhasil Mengubah Status Produk')
-                                    ->send();
-                            }),
-                        Tables\Actions\Action::make('unavailable')
-                            ->icon('heroicon-o-x-circle')
-                            ->color('danger')
-                            ->label('unavailable')
-                            ->requiresConfirmation()
-                            ->action(function (Product $record) {
-                                $record->update(['status' => 'unavailable']);
-                                Notification::make()
-                                    ->success()
-                                    ->title('Berhasil Mengubah Status Product')
-                                    ->send();
-                            })
-                    ])
-                        ->label('Ubah Status Produk'),
-
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\Action::make('available')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->label('available')
+                        ->requiresConfirmation()
+                        ->action(function (Product $record) {
+                            $record->update(['status' => 'available']);
+                            Notification::make()
+                                ->success()
+                                ->title('Berhasil Mengubah Status Produk')
+                                ->send();
+                        }),
+                    Tables\Actions\Action::make('unavailable')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->label('unavailable')
+                        ->requiresConfirmation()
+                        ->action(function (Product $record) {
+                            $record->update(['status' => 'unavailable']);
+                            Notification::make()
+                                ->success()
+                                ->title('Berhasil Mengubah Status Product')
+                                ->send();
+                        })
                 ])
-                    ->label('Select Product')
-                    ->icon('heroicon-o-eye'),
+                    ->label('Ubah Status Produk'),
 
+                Tables\Actions\DeleteBulkAction::make(),
             ]);
     }
 
@@ -413,7 +368,6 @@ class ProductResource extends Resource
             RelationManagers\RentalIncludeRelationManager::class
         ];
     }
-
 
     public static function getPages(): array
     {

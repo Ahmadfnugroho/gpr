@@ -2,15 +2,12 @@
 
 namespace App\Models;
 
-use BezhanSalleh\FilamentShield\Traits\HasPanelShield;
 use Filament\Models\Contracts\FilamentUser;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -43,6 +40,8 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         'source_info',
         'status',
     ];
+    protected $with = ['userPhotos', 'userPhoneNumbers'];
+
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -52,16 +51,11 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
                 'email',
                 'address',
                 'job',
-                'office_address',
-                'instagram_username',
-                'facebook_username',
-                'emergency_contact_name',
-                'emergency_contact_number',
-                'gender',
-                'source_info',
                 'status',
-            ]);
+            ])
+            ->dontLogIfAttributesChangedOnly(['updated_at']); // Optimisasi logging
     }
+
 
 
     /**
@@ -108,7 +102,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     }
 
 
-    public function Transactions(): HasMany
+    public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class, 'user_id', 'id');
     }

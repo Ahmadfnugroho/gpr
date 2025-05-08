@@ -23,6 +23,7 @@ class UserPhoto extends Model
             ->logOnly([
                 'user.name',
                 'photo_type',
+                'photo',
             ]);
     }
 
