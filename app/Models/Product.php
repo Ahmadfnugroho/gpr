@@ -15,13 +15,15 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
+
 class Product extends Model
 {
     use HasFactory, LogsActivity;
+    public const STATUS_AVAILABLE = 'available';
+    public const STATUS_UNAVAILABLE = 'unavailable';
 
     protected $fillable = [
         'name',
-        'quantity',
         'price',
         'thumbnail',
         'status',
@@ -36,11 +38,15 @@ class Product extends Model
         'price' => MoneyCast::class,
     ];
 
-
+    public function getQuantityAttribute()
+    {
+        // Refactor quantity to count available product items (serial numbers)
+        return $this->availableItems()->count();
+    }
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'text']);
+            ->logOnly(['name']);
     }
 
     public function setNameAttribute($value)
@@ -59,18 +65,14 @@ class Product extends Model
         parent::boot();
 
         static::saving(function ($product) {
-
-            // Memperbarui status berdasarkan available_quantity dan quantity
-            if ($product->quantity <= 0) {
-                $product->status = 'unavailable';
-            } else {
-                $product->status = 'available';
-            }
+            $product->status = $product->availableItems()->count() > 0
+                ? self::STATUS_AVAILABLE
+                : self::STATUS_UNAVAILABLE;
         });
 
-        static::creating(function ($product) {
-            // Format custom_id dengan prefix '1' dan ID unik
-            $product->custom_id = 'produk-' . (Product::max('id') + 1);
+        static::created(function ($product) {
+            $product->custom_id = 'produk-' . $product->id;
+            $product->saveQuietly(); // Hindari triggering event lagi
         });
     }
 
@@ -144,5 +146,20 @@ class Product extends Model
             'id', // foreign key di Product
             'include_product_id' // foreign key di RentalInclude
         );
+    }
+
+    public function items()
+    {
+        return $this->hasMany(ProductItem::class);
+    }
+
+    public function availableItems()
+    {
+        return $this->hasMany(ProductItem::class)->actuallyAvailable();
+    }
+
+    public function getIsAvailableAttribute(): bool
+    {
+        return $this->availableItems()->exists();
     }
 }

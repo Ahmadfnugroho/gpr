@@ -3,6 +3,8 @@
 namespace App\Observers;
 
 use App\Models\Transaction;
+use App\Models\ProductItem;
+use App\Models\ProductTransaction;
 use App\Notifications\TransactionNotification;
 use App\Services\FonnteService;
 use Illuminate\Support\Facades\Log;
@@ -19,9 +21,34 @@ class TransactionObserver
     public function updated(Transaction $transaction)
     {
         if ($transaction->wasChanged('booking_status')) {
+            $this->updateProductItemsAvailability($transaction);
             $this->sendStatusChangeNotification($transaction);
         } else {
             $this->sendTransactionNotification($transaction, 'updated');
+        }
+    }
+
+    protected function updateProductItemsAvailability(Transaction $transaction)
+    {
+        $previousStatus = $transaction->getOriginal('booking_status');
+        $currentStatus = $transaction->booking_status;
+
+        $aktifStatus = ['pending', 'paid', 'rented'];
+        $nonAktifStatus = ['cancelled', 'finished'];
+
+        $productTransactions = ProductTransaction::where('transaction_id', $transaction->id)->get();
+
+        foreach ($productTransactions as $pt) {
+            $productItem = ProductItem::find($pt->product_item_id);
+            if (!$productItem) {
+                continue;
+            }
+
+            if (in_array($previousStatus, $aktifStatus) && in_array($currentStatus, $nonAktifStatus)) {
+                $productItem->update(['is_available' => true]);
+            } elseif (in_array($previousStatus, $nonAktifStatus) && in_array($currentStatus, $aktifStatus)) {
+                $productItem->update(['is_available' => false]);
+            }
         }
     }
 

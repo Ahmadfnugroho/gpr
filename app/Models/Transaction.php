@@ -83,8 +83,8 @@ class Transaction extends Model
         static::creating(function ($transaction) {
             $transaction->booking_transaction_id = $transaction->generateUniqueBookingTrxId();
         });
-        static::saving(function ($transaction) {
 
+        static::saving(function ($transaction) {
             if ($transaction->start_date) {
                 $transaction->start_date = Carbon::parse($transaction->start_date)
                     ->format('Y-m-d H:i:s');
@@ -97,10 +97,33 @@ class Transaction extends Model
                     ->addDays($duration)
                     ->format('Y-m-d H:i:s');
             }
-            // Validasi promo_id
+        });
+
+        // ✅ Dipisahkan dari saving
+        static::saved(function ($transaction) {
+            $transaction->markItemsAvailableIfCancelledOrFinished();
         });
     }
 
+    public function markItemsAvailableIfCancelledOrFinished()
+    {
+        if (in_array($this->booking_status, ['cancelled', 'finished'])) {
+            foreach ($this->detailTransactions as $detail) {
+                foreach ($detail->serial_numbers as $serial) {
+                    $productItem = ProductItem::where('product_id', $detail->product_id)
+                        ->where('serial_number', $serial)
+                        ->first();
+
+                    if ($productItem) {
+                        $productItem->update([
+                            'is_available' => true,
+                            'detail_transaction_id' => null
+                        ]);
+                    }
+                }
+            }
+        }
+    }
 
 
 

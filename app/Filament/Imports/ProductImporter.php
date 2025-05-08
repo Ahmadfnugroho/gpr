@@ -2,23 +2,15 @@
 
 namespace App\Filament\Imports;
 
-namespace App\Filament\Imports;
-
 use App\Models\Product;
 use App\Models\Category;
 use App\Models\Brand;
 use App\Models\SubCategory;
-use App\Models\RentalInclude;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
 use Filament\Notifications\Notification;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-
 
 class ProductImporter extends Importer
 {
@@ -43,7 +35,6 @@ class ProductImporter extends Importer
                 ->rules(['required']),
             ImportColumn::make('thumbnail')
                 ->rules(['nullable', 'max:255']),
-
             ImportColumn::make('category')
                 ->relationship('category', 'name', 'id')
                 ->rules(['nullable']),
@@ -53,6 +44,8 @@ class ProductImporter extends Importer
             ImportColumn::make('sub_category')
                 ->relationship('subcategory', 'name', 'id')
                 ->rules(['nullable']),
+            ImportColumn::make('serial_numbers')
+                ->rules(['nullable', 'string']),
         ];
     }
 
@@ -102,6 +95,23 @@ class ProductImporter extends Importer
         try {
             // Simpan ke database
             $product->save();
+
+            // Handle serial numbers import
+            if (!empty($this->data['serial_numbers'])) {
+                $serialNumbersRaw = $this->data['serial_numbers'];
+                // Assume serial numbers are comma separated
+                $serialNumbers = array_map('trim', explode(',', $serialNumbersRaw));
+
+                // Delete existing items to avoid duplicates
+                $product->items()->delete();
+
+                foreach ($serialNumbers as $serialNumber) {
+                    $product->items()->create([
+                        'serial_number' => $serialNumber,
+                        'is_available' => true,
+                    ]);
+                }
+            }
         } catch (\Exception $e) {
             // Handle error
             throw new \Exception($e->getMessage());

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Services\GoogleSheetsServices;
+use App\Models\SyncLog;
 use App\Models\User;
 use App\Models\UserPhoneNumber;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -33,6 +35,14 @@ class GoogleSheetSyncController
                     if (empty($rowData['Email Address'])) {
                         continue;
                     }
+                    $incomingUpdatedAt = Carbon::parse($rowData['updated_at'] ?? now());
+
+                    $user = User::where('email', $rowData['Email Address'])->first();
+
+                    if ($user && $user->updated_at->gte($incomingUpdatedAt)) {
+                        continue; // Data lokal lebih baru, lewati
+                    }
+
 
                     $user = User::updateOrCreate(
                         ['email' => $rowData['Email Address']],
@@ -59,6 +69,14 @@ class GoogleSheetSyncController
                             ['user_id' => $user->id, 'phone_number' => $phone]
                         );
                     }
+                    SyncLog::create([
+                        'direction' => 'from_sheet',
+                        'model' => 'User',
+                        'model_id' => optional($user)->id,
+                        'payload' => $rowData,
+                        'status' => 'success',
+                        'message' => 'Synced from Google Sheet'
+                    ]);
                 }
             });
 
@@ -67,5 +85,57 @@ class GoogleSheetSyncController
             Log::error('Google Sheet Sync Error: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    public function export(Request $request)
+    {
+        $lastSyncAt = $request->query('since');
+        $users = User::with('phoneNumbers')
+            ->when($lastSyncAt, fn($q) => $q->where('updated_at', '>', $lastSyncAt))
+            ->get();
+
+
+        $headers = [
+            'Email Address',
+            'Nama Lengkap (Sesuai KTP)',
+            'Alamat Tinggal Sekarang (Ditulis Lengkap)',
+            'Pekerjaan',
+            'Alamat Kantor',
+            'Nama akun Instagram penyewa',
+            'Nama Kontak Emergency',
+            'No. Hp Kontak Emergency',
+            'Jenis Kelamin',
+            'Mengetahui Global Photo Rental dari',
+            'STATUS',
+            'No. Hp1',
+            'No. Hp2',
+            'updated_at',
+        ];
+
+        $values = [];
+        $values[] = $headers;
+
+        foreach ($users as $user) {
+            $phones = $user->phoneNumbers->pluck('phone_number')->values();
+            $values[] = [
+                $user->email,
+                $user->name,
+                $user->address,
+                $user->job,
+                $user->office_address,
+                $user->instagram_username,
+                $user->emergency_contact_name,
+                $user->emergency_contact_number,
+                $user->gender,
+                $user->source_info,
+                $user->status,
+                $phones[0] ?? '',
+                $phones[1] ?? '',
+                $user->updated_at->toDateTimeString()
+
+            ];
+        }
+
+        return response()->json(['values' => $values]);
     }
 }

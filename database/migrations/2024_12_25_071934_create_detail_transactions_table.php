@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * Jalankan migrasi.
      */
     public function up(): void
     {
@@ -20,12 +20,14 @@ return new class extends Migration
             $table->unsignedInteger('available_quantity');
             $table->unsignedInteger('price')->default(0);
             $table->unsignedInteger('total_price')->default(0);
+            $table->json('serial_numbers')->nullable()->comment('Nomor seri untuk setiap unit produk');
+
             $table->timestamps();
         });
     }
 
     /**
-     * Reverse the migrations.
+     * Batalkan migrasi.
      */
     public function down(): void
     {

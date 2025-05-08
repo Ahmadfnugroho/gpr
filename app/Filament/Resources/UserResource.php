@@ -8,22 +8,16 @@ use App\Filament\Imports\UserImporter;
 use App\Filament\Exports\UserExporter;
 
 use App\Models\User;
-use App\Models\UserPhoneNumber;
-use App\Models\UserPhoto;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Str;
 use Filament\Tables\Actions\ExportAction;
 use Filament\Actions\Exports\Enums\ExportFormat;
-use Filament\Forms\Components\Wizard\Step;
 use Filament\Tables\Actions\ImportAction;
 use Filament\Notifications\Notification;
-use Google\Service\ServiceNetworking\Http;
 use Illuminate\Support\Facades\Http as FacadesHttp;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 
@@ -55,6 +49,7 @@ class UserResource extends Resource
                         ->searchable(),
                     Forms\Components\TextInput::make('email')
                         ->required()
+                        ->email()
                         ->maxLength(255),
                     Forms\Components\TextInput::make('password')
                         ->default(function () {
@@ -73,7 +68,8 @@ class UserResource extends Resource
                     Forms\Components\TextInput::make('emergency_contact_name')
                         ->maxLength(255),
                     Forms\Components\TextInput::make('emergency_contact_number')
-                        ->maxLength(255),
+                        ->maxLength(255)
+                        ->phone(),
                     Forms\Components\Select::make('gender')
                         ->options([
                             'male' => 'Male',
@@ -107,32 +103,32 @@ class UserResource extends Resource
                     ->importer(UserImporter::class)
                     ->label('Import User'),
 
-                Tables\Actions\Action::make('Import dari Google Sheets')
-                    ->color('primary')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->requiresConfirmation()
-                    ->action(function () {
-                        $response = FacadesHttp::get(route('sync'));
+                // Tables\Actions\Action::make('Import dari Google Sheets')
+                //     ->color('primary')
+                //     ->icon('heroicon-o-arrow-down-tray')
+                //     ->requiresConfirmation()
+                //     ->action(function () {
+                //         $response = FacadesHttp::get(route('sync'));
 
-                        if ($response->json('redirect')) {
-                            $this->dispatchBrowserEvent('open-new-tab', ['url' => $response->json('redirect')]);
-                            return;
-                        }
+                //         if ($response->json('redirect')) {
+                //             $this->dispatchBrowserEvent('open-new-tab', ['url' => $response->json('redirect')]);
+                //             return;
+                //         }
 
-                        if ($response->successful()) {
-                            Notification::make()
-                                ->title('Import Berhasil')
-                                ->body('Data pengguna berhasil diimpor dari Google Sheets.')
-                                ->success()
-                                ->send();
-                        } else {
-                            Notification::make()
-                                ->title('Import Gagal')
-                                ->body('Terjadi kesalahan saat mengimpor data: ' . $response->body())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
+                //         if ($response->successful()) {
+                //             Notification::make()
+                //                 ->title('Import Berhasil')
+                //                 ->body('Data pengguna berhasil diimpor dari Google Sheets.')
+                //                 ->success()
+                //                 ->send();
+                //         } else {
+                //             Notification::make()
+                //                 ->title('Import Gagal')
+                //                 ->body('Terjadi kesalahan saat mengimpor data: ' . $response->body())
+                //                 ->danger()
+                //                 ->send();
+                //         }
+                //     }),
 
 
             ])
