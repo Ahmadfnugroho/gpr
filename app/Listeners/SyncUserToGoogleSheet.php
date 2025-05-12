@@ -7,6 +7,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Http;
 
+use Illuminate\Support\Facades\Log;
+
 class SyncUserToGoogleSheet
 {
     /**
@@ -40,8 +42,18 @@ class SyncUserToGoogleSheet
             'updated_at' => $user->updated_at->toIso8601String(),
         ];
 
-        Http::withHeaders([
-            'x-api-key' => config('services.google_sheet.api_key')
-        ])->post('https://script.google.com/macros/s/AKfycbwgVwR0t7HpOCqf14TYzdYb95QISsjo3-Tj7WbXgd5kSZn08AsgjJJrmVEJWA_7fN_L/exec', $payload);
+        try {
+            $response = Http::withHeaders([
+                'x-api-key' => config('services.google_sheet.api_key')
+            ])->post('https://script.google.com/macros/s/AKfycbwgVwR0t7HpOCqf14TYzdYb95QISsjo3-Tj7WbXgd5kSZn08AsgjJJrmVEJWA_7fN_L/exec', $payload);
+
+            if ($response->successful()) {
+                Log::info('SyncUserToGoogleSheet: Successfully synced user ' . $user->email);
+            } else {
+                Log::error('SyncUserToGoogleSheet: Failed to sync user ' . $user->email . '. Response: ' . $response->body());
+            }
+        } catch (\Exception $e) {
+            Log::error('SyncUserToGoogleSheet: Exception while syncing user ' . $user->email . '. Error: ' . $e->getMessage());
+        }
     }
 }
