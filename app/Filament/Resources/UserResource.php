@@ -68,8 +68,7 @@ class UserResource extends Resource
                     Forms\Components\TextInput::make('emergency_contact_name')
                         ->maxLength(255),
                     Forms\Components\TextInput::make('emergency_contact_number')
-                        ->maxLength(255)
-                        ->phone(),
+                        ->maxLength(255),
                     Forms\Components\Select::make('gender')
                         ->options([
                             'male' => 'Male',
