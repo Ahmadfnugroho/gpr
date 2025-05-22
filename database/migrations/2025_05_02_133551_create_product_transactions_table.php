@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('product_transactions', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('detail_transaction_id'); // Pastikan kolom ini ada
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
             $table->foreignId('transaction_id')->constrained()->onDelete('cascade');
             $table->foreignId('product_item_id')->nullable()->constrained()->onDelete('set null');
