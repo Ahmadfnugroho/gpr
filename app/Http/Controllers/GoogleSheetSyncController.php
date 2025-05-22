@@ -95,7 +95,7 @@ class GoogleSheetSyncController
     public function export(Request $request)
     {
         $lastSyncAt = $request->query('since');
-        $users = User::with('phoneNumbers')
+        $users = User::with('userPhoneNumbers')
             ->when($lastSyncAt, fn($q) => $q->where('updated_at', '>', $lastSyncAt))
             ->get();
 
@@ -121,7 +121,7 @@ class GoogleSheetSyncController
         $values[] = $headers;
 
         foreach ($users as $user) {
-            $phones = $user->phoneNumbers->pluck('phone_number')->values();
+            $phones = $user->userPhoneNumbers->pluck('phone_number')->values();
             $values[] = [
                 $user->email,
                 $user->name,
