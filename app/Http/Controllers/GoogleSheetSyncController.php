@@ -15,6 +15,11 @@ use Illuminate\Http\Request;
 
 class GoogleSheetSyncController
 {
+    /**
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+
     public function sync(Request $request)
     {
         try {
@@ -131,8 +136,7 @@ class GoogleSheetSyncController
                 $user->status,
                 $phones[0] ?? '',
                 $phones[1] ?? '',
-                $user->updated_at->toDateTimeString()
-
+                $user->updated_at->toISOString()
             ];
         }
 

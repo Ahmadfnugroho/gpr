@@ -45,7 +45,7 @@ class SyncUserToGoogleSheet
         try {
             $response = Http::withHeaders([
                 'x-api-key' => config('services.google_sheet.api_key')
-            ])->post('https://script.google.com/macros/s/AKfycbwgVwR0t7HpOCqf14TYzdYb95QISsjo3-Tj7WbXgd5kSZn08AsgjJJrmVEJWA_7fN_L/exec', $payload);
+            ])->post('https://global1.work.gd/api/google-sheet-sync', $payload);
 
             if ($response->successful()) {
                 Log::info('SyncUserToGoogleSheet: Successfully synced user ' . $user->email);
