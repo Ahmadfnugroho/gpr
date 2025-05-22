@@ -30,7 +30,6 @@ return new class extends Migration
             $table->index('slug');
             $table->index('status');
             $table->index('price');
-            $table->index('quantity');
         });
     }
 
