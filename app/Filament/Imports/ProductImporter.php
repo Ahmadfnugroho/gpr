@@ -44,6 +44,8 @@ class ProductImporter extends Importer
             ImportColumn::make('sub_category')
                 ->relationship('subcategory', 'name', 'id')
                 ->rules(['nullable']),
+            ImportColumn::make('premiere')
+                ->rules(['nullable', 'boolean']),
             ImportColumn::make('serial_numbers')
                 ->rules(['nullable', 'string']),
         ];
@@ -53,7 +55,7 @@ class ProductImporter extends Importer
     {
         $product = new Product();
         $product->name = $this->data['name'];
-        $product->slug = Str::slug($this->data['name']);
+        // Removed manual slug setting to rely on model's setter
 
         $category = $this->data['category'] ?? null;
         if ($category) {
@@ -91,6 +93,7 @@ class ProductImporter extends Importer
         $product->price = $this->data['price'] ?? 0;
         $product->thumbnail = $this->data['thumbnail'] ?? '';
         $product->status = $this->data['status'] ?? 'available';
+        $product->premiere = $this->data['premiere'] ?? false;
 
         try {
             // Simpan ke database
