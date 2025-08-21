@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\TransactionResource\FormSections\ProductList;
+namespace App\Filament\Resources\TransactionResource;
 
 class Number
 {

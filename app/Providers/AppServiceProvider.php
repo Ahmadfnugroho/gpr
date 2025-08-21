@@ -4,7 +4,6 @@ namespace App\Providers;
 
 use App\Models\DetailTransaction;
 use App\Models\ProductItem;
-use App\Models\ProductTransaction;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Observers\DetailTransactionObserver;
@@ -12,6 +11,7 @@ use App\Observers\TransactionObserver;
 use App\Observers\UserObserver;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Carbon\Carbon;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,12 +22,14 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Set Carbon locale to Indonesian
+        Carbon::setLocale('id');
+        
         // Paksa semua URL menggunakan HTTPS di production
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }
 
-        Transaction::observe(TransactionObserver::class);
         DetailTransaction::observe(DetailTransactionObserver::class);
 
 
@@ -54,8 +56,6 @@ class AppServiceProvider extends ServiceProvider
                             ]);
 
                             // Hapus product transaction
-                            ProductTransaction::where('product_item_id', $productItem->id)
-                                ->delete();
                         }
                     }
 

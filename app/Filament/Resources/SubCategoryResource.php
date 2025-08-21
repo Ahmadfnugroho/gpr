@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Notifications\Notification;
 use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Columns\ImageColumn;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 
 class SubCategoryResource extends Resource
@@ -60,6 +61,10 @@ class SubCategoryResource extends Resource
                     ->label('Nama Kategori')
                     ->searchable()
                     ->sortable(),
+                ImageColumn::make('photo')
+                    ->label('Photo')
+                    ->getStateUsing(fn($record) => asset('storage/' . $record->photo)),
+
 
             ])
             ->filters([

@@ -10,6 +10,8 @@ use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Facades\Log;
 
@@ -25,71 +27,39 @@ class DetailTransaction extends Model
         'available_quantity',
         'price',
         'total_price',
-        'serial_numbers',
     ];
-
     protected $casts = [
-        'price' => MoneyCast::class,
-        'total_price' => MoneyCast::class,
-        'serial_numbers' => 'array',
-
-
+        'price' => 'float',
+        'total_price' => 'float',
     ];
-
-    public function getSerialNumbersFromItemsAttribute(): string
+    private static function saveProductItems($detailTransaction)
     {
-        return $this->productTransactions
-            ->map(fn($pt) => $pt->productItem?->serial_number)
-            ->filter()
-            ->join(', ');
-    }
+        $productItemIds = $detailTransaction->product_item_ids;
 
-    public function updateProductItems()
-    {
-        $transaction = $this->transaction;
+        if (!empty($productItemIds)) {
+            // Hapus data lama di pivot table
+            $detailTransaction->productItems()->detach();
 
-        if (!$this->product_id || empty($this->serial_numbers) || !in_array($transaction->booking_status, ['pending', 'paid', 'rented'])) {
-            return;
-        }
-
-        foreach ($this->serial_numbers as $serial) {
-            $productItem = ProductItem::where('product_id', $this->product_id)
-                ->where('serial_number', $serial)
-                ->first();
-
-            if ($productItem && $productItem->is_available) {
-                $productItem->update(['is_available' => false]);
+            // Simpan data baru ke pivot table
+            foreach ($productItemIds as $productItemId) {
+                DetailTransactionProductItem::create([
+                    'detail_transaction_id' => $detailTransaction->id,
+                    'product_item_id' => $productItemId,
+                ]);
             }
         }
     }
-    public static function boot()
+    public function getBundlingSerialNumbersAttribute()
     {
-        parent::boot();
+        $value = $this->getAttributeFromArray('bundling_serial_numbers');
 
-        static::saved(function (DetailTransaction $detail) {
-            if (!is_array($detail->serial_numbers)) return;
+        if (!is_array($value)) {
+            return [];
+        }
 
-            // Hapus data lama untuk menjaga konsistensi
-            ProductTransaction::where('transaction_id', $detail->transaction_id)
-                ->where('detail_transaction_id', $detail->id)
-                ->delete();
-
-            foreach ($detail->serial_numbers as $serial) {
-                $item = ProductItem::where('product_id', $detail->product_id)
-                    ->where('serial_number', $serial)
-                    ->first();
-
-                if ($item) {
-                    ProductTransaction::create([
-                        'transaction_id' => $detail->transaction_id,
-                        'detail_transaction_id' => $detail->id,
-                        'product_item_id' => $item->id,
-                        'product_id' => $detail->product_id,
-                    ]);
-                }
-            }
-        });
+        return $value;
     }
+    // Optionally, if you want to always have it available as an attribute:
 
 
 
@@ -103,10 +73,18 @@ class DetailTransaction extends Model
         return $this->belongsTo(Product::class);
     }
 
-    public function bundling()
+    public function bundling(): BelongsTo
     {
         return $this->belongsTo(Bundling::class);
     }
+    public function productItems()
+    {
+        return $this->belongsToMany(ProductItem::class, 'detail_transaction_product_item')
+            ->using(DetailTransactionProductItem::class)
+            ->withTimestamps();
+    }
+
+
 
     public function rentalIncludes(): HasManyThrough
     {
@@ -117,9 +95,40 @@ class DetailTransaction extends Model
             'include_product_id'
         );
     }
-
-    public function productTransactions()
+    public function getCleanedBundlingSerialNumbersAttribute()
     {
-        return $this->hasMany(ProductTransaction::class);
+        $raw = $this->bundling_serial_numbers ?? [];
+
+        if (is_string($raw)) {
+            $raw = json_decode($raw, true);
+        }
+
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        return collect($raw)
+            ->map(function ($item) {
+                return is_array($item) ? $item : [];
+            })
+            ->filter(function ($item) {
+                return isset($item['product_id']) && $item['product_id'];
+            })
+            ->values()
+            ->toArray();
+    }
+
+    public static function boot()
+    {
+        parent::boot();
+
+        static::saved(function ($detail) {
+            // Simpan relasi ke pivot table jika productItems ada
+            if (isset($detail->productItems) && is_array($detail->productItems)) {
+                $detail->productItems()->sync($detail->productItems);
+            } elseif (isset($detail->product_item_ids) && is_array($detail->product_item_ids)) {
+                $detail->productItems()->sync($detail->product_item_ids);
+            }
+        });
     }
 }

@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('bundling_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->integer('quantity')->default(1);
         });
     }
 

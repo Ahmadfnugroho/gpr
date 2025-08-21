@@ -44,9 +44,10 @@ class ProductSpecificationResource extends Resource
                     ->searchable()
                     ->preload(),
 
-                forms\Components\TextInput::make('name')
+                forms\Components\MarkdownEditor::make('name')
                     ->required()
-                    ->maxLength(255),
+                    ->rules(['string']), // <- Hanya validasi tipe, tanpa batas panjang
+
             ]);
     }
 

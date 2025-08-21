@@ -9,6 +9,7 @@ use App\Models\ProductPhoto;
 use App\Filament\Imports\ProductPhotoImporter;
 use Filament\Tables\Actions\ImportAction;
 use Filament\Tables;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -30,14 +31,16 @@ class ProductPhotoRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-        ->headerActions([
-            Tables\Actions\CreateAction::make(),
-            ImportAction::make()
-                ->importer(ProductPhotoImporter::class),
-        ])
+            ->headerActions([
+                Tables\Actions\CreateAction::make(),
+                ImportAction::make()
+                    ->importer(ProductPhotoImporter::class),
+            ])
             ->recordTitleAttribute('product_id')
             ->columns([
-                Tables\Columns\ImageColumn::make('photo'),
+                ImageColumn::make('photo')
+                    ->label('Photo')
+                    ->getStateUsing(fn($record) => asset('storage/' . $record->photo)),
             ])
             ->filters([
                 //

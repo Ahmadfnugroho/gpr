@@ -15,6 +15,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Actions\ImportAction;
 use Filament\Notifications\Notification;
+use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 
@@ -62,6 +63,13 @@ class ProductPhotoResource extends Resource
                 Tables\Columns\TextColumn::make('product.name')
                     ->searchable()
                     ->sortable(),
+
+
+
+                ImageColumn::make('photo')
+                    ->label('Photo')
+                    ->getStateUsing(fn($record) => asset('storage/' . $record->photo))
+                    ->size(640) // ukuran dalam piksel (default biasanya 40)
 
             ])
             ->filters([

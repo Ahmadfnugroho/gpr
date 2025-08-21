@@ -30,6 +30,8 @@ use Filament\Tables\Columns\ColumnGroup;
 use Illuminate\Database\Eloquent\Model;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\FacadesLog;
 use Illuminate\Support\HtmlString;
 
 class ProductResource extends Resource
@@ -54,52 +56,15 @@ class ProductResource extends Resource
     }
     public static function getGlobalSearchResultDetails(\Illuminate\Database\Eloquent\Model $record): array
     {
-        // Ambil data transaksi terkait (jika ada)
+        $today = Carbon::now();
+        $startDate = $today;
+        $endDate = $today->copy()->addDay();
+        $available = $record->getAvailableQuantityForPeriod($startDate, $endDate);
+        $serials = implode(', ', $record->getAvailableSerialNumbersForPeriod($startDate, $endDate));
         return [
-            '(status' => (function () use ($record) {
-                // Jumlah barang yang tersedia
-                $jumlahBarang = $record->quantity ?? 0;
-                // Hitung rented quantity
-                $today = Carbon::now();
-
-                // Status transaksi yang termasuk dalam perhitungan
-                $includedStatuses = ['rented', 'paid', 'pending'];
-
-                // Hitung rented quantity
-                $rentedQuantity = $record->detailTransactions
-                    ->filter(function ($detailTransaction) use ($today, $includedStatuses) {
-                        // Ambil start_date dan end_date dari transaksi
-                        $startDates = $detailTransaction->transaction->pluck('start_date')->toArray();
-                        $endDates = $detailTransaction->transaction->pluck('end_date')->toArray();
-
-                        // Cek apakah ada transaksi yang sedang berlangsung
-                        foreach ($startDates as $index => $startDate) {
-                            $endDate = $endDates[$index];
-
-                            // Parse tanggal ke objek Carbon
-                            $startDate = Carbon::parse($startDate);
-                            $endDate = Carbon::parse($endDate);
-
-                            // Cek status transaksi dan rentang tanggal
-                            if (
-                                in_array($detailTransaction->transaction->booking_status, $includedStatuses) &&
-                                $startDate <= $today &&
-                                $endDate >= $today
-                            ) {
-                                return true; // Transaksi sedang berlangsung
-                            }
-                        }
-
-                        return false; // Transaksi tidak sedang berlangsung
-                    })
-                    ->sum('quantity'); // Jumlahkan quantity
-
-
-                // Hitung jumlah tersedia
-                $jumlahTersedia = $record->quantity - $rentedQuantity;
-                $status = $jumlahTersedia > 0 ? $record->status : 'unavailable';
-                return "{$status}, Tersedia: {$jumlahTersedia})";
-            })(), // Eksekusi Closure dan kembalikan nilainya
+            'Status' => ($available > 0 ? 'available' : 'unavailable'),
+            'Tersedia' => $available,
+            'Serials' => $serials,
         ];
     }
 
@@ -138,7 +103,8 @@ class ProductResource extends Resource
                         'available' => 'Tersedia',
                         'unavailable' => 'Tidak Tersedia',
                     ])
-                    ->formatStateUsing(function (Product $record) {
+                    ->formatStateUsing(function ($record) {
+                        if (!$record) return 'available'; // Default saat create
                         return $record->items()->where('is_available', true)->count() > 0
                             ? 'available'
                             : 'unavailable';
@@ -300,7 +266,7 @@ class ProductResource extends Resource
                     ->searchable()
                     ->multiple()
                     ->preload(),
-                Tables\Filters\SelectFilter::make('subcategory_id')
+                Tables\Filters\SelectFilter::make('sub_category_id')
                     ->label('Sub Kategori')
                     ->options(SubCategory::all()->pluck('name', 'id')->toArray())
                     ->searchable()

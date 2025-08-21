@@ -17,7 +17,7 @@ return new class extends Migration
                 ->constrained('products')
                 ->cascadeOnDelete();
 
-            $table->string('name');
+            $table->text('name');
 
             $table->softDeletes();
             $table->timestamps();
@@ -32,4 +32,3 @@ return new class extends Migration
         Schema::dropIfExists('product_specifications');
     }
 };
-

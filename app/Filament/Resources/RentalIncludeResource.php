@@ -41,6 +41,11 @@ class RentalIncludeResource extends Resource
                     ->searchable()
                     ->preload()
                     ->required(),
+                Forms\Components\TextInput::make('quantity')
+                    ->label('Jumlah')
+                    ->numeric()
+                    ->required()
+
             ]);
     }
 
@@ -59,13 +64,17 @@ class RentalIncludeResource extends Resource
 
             ->columns([
                 Tables\Columns\TextColumn::make('product.name')
+                    ->label('Produk Utama')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('includedProduct.name')
+                    ->label('Produk yang Disertakan')
                     ->searchable()
                     ->sortable(),
-
-
+                Tables\Columns\TextColumn::make('quantity')
+                    ->label('Jumlah')
+                    ->numeric()
+                    ->sortable(),
             ])
             ->filters([
                 //

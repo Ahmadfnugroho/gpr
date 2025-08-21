@@ -18,26 +18,26 @@ class ProductExporter extends Exporter
                 ->label('ID'),
             ExportColumn::make('name')
                 ->label('Nama Produk'),
-            ExportColumn::make('quantity')
-                ->label('Jumlah Produk'),
-            ExportColumn::make('price')
-                ->label('Harga Produk'),
-            ExportColumn::make('status')
-                ->label('Status'),
-            ExportColumn::make('slug')
-                ->label('Slug'),
-            ExportColumn::make('category.name')
-                ->label('Kategori'),
-            ExportColumn::make('brand.name')
-                ->label('Brand'),
-            ExportColumn::make('subCategory.name')
-                ->label('Sub Kategori'),
-            ExportColumn::make('deleted_at')
-                ->label('Deleted At'),
-            ExportColumn::make('created_at')
-                ->label('Created At'),
-            ExportColumn::make('updated_at')
-                ->label('Updated At'),
+            // ExportColumn::make('quantity')
+            //     ->label('Jumlah Produk'),
+            // ExportColumn::make('price')
+            //     ->label('Harga Produk'),
+            // ExportColumn::make('status')
+            //     ->label('Status'),
+            // ExportColumn::make('slug')
+            //     ->label('Slug'),
+            // ExportColumn::make('category.name')
+            //     ->label('Kategori'),
+            // ExportColumn::make('brand.name')
+            //     ->label('Brand'),
+            // ExportColumn::make('subCategory.name')
+            //     ->label('Sub Kategori'),
+            // ExportColumn::make('deleted_at')
+            //     ->label('Deleted At'),
+            // ExportColumn::make('created_at')
+            //     ->label('Created At'),
+            // ExportColumn::make('updated_at')
+            //     ->label('Updated At'),
         ];
     }
 

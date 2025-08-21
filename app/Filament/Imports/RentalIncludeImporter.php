@@ -21,7 +21,11 @@ class RentalIncludeImporter extends Importer
             ImportColumn::make('include_product_id') // ID produk yang disertakan
                 ->requiredMapping()
                 ->numeric()
-                ->rules(['required', 'integer', 'exists:products,id']), // Validasi ID produk
+                ->rules(['required', 'integer', 'exists:products,id']),
+            ImportColumn::make('quantity')
+                ->requiredMapping()
+                ->numeric()
+                ->rules(['required', 'integer']) // Validasi ID produk
         ];
     }
 

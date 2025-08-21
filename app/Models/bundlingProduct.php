@@ -6,13 +6,23 @@ use Illuminate\Database\Eloquent\Model;
 
 class bundlingProduct extends Model
 {
-    public function Bundlings()
+    protected $table = 'bundling_products';
+    public $timestamps = false;
+
+    protected $fillable = [
+        'bundling_id',
+        'product_id',
+        'quantity',
+    ];
+
+
+    public function bundling()
     {
-        return $this->hasMany(Bundling::class);
+        return $this->belongsTo(Bundling::class, 'bundling_id');
     }
 
-    public function products()
+    public function product()
     {
-        return $this->hasMany(Product::class);
+        return $this->belongsTo(Product::class, 'product_id');
     }
 }

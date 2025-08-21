@@ -2,13 +2,22 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Exports\BundlingExporter;
 use App\Filament\Imports\BundlingImporter;
 use App\Filament\Resources\BundlingResource\Pages;
 use App\Models\Bundling;
+use App\Models\Product;
 use Carbon\Carbon;
+use Filament\Tables\Actions\ExportAction;
 use Filament\Tables\Actions\ImportAction;
+use Filament\Actions\Exports\Enums\ExportFormat;
+
 use Filament\Forms;
 use Filament\Forms\Components\Builder;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -54,45 +63,19 @@ class BundlingResource extends Resource
     // Detail tambahan untuk hasil pencarian
     public static function getGlobalSearchResultDetails(\Illuminate\Database\Eloquent\Model $record): array
     {
-        // Format harga bundling
-        // $formattedPrice = 'Rp' . number_format($record->price, 0, ',', '.');
-
-        // Daftar produk dalam bundling beserta statusnya
-
         $today = Carbon::now();
-
-        // Status transaksi yang termasuk dalam perhitungan
-        $includedStatuses = ['rented', 'paid', 'pending'];
-
-        // Hitung available quantity untuk setiap produk dalam bundling
-        $productsWithStatusAndAvailability = $record->products->map(function ($product) use ($today, $includedStatuses) {
-            // Hitung rented quantity untuk produk ini
-            $rentedQuantity = $product->detailTransactions
-                ->filter(function ($detailTransaction) use ($today, $includedStatuses) {
-                    // Ambil start_date dan end_date dari transaksi
-                    $startDate = Carbon::parse($detailTransaction->transaction->start_date);
-                    $endDate = Carbon::parse($detailTransaction->transaction->end_date);
-
-                    // Cek status transaksi dan rentang tanggal
-                    return in_array($detailTransaction->transaction->booking_status, $includedStatuses) &&
-                        $startDate <= $today &&
-                        $endDate >= $today;
-                })
-                ->sum('quantity'); // Jumlahkan quantity
-
-            // Hitung available quantity
-            $availableQuantity = $product->quantity - $rentedQuantity;
-
-            // Tentukan status berdasarkan available quantity
-            $status = $availableQuantity > 0 ? $product->status : 'unavailable';
-
-            // Format hasil
-            return "{$product->name} ( {$status}, Tersedia: {$availableQuantity})";
-        })->implode(', '); // Gabungkan semua produk menjadi satu string yang dipisahkan oleh koma
-
-
+        $startDate = $today;
+        $endDate = $today->copy()->addDay();
+        $available = $record->getAvailableQuantityForPeriod($startDate, $endDate, 1);
+        $productsWithStatusAndAvailability = $record->products->map(function ($product) use ($startDate, $endDate) {
+            $available = $product->getAvailableQuantityForPeriod($startDate, $endDate);
+            $serials = implode(', ', $product->getAvailableSerialNumbersForPeriod($startDate, $endDate));
+            $status = $available > 0 ? 'available' : 'unavailable';
+            return "{$product->name} ({$status}, Tersedia: {$available}, Serials: {$serials})";
+        })->implode(', ');
         return [
-            'Products' => $productsWithStatusAndAvailability, // Daftar produk dengan status dan available quantity
+            'Products' => $productsWithStatusAndAvailability,
+            'Bundling Available' => $available,
         ];
     }
     // Eager-load relationships untuk optimasi query
@@ -108,23 +91,38 @@ class BundlingResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('name')
+                TextInput::make('name')
                     ->label('Nama Bundling')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\TextInput::make('price')
+
+                TextInput::make('price')
                     ->label('Harga')
-                    ->required()
-                    ->maxLength(255)
-                    ->helperText('Contoh: 100000')
-                    ->numeric(),
-                Forms\Components\Select::make('products')
-                    ->label('Produk')
-                    ->relationship('products', 'name')
-                    ->multiple()
-                    ->required()
-                    ->searchable()
-                    ->preload()
+                    ->numeric()
+                    ->prefix('Rp'),
+
+                Repeater::make('bundlingProducts')
+                    ->relationship('bundlingProducts') // relasi hasMany ke model pivot
+                    ->label('Produk dalam Bundling')
+                    ->schema([
+                        Select::make('product_id')
+                            ->label('Pilih Produk')
+                            ->options(Product::pluck('name', 'id'))
+                            ->searchable()
+                            ->preload()
+                            ->required(),
+
+                        TextInput::make('quantity')
+                            ->label('Jumlah')
+                            ->numeric()
+                            ->default(1)
+                            ->minValue(1)
+                            ->required(),
+                    ])
+                    ->columns(2)
+                    ->addActionLabel('Tambah Produk')
+                    ->collapsible()
+                    ->deletable()
             ]);
     }
 
@@ -164,6 +162,11 @@ class BundlingResource extends Resource
             ])
 
             ->headerActions([
+                ExportAction::make()
+                    ->exporter(BundlingExporter::class)
+                    ->formats([
+                        ExportFormat::Xlsx,
+                    ]),
                 ImportAction::make()
                     ->importer(BundlingImporter::class)
                     ->label('Import Bundling Product'),

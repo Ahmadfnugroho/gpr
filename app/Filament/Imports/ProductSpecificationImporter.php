@@ -22,7 +22,7 @@ class ProductSpecificationImporter extends Importer
                 ->rules(['required']),
             ImportColumn::make('name')
                 ->requiredMapping()
-                ->rules(['required', 'max:255']),
+                ->rules(['required', 'string']),
         ];;
     }
 

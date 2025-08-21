@@ -37,12 +37,13 @@ class Product extends Model
     protected $casts = [
         'price' => MoneyCast::class,
     ];
+    protected $appends = ['is_available'];
 
-    public function getQuantityAttribute()
-    {
-        // Refactor quantity to count available product items (serial numbers)
-        return $this->availableItems()->count();
-    }
+    // public function getQuantityAttribute()
+    // {
+    //     // Refactor quantity to count available product items (serial numbers)
+    //     return $this->availableItems()->count();
+    // }
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -64,11 +65,7 @@ class Product extends Model
     {
         parent::boot();
 
-        static::saving(function ($product) {
-            $product->status = $product->availableItems()->count() > 0
-                ? self::STATUS_AVAILABLE
-                : self::STATUS_UNAVAILABLE;
-        });
+
 
         static::created(function ($product) {
             $product->custom_id = 'produk-' . $product->id;
@@ -77,7 +74,46 @@ class Product extends Model
     }
 
 
+    // app/Models/Product.php
 
+    // public function getAvailableQuantityAttribute()
+    // {
+    //     $now = now();
+
+    //     $totalSerials = $this->items()->count();
+
+    //     $usedSerialsCount = $this->items()
+    //         ->whereHas('detailTransactions.transaction', function ($q) use ($now) {
+    //             $q->whereIn('booking_status', ['pending', 'paid', 'rented'])
+    //                 ->where('end_date', '>=', $now);
+    //         })
+    //         ->count();
+
+    //     return max(0, $totalSerials - $usedSerialsCount);
+    // }
+    public function getAvailableQuantityForPeriod(Carbon $startDate, Carbon $endDate): int
+    {
+        return $this->items()
+            ->whereDoesntHave('detailTransactions.transaction', function ($q) use ($startDate, $endDate) {
+                $q->whereIn('booking_status', ['pending', 'paid', 'rented'])
+                    ->where(function ($q2) use ($startDate, $endDate) {
+                        $q2->whereBetween('start_date', [$startDate, $endDate])
+                            ->orWhereBetween('end_date', [$startDate, $endDate])
+                            ->orWhere(function ($q3) use ($startDate, $endDate) {
+                                $q3->where('start_date', '<', $startDate)
+                                    ->where('end_date', '>', $endDate);
+                            });
+                    });
+            })
+            ->count();
+    }
+    public function getAvailableSerialNumbersForPeriod($startDate, $endDate)
+    {
+        return $this->items()
+            ->actuallyAvailableForPeriod($startDate, $endDate)
+            ->pluck('serial_number')
+            ->toArray();
+    }
 
 
     public function category(): BelongsTo
@@ -133,7 +169,7 @@ class Product extends Model
 
     public function bundlings()
     {
-        return $this->belongsToMany(Bundling::class, 'bundling_products', 'product_id', 'bundling_id')->withPivot('id');
+        return $this->belongsToMany(Bundling::class, 'bundling_products', 'product_id', 'bundling_id')->withPivot('id', 'quantity');
     }
 
 
@@ -155,11 +191,31 @@ class Product extends Model
 
     public function availableItems()
     {
-        return $this->hasMany(ProductItem::class)->actuallyAvailable();
+        $now = now();
+        return $this->items()->where('is_available', true)
+            ->whereDoesntHave('detailTransactions.transaction', function ($query) use ($now) {
+                $query->whereIn('booking_status', ['pending', 'paid', 'rented'])
+                    ->where('end_date', '>=', $now);
+            });
     }
 
     public function getIsAvailableAttribute(): bool
     {
-        return $this->availableItems()->exists();
+        $today = Carbon::today();
+        $endOfDay = Carbon::today()->endOfDay();
+
+        // Cek apakah ada item yang tersedia hari ini
+        return $this->items()
+            ->actuallyAvailableForPeriod($today, $endOfDay)
+            ->exists();
+    }
+
+    public function getStatusAttribute($value): string
+    {
+        // Jika kamu ingin tetap bisa override via DB, atau biarkan otomatis
+        // Kita overwrite berdasarkan ketersediaan
+        return $this->is_available
+            ? self::STATUS_AVAILABLE
+            : self::STATUS_UNAVAILABLE;
     }
 }

@@ -11,7 +11,7 @@ class FonnteService
 
     public function __construct()
     {
-        $this->token = config('services.fonnte.token');
+        $this->token = config('services.fonnte.token') ?? '';
     }
 
     public function sendMessage(string $target, string $message): void

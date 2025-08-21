@@ -1,419 +1,638 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Invoice Global Photo Rental</title>
 
-<style>
-  /* Main invoice box styling */
-  .invoice-box {
-    max-width: 800px;
-    margin: auto;
-    padding: 30px;
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-    font-size: 14px;
-    line-height: 1.6;
-    font-family: Arial, sans-serif;
-    color: #333;
-    background-color: #f9f9f9;
-  }
+<head>
+  <meta charset="utf-8" />
+  <title>Invoice Global Photo Rental</title>
 
-  /* Table styling */
-  .invoice-box table {
-    width: 100%;
-    line-height: 1.6;
-    border-collapse: collapse;
-    margin-top: 10px;
-  }
+  <style>
+    /* Reset & Base Styling */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-  .invoice-box th,
-  .invoice-box td {
-    padding: 6px 8px;
-    text-align: left;
-  }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.4;
+      color: #000;
+      background-color: #fff;
+    }
 
-  /* Header Styling */
-  .invoice-box .title {
-    display: flex;
-    align-items: center;
-  }
+    /* Main Container */
+    .invoice-container {
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 12mm;
+      background-color: #fff;
+    }
 
-  .invoice-box .title img {
-    width: 100px;
-    height: auto;
-  }
+    /* Grid System */
+    .row {
+      display: table;
+      width: 100%;
+      margin-bottom: 8px;
+    }
 
-  .invoice-box .title b {
-    font-size: 20px;
-    color: #2e2e2e;
-  }
+    .col {
+      display: table-cell;
+      vertical-align: top;
+    }
 
-  .invoice-box .title td:last-child {
-    text-align: right;
-    vertical-align: top;
-  }
+    .col-6 {
+      width: 50%;
+    }
 
-  /* Section Styling */
-  .invoice-box .section-title {
-    font-size: 16px;
-    font-weight: bold;
-    color: #2e2e2e;
-    text-align: center;
-    border-bottom: 2px solid #ddd;
-    padding-bottom: 8px;
-    margin-top: 20px;
-  }
+    .col-4 {
+      width: 33.333%;
+    }
 
-  /* Durasi, Total, Diskon, Grand Total */
-  .invoice-box table tr.durasi td {
-    font-weight: bold;
-    border-top: 1px solid #ddd;
-    font-size: 13px;
-  }
+    .col-8 {
+      width: 66.666%;
+    }
 
-  .invoice-box table tr.total td {
-    font-weight: bold;
-    background-color: #f1f1f1;
-    border-top: 2px solid #ddd;
-    border-bottom: 2px solid #ddd;
-    font-size: 14px;
-  }
+    .col-3 {
+      width: 25%;
+    }
 
-  /* Keterangan Column */
-  .keterangan {
-    font-size: 13px;
-    font-weight: bold;
-    vertical-align: top;
-    padding: 10px;
-    background-color: #f1f1f1;
-    border: 1px solid #ddd;
-  }
+    .col-9 {
+      width: 75%;
+    }
 
-  /* Terms and conditions */
-  .invoice-box h4 {
-    text-align: center;
-    font-size: 14px;
-    color: #555;
-    margin-bottom: 10px;
-  }
+    .col-12 {
+      width: 100%;
+    }
 
-  .invoice-box ol {
-    list-style: decimal;
-    font-size: 12px;
-    color: #555;
-    margin-left: 15px;
-  }
+    /* Typography Hierarchy - Reduced by 30% */
+    .h1 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #000;
+      margin-bottom: 5px;
+    }
 
-  .invoice-box ol li {
-    line-height: 1.4;
-  }
+    .h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #000;
+      margin-bottom: 4px;
+    }
 
-  /* Responsive Design */
-  @media only screen and (max-width: 600px) {
-    .invoice-box .title td {
+    .h3 {
+      font-size: 11px;
+      font-weight: 600;
+      color: #000;
+      margin-bottom: 6px;
       text-align: center;
-      display: block;
+      border-bottom: 2px solid #000;
+      padding-bottom: 4px;
     }
 
-    .invoice-box table {
-      font-size: 12px;
-    }
-  }
-</style>
-  </head>
-
-  <body>
-    <div class="invoice-box">
-      <table cellpadding="0" cellspacing="0">
-        <tr class="top">
-          <td colspan="2">
-            <table>
-              <tr>
-                <td class="title">
-                  <table>
-                    <tr>
-                      <td>
-                        <img
-                          src="{{ public_path('images/LOGO GPR.png') }}"
-                          alt="Logo"
-                          style="width: auto; height: 100px;"
-                        />
-                      </td>
-                      <td style="text-align: left; padding-left: 15px;">
-                        <b style="font-size: 22px; color: #333;">Global Photo Rental</b>
-                        <p style="font-size: 12px; line-height: 0; color: #777;">WA: 0812-1234-9564</p>
-                        <p style="font-size: 12px; line-height: 0;color: #777;">IG: global.photorental</p>
-                        <p style="font-size: 12px; line-height: 0;color: #777;">Alamat: Jln Kepu Selatan No. 11A RT 03 </p>
-                        <p style="font-size: 12px; line-height: 0;color: #777;">RW 03, Kec. Kemayoran, Jakarta Pusat</p>
-                      </td>
-                      <td style="vertical-align: bottom; text-align: right;">
-                        <p style="font-size: 14px; color: #555;">
-                          <b>Invoice #: {{$record->booking_transaction_id }}</b><br />
-                          Tanggal: {{ \Carbon\Carbon::now()->isoFormat(' D MMMM Y H:mm') }}
-                        </p>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-
-        <tr class="information">
-          <td colspan="2">
-            <table style="margin-top: -30px; margin-bottom: 0px;">
-              <tr style="font-size: 14px; color: #555;">
-                <td>
-                  <strong>Nama:</strong> {{ $record->user->name }}<br />
-                  <strong>No Telepon:</strong> {{ $record->user->phone_number }}<br />
-                  <strong>Email:</strong> {{ $record->user->email }}
-                </td>
-                <td>
-                  <strong>Booking ID:</strong> {{ $record->booking_transaction_id }}<br />
-                  <strong>Tanggal Mulai Sewa:</strong> {{ \Carbon\Carbon::parse($record->start_date)->isoFormat('dddd, D MMMM Y H:mm') }}<br />
-                  <strong>Tanggal Selesai Sewa:</strong> {{ \Carbon\Carbon::parse($record->end_date)->isoFormat('dddd, D MMMM Y H:mm') }}
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-
-        <tr>
-          <td colspan="2">
-            <h3 class="section-title" style="margin-top: -20px;">Detail Produk</h3>
-            <table style="margin-bottom: -5px">
-				<thead>
-                <tr style="font-size: 10px; text-align: center">
-                  <th style="font-size: 10px; text-align: center">No</th>
-                  <th style="font-size: 10px; text-align: center">Produk</th>
-                  <th style="font-size: 10px; text-align: center">No Seri</th>
-                  <th style="font-size: 10px; text-align: center">Jml</th>
-                  
-                  <th style="font-size: 10px; text-align: center">Harga</th>
-                </tr>
-              </thead>
-              <tbody>
-                @foreach($record->detailTransactions as $detail)
-                <tr style="font-size: 10px">
-                  <td style="text-align: center;">{{ $loop->iteration }}</td>
-                  <td style="text-align: left;">
-                    @if ($detail->bundling_id == null)
-                    {{ $detail->product->name }}
-                    @foreach($detail->product->rentalIncludes as $rentalInclude)
-                    <br />{{ $rentalInclude->includedProduct->name }}
-                    @endforeach
-
-                    @else
-                    @foreach($detail->bundling->products as $product)
-                    <br /> {{ $product->name }}
-                    @foreach($product->rentalIncludes as $rentalInclude)
-                    <br />{{ $rentalInclude->includedProduct->name }}
-
-                    @endforeach
-
-                    @endforeach
-                    @endif
-                  </td>
-                  <td style="text-align: center;">
-                    @if ($detail->bundling_id == null)
-                    {{ $detail->product->id }}
-                    @foreach($detail->product->rentalIncludes as $rentalInclude)
-                    <br />{{ $rentalInclude->includedProduct->id }}
-                    @endforeach
-
-                    @else
-                    @foreach($detail->bundling->products as $product)
-                    <br /> {{ $product->id }}
-                    @foreach($product->rentalIncludes as $rentalInclude)
-                    <br />{{ $rentalInclude->includedProduct->id }}
-
-                    @endforeach
-
-                    @endforeach
-                    @endif
-
-
-
-
-
-                  </td>
-                  <td style="text-align: center;">
-                    @if ($detail->bundling_id == null)
-                    {{ $detail->product->quantity }}
-
-                    @else
-                    <br /> {{ $detail->bundling->quantity}}
-                        {{-- {{ Log::info($detail->bundling->quantity)}} --}}
-                    @endif
-
-
-                  
-                  </td>
-                  <td style="text-align: center;">Rp
-                    @if ($detail->bundling_id == null)
-
-                    {{ number_format($detail->product->price, 0, ',', '.') }}
-                    @else
-                    {{ number_format($detail->bundling->price, 0, ',', '.') }}
-
-                      
-                    @endif
-
-                  
-                  </td>
-                </tr>
-                @endforeach
-              </tbody>
-            </table>
-          </td>
-        </tr>
-        <table>
-          <tr>
-              <td rowspan="4" style="font-size: 8px; font-weight: bold; text-align: left; vertical-align: top; padding: 0px; width: 400px;">
-                  Keterangan: <br>
-                  {{ ($record->note) }}
-              </td>
-              <td></td>
-              <td style="font-size: 8px; font-weight: bold; padding-top: 0px; padding-bottom: 0px; text-align: right; border-top: 1px solid #ddd; width: 200px">
-                  Durasi: {{ ($record->duration) }} Hari
-              </td>
-          </tr>
-          <tr>
-              <td></td>
-              <td style="font-size: 8px; font-weight: bold; padding-top: 0px; padding-bottom: 0px; text-align: right;">
-                @php
-    $totalPrice = 0;
-
-    foreach ($record->detailTransactions as $detail) {
-      $totalPrice += $detail->bundling_id ? $detail->bundling->price * $detail->bundling->quantity : $detail->product->price * $detail->product->quantity;
-
+    .h4 {
+      font-size: 10px;
+      font-weight: 600;
+      color: #000;
+      margin-bottom: 3px;
     }
 
-@endphp  
-
-                
-                Total: Rp{{ number_format($totalPrice * $record->duration, 0, ',', '.') }}
-              </td>
-          </tr>
-          <tr>
-              <td></td>
-              <td style="font-size: 8px; font-weight: bold; padding-top: 0px; padding-bottom: 0px; text-align: right;">
-                  @php
-                      $diskon = 0;
-                      $totalPrice = 0;
-
-                      foreach ($record->detailTransactions as $detail) {
-      $totalPrice += $detail->bundling_id ? $detail->bundling->price * $detail->bundling->quantity : $detail->product->price * $detail->product->quantity;
-
+    .text-large {
+      font-size: 11px;
+      font-weight: 500;
     }
 
-                      if ($record->promo) {
-                          $rules = $record->promo->rules;
-                          $duration = $record->duration;
-                          $groupSize = isset($rules[0]['group_size']) ? (int) $rules[0]['group_size'] : 1;
-                          $payDays = isset($rules[0]['pay_days']) ? (int) $rules[0]['pay_days'] : $groupSize;
-                          $discountedDays = (int) ($duration / $groupSize) * $payDays;
-                          $remainingDays = $duration % $groupSize;
-                          $daysToPay = $discountedDays + $remainingDays;
+    .text-medium {
+      font-size: 8px;
+      font-weight: 400;
+    }
 
+    .text-small {
+      font-size: 7px;
+      font-weight: 400;
+    }
 
+    .text-xs {
+      font-size: 6px;
+      font-weight: 400;
+    }
 
+    .font-bold {
+      font-weight: 700;
+    }
 
-      
-                          $diskon = match ($record->promo->type) {
-                              // 'day_based' => (int) ((int) ($totalPrice * $duration / ($rules[0]['group_size'] ?? 1)) * ($rules[0]['pay_days'] ?? ($rules[0]['group_size'] ?? 1)) + ($totalPrice * $duration % ($rules[0]['group_size'] ?? 1))),
-                              'day_based' => (int) ((int) ($totalPrice * $duration) - ($totalPrice * $daysToPay)),
+    .font-semibold {
+      font-weight: 600;
+    }
 
-                              'percentage' => (int) (($totalPrice * $duration) * ($rules[0]['percentage'] ?? 0 / 100)),
-                              'nominal' => min($rules[0]['nominal'] ?? 0, (int) ($total * $duration)),
-                              default => 0,
-                          };
-                      }
-                  @endphp
-                  Diskon: Rp{{ number_format($diskon, 0, ',', '.') }}
-              </td>
-          </tr>
-          <tr>
-              <td></td>
-              <td style="font-size: 12px; font-weight: bold; padding-top: 0px; padding-bottom: 0px; text-align: right; border-top: 1px solid #ddd;">
-                  Grand Total: Rp{{ number_format($record->grand_total, 0, ',', '.') }}
-              </td>
-          </tr>
-      </table>
-      
-		<tr>
-			<td colspan="2">
-			  <p
-			  style="
-				font-size: 8px;
-				text-align: left;
-				margin-top: -10px
-			  "
-			>
-			  Pembayaran dapat dilakukan melalui:
-			</p>            <p style="list-style: decimal; font-size: 8px; text-align: justify; line-height: 0px">
-				Bank BCA
-				</p>
-				<p style="list-style: decimal; font-size: 8px; text-align: justify; margin-top: 0px; line-height: 0px">
-					0910079531
-					</p>				
-					<p style="list-style: decimal; font-size: 8px; text-align: justify; margin-top: 0px; line-height: 0px">
-						Dissa Mustika
-						</p>				
-			</p>
-			</td>
-		  </tr>
-        <tr>
-          <td colspan="2">
-			<h4 class="section-title" style="margin-top: -20px; margin-bottom: -10px">Tanda Terima</h4>
-            <table style="margin-top: -10px; font-size: 10px; color: #555;">
-              <thead>
-                <tr>
-                  <th style="text-align: center;">Diserahkan Oleh:</th>
-                  <th style="text-align: center;">Diterima Oleh:</th>
-                  <th style="text-align: center;">Dikembalikan Oleh:</th>
-                  <th style="text-align: center;">Diserahkan Oleh:</th>
-                </tr>
-              </thead>
+    .font-medium {
+      font-weight: 500;
+    }
 
+    .font-normal {
+      font-weight: 400;
+    }
 
+    /* Text Alignment */
+    .text-left {
+      text-align: left;
+    }
 
-              <tbody>
-                <tr>
-                  <td style="text-align: center;"><p></p><p></p><p></p><p></p>
-					(Nama Petugas)
-				</td>
-                  <td style="text-align: center;"><p></p><p></p><p></p><p></p>{{ $record->user->name }}</td>
-                  <td style="text-align: center;"><p></p><p></p><p></p><p></p>{{ $record->user->name }}</td>
-                  <td style="text-align: center;"><p></p><p></p><p></p><p></p>(Nama Petugas)</td>
-                </tr>
-              </tbody>
-            </table>
-          </td>
-        </tr>
+    .text-center {
+      text-align: center;
+    }
 
-        <tr>
-          <td colspan="2">
-			<h4
-			style="
-			  font-size: x-small;
-			  text-align: center;
-			  margin-bottom: -5px;
-			  margin-top: -20px
-			"
-		  >
-			Syarat dan Ketentuan
-		  </h4>            <ol style="list-style: decimal; font-size:xx-small; text-align: justify; margin-top: 0px">
-              <li>Pihak yang menyewa diwajibkan meninggalkan 2 identitas asli (KTP/SIM/Kartu Keluarga/STNK/BPKP dll) yang masih berlaku</li>
-              <li>Lama peminjaman 24 jam dihitung sejak jadwal yang tertera pada form di Invoice ini</li>
-              <li>Keterlambatan pengembalian unit sewa akan dikenakan denda 30% dari total biaya sewa dengan toleransi terlambat maksimal 3  jam, keterlambatan lebih dari 3 jam dihitung penambahan pembayaran penuh 1 hari dengan konfirmasi kepada pihak Global  Photo Rental sebelumnya</li>
-			  <li>pabila dalam waktu 1x24 jam unit sewa tidak dikembalikan tanpa konfirmasi atau pemberitahuan, pihak yang menyewa akan  dilaporkan ke kepolisian setempat</li>
-              <li>Kerusakan/kehilangan barang sewaan selama peminjaman menjadi tanggung jawab pihak yang menyewa dan wajib mengganti  biaya perbaikan atau komponen unit yang rusak/hilang. Apabila kerusakan tidak bisa diperbaiki maka pihak yang menyewa wajib  mengganti dengan yang unit baru</li>
-            </ol>
-          </td>
-        </tr>
-      </table>
+    .text-right {
+      text-align: right;
+    }
+
+    /* Spacing Utilities - Reduced margins */
+    .mb-5 {
+      margin-bottom: 3px;
+    }
+
+    .mb-10 {
+      margin-bottom: 6px;
+    }
+
+    .mb-15 {
+      margin-bottom: 8px;
+    }
+
+    .mb-20 {
+      margin-bottom: 10px;
+    }
+
+    .mt-10 {
+      margin-top: 6px;
+    }
+
+    .mt-15 {
+      margin-top: 8px;
+    }
+
+    .mt-20 {
+      margin-top: 10px;
+    }
+
+    .p-8 {
+      padding: 8px;
+    }
+
+    .p-10 {
+      padding: 10px;
+    }
+
+    .px-8 {
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+
+    .py-6 {
+      padding-top: 6px;
+      padding-bottom: 6px;
+    }
+
+    /* Header Section */
+    .header-section {
+      margin-bottom: 12px;
+      border-bottom: 1px solid #000;
+      padding-bottom: 8px;
+    }
+
+    .company-logo {
+      width: 80px;
+      height: auto;
+    }
+
+    .company-info {
+      padding-left: 15px;
+    }
+
+    .invoice-info {
+      padding-right: 0;
+    }
+
+    /* Customer Info Section */
+    .customer-section {
+      margin-bottom: 12px;
+    }
+
+    .info-label {
+      display: inline-block;
+      width: 140px;
+      font-weight: 600;
+    }
+
+    /* Table Styling */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 8px;
+    }
+
+    .data-table th {
+      background-color: #000;
+      color: #fff;
+      padding: 5px;
+      font-weight: 600;
+      font-size: 8px;
+      text-align: center;
+      border: 1px solid #000;
+    }
+
+    .data-table td {
+      padding: 4px 5px;
+      border: 1px solid #000;
+      font-size: 7px;
+      vertical-align: top;
+    }
+
+    .data-table tbody tr:nth-child(even) {
+      background-color: #f8f8f8;
+    }
+
+    /* Summary Section */
+    .summary-table {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .summary-table td {
+      padding: 2px 0;
+      font-size: 8px;
+    }
+
+    .summary-label {
+      width: 60%;
+      font-weight: 600;
+    }
+
+    .summary-value {
+      width: 40%;
+      text-align: right;
+      font-weight: 500;
+    }
+
+    .grand-total {
+      border-top: 2px solid #000;
+      font-size: 10px;
+      font-weight: 700;
+      padding-top: 4px !important;
+    }
+
+    /* Notes Section */
+    .notes-section {
+      background-color: #f5f5f5;
+      border: 1px solid #000;
+      padding: 10px;
+      margin-bottom: 20px;
+    }
+
+    /* Payment Info */
+    .payment-info {
+      margin-bottom: 20px;
+      padding: 10px;
+      background-color: #f9f9f9;
+      border-left: 3px solid #000;
+    }
+
+    /* Signature Section */
+    .signature-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    .signature-table th,
+    .signature-table td {
+      border: 1px solid #000;
+      padding: 5px;
+      text-align: center;
+      font-size: 7px;
+    }
+
+    .signature-table th {
+      background-color: #f0f0f0;
+      font-weight: 600;
+    }
+
+    .signature-space {
+      height: 40px;
+      vertical-align: bottom;
+    }
+
+    /* Terms Section */
+    .terms-section {
+      margin-top: 20px;
+    }
+
+    .terms-list {
+      list-style: decimal;
+      padding-left: 20px;
+      margin-top: 10px;
+    }
+
+    .terms-list li {
+      font-size: 6px;
+      line-height: 1.2;
+      margin-bottom: 2px;
+      text-align: justify;
+    }
+
+    /* Dividers */
+    .divider {
+      height: 1px;
+      background-color: #000;
+      margin: 15px 0;
+    }
+
+    .divider-light {
+      height: 1px;
+      background-color: #ccc;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="invoice-container">
+    <!-- Header Section -->
+    <div class="header-section">
+      <div class="row">
+        <div class="col col-3">
+          <img src="{{ public_path('storage/LOGO-GPR.png') }}" alt="Logo" class="company-logo" />
+        </div>
+        <div class="col col-6 company-info">
+          <div class="h1">Global Photo Rental</div>
+          <div class="text-small font-normal mb-5">WA: 0812-1234-9564</div>
+          <div class="text-small font-normal mb-5">IG: global.photorental</div>
+          <div class="text-small font-normal mb-5">Alamat: Jln Kepu Selatan No. 11A RT 03</div>
+          <div class="text-small font-normal">RW 03, Kec. Kemayoran, Jakarta Pusat</div>
+        </div>
+        <div class="col col-3 invoice-info text-right">
+          <div class="h4">Invoice #: {{ $record->booking_transaction_id ?? 'N/A' }}</div>
+          <div class="text-medium font-normal">Tanggal: {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y H:mm') }}</div>
+        </div>
+      </div>
     </div>
-  </body>
+
+    <!-- Customer Information Section -->
+    <div class="customer-section">
+      <div class="row">
+        <div class="col col-6">
+          <div class="text-medium mb-5">
+            <span class="info-label font-semibold">Nama:</span>
+            <span class="font-normal">{{ $record->user?->name ?? 'N/A' }}</span>
+          </div>
+          <div class="text-medium mb-5">
+            <span class="info-label font-semibold">No Telepon:</span>
+            <span class="font-normal">{{ $record->user?->phone_number ?? 'N/A' }}</span>
+          </div>
+          <div class="text-medium mb-5">
+            <span class="info-label font-semibold">Email:</span>
+            <span class="font-normal">{{ $record->user?->email ?? 'N/A' }}</span>
+          </div>
+        </div>
+        <div class="col col-6">
+          <div class="text-medium mb-5">
+            <span class="info-label font-semibold">Booking ID:</span>
+            <span class="font-normal">{{ $record->booking_transaction_id ?? 'N/A' }}</span>
+          </div>
+          <div class="text-medium mb-5">
+            <span class="info-label font-semibold">Tanggal Mulai Sewa:</span>
+            <span class="font-normal">
+              @if($record->start_date)
+              {{ \Carbon\Carbon::parse($record->start_date)->locale('id')->isoFormat('dddd, D MMMM Y H:mm') }}
+              @else
+              N/A
+              @endif
+            </span>
+          </div>
+          <div class="text-medium mb-5">
+            <span class="info-label font-semibold">Tanggal Selesai Sewa:</span>
+            <span class="font-normal">
+              @if($record->end_date)
+              {{ \Carbon\Carbon::parse($record->end_date)->locale('id')->isoFormat('dddd, D MMMM Y H:mm') }}
+              @else
+              N/A
+              @endif
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Details Section -->
+    <div class="h3">Detail Produk</div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 5%;">No</th>
+          <th style="width: 45%;">Produk</th>
+          <th style="width: 20%;">No Seri</th>
+          <th style="width: 10%;">Jml</th>
+          <th style="width: 20%;">Harga</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach($record->DetailTransactions as $detail)
+        <tr>
+          <td class="text-center">{{ $loop->iteration }}</td>
+          <td>
+            @if ($detail->bundling_id == null)
+            <span class="font-medium">{{ $detail->product?->name ?? 'N/A' }}</span>
+            @if($detail->product && $detail->product->rentalIncludes)
+            @foreach($detail->product->rentalIncludes as $rentalInclude)
+            <br><span class="text-xs">&nbsp;&nbsp;• {{ $rentalInclude->includedProduct?->name ?? 'N/A' }}</span>
+            @endforeach
+            @endif
+            @else
+            <span class="font-semibold">{{ $detail->bundling?->name ?? 'N/A' }}</span>
+            @if($detail->bundling && $detail->bundling->products)
+            @foreach($detail->bundling->products as $product)
+            <br><span class="text-xs">&nbsp;&nbsp;— {{ $product->name ?? 'N/A' }}</span>
+            @if($product->rentalIncludes)
+            @foreach($product->rentalIncludes as $rentalInclude)
+            <br><span class="text-xs">&nbsp;&nbsp;&nbsp;&nbsp;• {{ $rentalInclude->includedProduct?->name ?? 'N/A' }}</span>
+            @endforeach
+            @endif
+            @endforeach
+            @endif
+            @endif
+          </td>
+          <td class="text-xs">
+            @if ($detail->bundling_id == null)
+            @if($detail->productItems && $detail->productItems->count() > 0)
+            @foreach($detail->productItems as $productItem)
+            {{ $productItem->serial_number ?? 'N/A' }}<br>
+            @endforeach
+            @else
+            N/A
+            @endif
+            @else
+            @if($detail->bundling && $detail->bundling->products)
+            @foreach($detail->bundling->products as $product)
+            @if($product->items && $product->items->count() > 0)
+            @foreach($product->items->take($detail->quantity ?? 1) as $item)
+            {{ $item->serial_number ?? 'N/A' }}<br>
+            @endforeach
+            @endif
+            @endforeach
+            @else
+            N/A
+            @endif
+            @endif
+          </td>
+          <td class="text-center font-medium">{{ $detail->quantity ?? 0 }}</td>
+          <td class="text-center font-medium">
+            @php
+            $subtotalPrice = 0;
+            if ($detail->bundling_id && $detail->bundling) {
+            $subtotalPrice = ($detail->bundling->price ?? 0) * ($detail->quantity ?? 1);
+            } elseif ($detail->product_id && $detail->product) {
+            $subtotalPrice = ($detail->product->price ?? 0) * ($detail->quantity ?? 1);
+            }
+            @endphp
+            Rp{{ number_format($subtotalPrice, 0, ',', '.') }}
+          </td>
+        </tr>
+        @endforeach
+      </tbody>
+    </table>
+
+    <!-- Summary Section -->
+    <div class="row mt-15">
+      <div class="col col-6">
+        <div class="notes-section">
+          <div class="text-small font-semibold mb-5">Keterangan:</div>
+          <div class="text-xs">{{ $record->note ?? '-' }}</div>
+        </div>
+      </div>
+      <div class="col col-6">
+        <table class="summary-table">
+          <tr>
+            <td class="summary-label">Durasi:</td>
+            <td class="summary-value">{{ $record->duration ?? 0 }} Hari</td>
+          </tr>
+          <tr>
+            <td class="summary-label">Total:</td>
+            <td class="summary-value">
+              @php
+              $totalPrice = 0;
+              foreach ($record->DetailTransactions as $detail) {
+              if ($detail->bundling_id && $detail->bundling) {
+              $price = $detail->bundling->price ?? 0;
+              $qty = $detail->quantity ?? 1;
+              } elseif ($detail->product) {
+              $price = $detail->product->price ?? 0;
+              $qty = $detail->quantity ?? 1;
+              } else {
+              $price = $detail->price ?? 0;
+              $qty = $detail->quantity ?? 1;
+              }
+              $totalPrice += $price * $qty;
+              }
+              @endphp
+              Rp{{ number_format($totalPrice * ($record->duration ?? 1), 0, ',', '.') }}
+            </td>
+          </tr>
+          <tr>
+            <td class="summary-label">Diskon:</td>
+            <td class="summary-value">
+              @php
+              $diskon = 0;
+              $totalPriceForDiscount = 0;
+
+              foreach ($record->DetailTransactions as $detail) {
+              if ($detail->bundling_id && $detail->bundling) {
+              $price = $detail->bundling->price ?? 0;
+              $qty = $detail->quantity ?? 1;
+              } elseif ($detail->product) {
+              $price = $detail->product->price ?? 0;
+              $qty = $detail->quantity ?? 1;
+              } else {
+              $price = $detail->price ?? 0;
+              $qty = $detail->quantity ?? 1;
+              }
+              $totalPriceForDiscount += $price * $qty;
+              }
+
+              if ($record->promo && $record->promo->rules) {
+              $rules = $record->promo->rules;
+              $duration = $record->duration ?? 1;
+              $groupSize = isset($rules[0]['group_size']) ? (int) $rules[0]['group_size'] : 1;
+              $payDays = isset($rules[0]['pay_days']) ? (int) $rules[0]['pay_days'] : $groupSize;
+              $discountedDays = (int) ($duration / $groupSize) * $payDays;
+              $remainingDays = $duration % $groupSize;
+              $daysToPay = $discountedDays + $remainingDays;
+
+              $diskon = match ($record->promo->type ?? 'none') {
+              'day_based' => (int) ((int) ($totalPriceForDiscount * $duration) - ($totalPriceForDiscount * $daysToPay)),
+              'percentage' => (int) (($totalPriceForDiscount * $duration) * (($rules[0]['percentage'] ?? 0) / 100)),
+              'nominal' => min($rules[0]['nominal'] ?? 0, (int) ($totalPriceForDiscount * $duration)),
+              default => 0,
+              };
+              }
+              @endphp
+              Rp{{ number_format($diskon, 0, ',', '.') }}
+            </td>
+          </tr>
+          <tr class="grand-total">
+            <td class="summary-label">Grand Total:</td>
+            <td class="summary-value">Rp{{ number_format($record->grand_total ?? 0, 0, ',', '.') }}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Payment Information -->
+    <div class="payment-info">
+      <div class="text-small font-semibold mb-5">Pembayaran dapat dilakukan melalui:</div>
+      <div class="text-xs font-normal">Bank BCA: 0910079531 (Dissa Mustika)</div>
+    </div>
+
+    <!-- Signature Section -->
+    <div class="h3">Tanda Terima</div>
+    <table class="signature-table">
+      <thead>
+        <tr>
+          <th>Diserahkan Oleh:</th>
+          <th>Diterima Oleh:</th>
+          <th>Dikembalikan Oleh:</th>
+          <th>Diterima Oleh:</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="signature-space">
+            <div style="margin-top: 25px;">(Nama Petugas)</div>
+          </td>
+          <td class="signature-space">
+            <div style="margin-top: 25px;">{{ $record->user?->name ?? 'N/A' }}</div>
+          </td>
+          <td class="signature-space">
+            <div style="margin-top: 25px;">{{ $record->user?->name ?? 'N/A' }}</div>
+          </td>
+          <td class="signature-space">
+            <div style="margin-top: 25px;">(Nama Petugas)</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Terms and Conditions -->
+    <div class="terms-section">
+      <div class="h4 text-center">Syarat dan Ketentuan</div>
+      <ol class="terms-list">
+        <li>Pihak yang menyewa wajib meninggalkan KTP Asli</li>
+        <li>Lama peminjaman 24 jam dihitung sejak jadwal yang tertera pada form di Invoice ini</li>
+        <li>Keterlambatan pengembalian alat 3 jam pertama dari jam tertera di form dikenakan denda 30% dari total sewa, keterlambatan lebih dari 3 jam dihitung penambahan pembayaran penuh 1 hari dengan konfirmasi kepada pihak Global Photo Rental sebelumnya</li>
+        <li>Apabila dalam waktu 1x24 jam unit sewa tidak dikembalikan tanpa konfirmasi atau pemberitahuan, pihak yang menyewa akan dilaporkan ke kepolisian setempat</li>
+        <li>Kerusakan/kehilangan barang sewaan selama peminjaman menjadi tanggung jawab pihak yang menyewa dan wajib mengganti biaya perbaikan atau komponen unit yang rusak/hilang. Apabila kerusakan tidak bisa diperbaiki maka pihak yang menyewa wajib mengganti dengan yang unit baru</li>
+        <li>Setiap alat dilengkapi dengan sticker Global Photo Rental. Dilarang keras merusak atau melepaskan sticker yang menempel pada alat, sticker yang dicopot atau dilepaskan tanpa izin akan dikenakan denda Rp500.000</li>
+      </ol>
+    </div>
+  </div>
+</body>
+
 </html>

@@ -37,6 +37,12 @@ class Brand extends Model
                 'premiere',
             ]);
     }
+    public function getLogoUrlAttribute()
+    {
+        return $this->logo
+            ? url('storage/' . ltrim($this->logo, '/'))
+            : null;
+    }
 
     public function setNameAttribute($value)
     {

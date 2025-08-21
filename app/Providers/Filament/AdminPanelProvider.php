@@ -29,19 +29,30 @@ class AdminPanelProvider extends PanelProvider
     {
         return $panel
             ->default()
-            ->sidebarCollapsibleOnDesktop()
             ->id('admin')
-            ->registration()
-            ->passwordReset()
-            ->emailVerification()
-            ->profile()
             ->path('admin')
             ->login()
+            ->registration()
+            ->emailVerification()
+            ->profile()
+            ->passwordReset()
+
+            // === UI Enhancement ===
+            ->maxContentWidth('full')
+            ->sidebarCollapsibleOnDesktop()
             ->font('Poppins')
             ->defaultThemeMode(ThemeMode::Dark)
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Emerald,
+                'secondary' => Color::Sky,
+                'gray' => Color::Zinc,
+                'danger' => Color::Rose,
+                'info' => Color::Sky,
+                'success' => Color::Emerald,
+                'warning' => Color::Amber,
             ])
+            // === Branding ===
+
             ->brandName('Global Photo Rental')
             ->favicon(asset('images/LOGO GPR.png'))
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')

@@ -15,8 +15,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
             $table->foreignId('include_product_id')->constrained('products')->cascadeOnDelete();
+            $table->string('quantity');
             $table->softDeletes();
-            $table->timestamps();        });
+            $table->timestamps();
+        });
     }
 
     /**

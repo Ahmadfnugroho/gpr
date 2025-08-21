@@ -19,12 +19,13 @@ class RentalInclude extends Model
 
     protected $fillable = [
         'product_id',
-        'include_product_id'
+        'include_product_id',
+        'quantity'
     ];
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['product.id', 'include_product.name']);
+            ->logOnly(['product.name', 'includedProduct.name']);
     }
 
 

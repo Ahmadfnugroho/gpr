@@ -42,7 +42,6 @@ class Transaction extends Model
     protected $casts = [
         'down_payment' => MoneyCast::class,
         'remaining_payment' => MoneyCast::class,
-
         'grand_total' => MoneyCast::class,
         'start_date' => 'datetime',
         'end_date' => 'datetime',
@@ -100,30 +99,9 @@ class Transaction extends Model
         });
 
         // ✅ Dipisahkan dari saving
-        static::saved(function ($transaction) {
-            $transaction->markItemsAvailableIfCancelledOrFinished();
-        });
     }
 
-    public function markItemsAvailableIfCancelledOrFinished()
-    {
-        if (in_array($this->booking_status, ['cancelled', 'finished'])) {
-            foreach ($this->detailTransactions as $detail) {
-                foreach ($detail->serial_numbers as $serial) {
-                    $productItem = ProductItem::where('product_id', $detail->product_id)
-                        ->where('serial_number', $serial)
-                        ->first();
 
-                    if ($productItem) {
-                        $productItem->update([
-                            'is_available' => true,
-                            'detail_transaction_id' => null
-                        ]);
-                    }
-                }
-            }
-        }
-    }
 
 
 
@@ -132,9 +110,38 @@ class Transaction extends Model
         return $this->belongsTo(User::class);
     }
 
+
     public function detailTransactions(): HasMany
     {
         return $this->hasMany(DetailTransaction::class);
+    }
+
+    protected $with = ['detailTransactions'];
+
+    // Remove the accessor to avoid overriding relation loading
+    // public function getDetailTransactionsAttribute()
+    // {
+    //     if (!array_key_exists('detailTransactions', $this->relations)) {
+    //         return new Collection();
+    //     }
+
+    //     $relation = $this->relations['detailTransactions'];
+
+    //     if (!$relation || $relation === false || !is_array($relation) && !$relation instanceof Collection) {
+    //         \Illuminate\Support\Facades\Log::warning("detailTransactions relation invalid or missing on Transaction ID: {$this->id}. Returning empty collection.");
+    //         return new Collection();
+    //     }
+
+    //     return $relation instanceof Collection ? $relation : new Collection($relation);
+    // }
+
+    public function setRelation($key, $value)
+    {
+        if ($key === 'detailTransactions' && $value === false) {
+            Log::error("Someone set detailTransactions to FALSE! ID: " . $this->id);
+        }
+
+        return parent::setRelation($key, $value);
     }
     public function rentalIncludes(): HasManyThrough
     {

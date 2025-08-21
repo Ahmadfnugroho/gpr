@@ -9,8 +9,9 @@ use App\Models\SubCategory;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
-use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+
 
 class ProductImporter extends Importer
 {
@@ -22,27 +23,20 @@ class ProductImporter extends Importer
             ImportColumn::make('name')
                 ->requiredMapping()
                 ->rules(['required', 'max:255']),
-            ImportColumn::make('quantity')
-                ->requiredMapping()
-                ->numeric()
-                ->rules(['required', 'integer']),
             ImportColumn::make('price')
                 ->requiredMapping()
                 ->numeric()
                 ->rules(['required', 'integer']),
+            ImportColumn::make('thumbnail')
+                ->rules(['nullable', 'max:255']),
             ImportColumn::make('status')
                 ->requiredMapping()
                 ->rules(['required']),
-            ImportColumn::make('thumbnail')
-                ->rules(['nullable', 'max:255']),
             ImportColumn::make('category')
-                ->relationship('category', 'name', 'id')
                 ->rules(['nullable']),
             ImportColumn::make('brand')
-                ->relationship('brand', 'name', 'id')
                 ->rules(['nullable']),
             ImportColumn::make('sub_category')
-                ->relationship('subcategory', 'name', 'id')
                 ->rules(['nullable']),
             ImportColumn::make('premiere')
                 ->rules(['nullable', 'boolean']),
@@ -53,84 +47,75 @@ class ProductImporter extends Importer
 
     public function resolveRecord(): ?Product
     {
-        $product = new Product();
-        $product->name = $this->data['name'];
-        // Removed manual slug setting to rely on model's setter
-
-        $category = $this->data['category'] ?? null;
-        if ($category) {
-            $category = Category::where('name', $category)->first();
-            if ($category) {
-                $product->category_id = $category->id;
-            } else {
-                $product->category_id = null;
-            }
-        }
-
-        $brand = $this->data['brand'] ?? null;
-        if ($brand) {
-            $brand = Brand::where('name', $brand)->first();
-            if ($brand) {
-                $product->brand_id = $brand->id;
-            } else {
-                $product->brand_id = null;
-            }
-        }
-
-        $SubCategory = $this->data['sub_category'] ?? null;
-        if ($SubCategory) {
-            $SubCategory = SubCategory::where('name', $SubCategory)->first();
-            if ($SubCategory) {
-                $product->sub_category_id = $SubCategory->id;
-            } else {
-                $product->sub_category_id = null;
-            }
-        } else {
-            $product->sub_category_id = null;
-        }
-
-        $product->quantity = $this->data['quantity'] ?? 0;
-        $product->price = $this->data['price'] ?? 0;
-        $product->thumbnail = $this->data['thumbnail'] ?? '';
-        $product->status = $this->data['status'] ?? 'available';
-        $product->premiere = $this->data['premiere'] ?? false;
-
         try {
-            // Simpan ke database
+            DB::beginTransaction();
+
+            // Ambil atau buat produk berdasarkan name
+            $product = Product::where('name', $this->data['name'] ?? '')->first();
+            if (!$product) {
+                $product = new Product();
+            }
+
+            // Handle premiere (default false)
+            if (!isset($this->data['premiere']) || is_null($this->data['premiere'])) {
+                $this->data['premiere'] = false;
+            } else {
+                $this->data['premiere'] = filter_var($this->data['premiere'], FILTER_VALIDATE_BOOLEAN);
+            }
+
+            // Simpan serial numbers untuk nanti
+            $serialNumbers = $this->data['serial_numbers'] ?? null;
+            unset($this->data['serial_numbers']);
+
+            // Mapping category, brand, sub_category ke ID
+            $category = Category::where('name', $this->data['category'] ?? null)->first();
+            $brand = Brand::where('name', $this->data['brand'] ?? null)->first();
+            $subCategory = SubCategory::where('name', $this->data['sub_category'] ?? null)->first();
+
+            // Hapus kolom yang bukan field tabel
+            unset($this->data['category']);
+            unset($this->data['brand']);
+            unset($this->data['sub_category']);
+
+            // Set ID
+            $this->data['category_id'] = $category ? $category->id : null;
+            $this->data['brand_id'] = $brand ? $brand->id : null;
+            $this->data['sub_category_id'] = $subCategory ? $subCategory->id : null;
+
+            // Isi atribut produk
+            $product->fill($this->data);
             $product->save();
 
-            // Handle serial numbers import
-            if (!empty($this->data['serial_numbers'])) {
-                $serialNumbersRaw = $this->data['serial_numbers'];
-                // Assume serial numbers are comma separated
-                $serialNumbers = array_map('trim', explode(',', $serialNumbersRaw));
-
-                // Delete existing items to avoid duplicates
-                $product->items()->delete();
-
-                foreach ($serialNumbers as $serialNumber) {
-                    $product->items()->create([
-                        'serial_number' => $serialNumber,
-                        'is_available' => true,
-                    ]);
+            // Simpan serial numbers
+            if (!empty($serialNumbers)) {
+                $serialNumbersArray = array_map('trim', explode(',', $serialNumbers));
+                foreach ($serialNumbersArray as $serial) {
+                    if (!$product->items()->where('serial_number', $serial)->exists()) {
+                        $product->items()->create([
+                            'serial_number' => $serial,
+                            'is_available' => true,
+                        ]);
+                    }
                 }
             }
-        } catch (\Exception $e) {
-            // Handle error
-            throw new \Exception($e->getMessage());
-        }
 
-        return $product;
+            DB::commit();
+            return $product;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw new \Exception("Import gagal: " . $e->getMessage());
+        }
     }
+
+
+
 
     public static function getCompletedNotificationBody(Import $import): string
     {
-        $body = 'Your product import has completed and ' . number_format($import->successful_rows) . ' ' . str('row')->plural($import->successful_rows) . ' imported.';
-
+        $body = 'Impor produk selesai. ' . number_format($import->successful_rows) . ' data berhasil diimpor.';
         if ($failedRowsCount = $import->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to import.';
+            $body .= ' ' . number_format($failedRowsCount) . ' data gagal diimpor.';
         }
-
         return $body;
     }
 }

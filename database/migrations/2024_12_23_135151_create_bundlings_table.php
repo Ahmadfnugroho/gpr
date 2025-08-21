@@ -14,10 +14,12 @@ return new class extends Migration
         Schema::create('bundlings', function (Blueprint $table) {
             $table->id();
             $table->string('custom_id')->unique();
+            $table->string('slug')->unique();
 
             $table->string('name');
             $table->unsignedInteger('price');
-            $table->unsignedInteger('quantity');
+            $table->boolean('premiere')->default(false);
+
 
 
             $table->timestamps();

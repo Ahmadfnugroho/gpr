@@ -14,8 +14,10 @@ class RentalIncludeResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-return [
-    'id' => $this->id,
-    'includedProduct' => new ProductResource($this->whenLoaded('includedProduct')),
-];}
+        return [
+            'id' => $this->id,
+            'includedProduct' => new ProductResource($this->whenLoaded('includedProduct')),
+            'quantity' => $this->quantity,
+        ];
+    }
 }

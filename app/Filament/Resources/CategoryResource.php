@@ -15,6 +15,7 @@ use Filament\Notifications\Notification;
 use App\Filament\Imports\CategoryImporter;
 use Filament\Tables\Actions\ImportAction;
 use App\Models\Str;
+use Filament\Tables\Columns\ImageColumn;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 
 class CategoryResource extends Resource
@@ -63,6 +64,9 @@ class CategoryResource extends Resource
                     ->label('Nama Kategori')
                     ->searchable()
                     ->sortable(),
+                ImageColumn::make('photo')
+                    ->label('Photo')
+                    ->getStateUsing(fn($record) => asset('storage/' . $record->photo)),
 
             ])
             ->filters([

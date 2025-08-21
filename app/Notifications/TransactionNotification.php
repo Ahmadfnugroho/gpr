@@ -11,12 +11,13 @@ namespace App\Notifications;
 
 use App\Models\Transaction;
 use Illuminate\Bus\Queueable;
+use Illuminate\Queue\SerializesModels;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class TransactionNotification extends Notification
 {
-    use Queueable;
+    use Queueable, SerializesModels;
 
     protected Transaction $transaction;
     protected string $eventType;
