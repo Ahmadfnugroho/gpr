@@ -1,0 +1,14 @@
+# Pilihan 1: PHP Built-in Server (Sederhana, untuk development/testing)
+# web: php -S 0.0.0.0:$PORT -t public/
+
+# Pilihan 2: Laravel Artisan Serve (Direkomendasikan untuk Laravel)
+# web: php artisan serve --host=0.0.0.0 --port=$PORT
+
+# Pilihan 3: Nginx + PHP-FPM (Untuk production)
+# web: nginx -c /app/nginx.conf && php-fpm
+
+# Pilihan 4: Apache (Jika tersedia di platform)
+# web: apache2-foreground
+
+# Pilihan 5: Custom script
+# web: ./start-server.sh
