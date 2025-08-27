@@ -88,6 +88,44 @@ class BrandResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('enable_premiere')
+                        ->icon('heroicon-o-star')
+                        ->color('warning')
+                        ->label('Aktifkan Brand Premiere')
+                        ->requiresConfirmation()
+                        ->modalHeading('Aktifkan Brand Premiere')
+                        ->modalDescription('Apakah Anda yakin ingin mengaktifkan brand premiere untuk brand yang dipilih?')
+                        ->modalSubmitActionLabel('Ya, Aktifkan')
+                        ->action(function ($records) {
+                            $count = $records->count();
+                            $records->each(function ($record) {
+                                $record->update(['premiere' => true]);
+                            });
+                            Notification::make()
+                                ->success()
+                                ->title('Berhasil Mengaktifkan Brand Premiere')
+                                ->body("{$count} brand berhasil diaktifkan sebagai premiere.")
+                                ->send();
+                        }),
+                    Tables\Actions\BulkAction::make('disable_premiere')
+                        ->icon('heroicon-o-star')
+                        ->color('gray')
+                        ->label('Nonaktifkan Brand Premiere')
+                        ->requiresConfirmation()
+                        ->modalHeading('Nonaktifkan Brand Premiere')
+                        ->modalDescription('Apakah Anda yakin ingin menonaktifkan brand premiere untuk brand yang dipilih?')
+                        ->modalSubmitActionLabel('Ya, Nonaktifkan')
+                        ->action(function ($records) {
+                            $count = $records->count();
+                            $records->each(function ($record) {
+                                $record->update(['premiere' => false]);
+                            });
+                            Notification::make()
+                                ->success()
+                                ->title('Berhasil Menonaktifkan Brand Premiere')
+                                ->body("{$count} brand berhasil dinonaktifkan dari premiere.")
+                                ->send();
+                        }),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);

@@ -322,6 +322,48 @@ class ProductResource extends Resource
                 ])
                     ->label('Ubah Status Produk'),
 
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('enable_featured')
+                        ->icon('heroicon-o-star')
+                        ->color('warning')
+                        ->label('Aktifkan Featured')
+                        ->requiresConfirmation()
+                        ->modalHeading('Aktifkan Featured')
+                        ->modalDescription('Apakah Anda yakin ingin mengaktifkan featured untuk produk yang dipilih?')
+                        ->modalSubmitActionLabel('Ya, Aktifkan')
+                        ->action(function ($records) {
+                            $count = $records->count();
+                            $records->each(function ($record) {
+                                $record->update(['premiere' => true]);
+                            });
+                            Notification::make()
+                                ->success()
+                                ->title('Berhasil Mengaktifkan Featured')
+                                ->body("{$count} produk berhasil diaktifkan sebagai featured.")
+                                ->send();
+                        }),
+                    Tables\Actions\BulkAction::make('disable_featured')
+                        ->icon('heroicon-o-star')
+                        ->color('gray')
+                        ->label('Nonaktifkan Featured')
+                        ->requiresConfirmation()
+                        ->modalHeading('Nonaktifkan Featured')
+                        ->modalDescription('Apakah Anda yakin ingin menonaktifkan featured untuk produk yang dipilih?')
+                        ->modalSubmitActionLabel('Ya, Nonaktifkan')
+                        ->action(function ($records) {
+                            $count = $records->count();
+                            $records->each(function ($record) {
+                                $record->update(['premiere' => false]);
+                            });
+                            Notification::make()
+                                ->success()
+                                ->title('Berhasil Menonaktifkan Featured')
+                                ->body("{$count} produk berhasil dinonaktifkan dari featured.")
+                                ->send();
+                        })
+                ])
+                    ->label('Ubah Featured Produk'),
+
                 Tables\Actions\DeleteBulkAction::make(),
             ]);
     }
