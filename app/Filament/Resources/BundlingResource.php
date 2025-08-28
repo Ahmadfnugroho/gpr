@@ -55,7 +55,6 @@ class BundlingResource extends Resource
         return parent::getGlobalSearchEloquentQuery()
             ->with([
                 'products:id,name',
-                'bundlingProducts:id,bundling_id,product_id,quantity',
                 'detailTransactions.transaction:id,start_date,end_date,booking_status'
             ]);
     }
@@ -142,7 +141,7 @@ class BundlingResource extends Resource
                     ->numeric()
                     ->prefix('Rp'),
 
-                Repeater::make('bundlingProducts')
+Repeater::make('bundlingProducts')
                     ->relationship('bundlingProducts') // relasi hasMany ke model pivot
                     ->label('Produk dalam Bundling')
                     ->schema([
