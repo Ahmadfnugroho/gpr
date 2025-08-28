@@ -67,7 +67,7 @@ class GoogleSheetSyncController
         } elseif (in_array($status, ['inactive', 'nonaktif', 'blacklist', 'banned'])) {
             return 'blacklist';
         }
-        return 'active'; // default fallback
+        return 'blacklist'; // default fallback
     }
 
     /**
@@ -79,10 +79,10 @@ class GoogleSheetSyncController
             Log::warning('Status value is empty, using blacklist as default');
             return 'blacklist';
         }
-        
+
         if ($statusValue === 'active') return 'active';
         if ($statusValue === 'blacklist') return 'blacklist';
-        
+
         Log::warning('Unknown status value: ' . $statusValue . ', using Inactive as default');
         return 'blacklist';
     }
