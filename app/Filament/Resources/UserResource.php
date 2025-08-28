@@ -44,17 +44,37 @@ class UserResource extends Resource
     public static function getGlobalSearchEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
         return parent::getGlobalSearchEloquentQuery()
-            ->with(['userPhoneNumbers:id,user_id,phone_number'])
-            ->where('status', '!=', 'deleted');
+            ->with([
+                'userPhoneNumbers:id,user_id,phone_number',
+                'transactions:id,user_id,start_date,end_date,booking_status'
+            ])
+            ->where('status', '!=', 'deleted')
+            ->whereHas('transactions', function ($query) {
+                $query->where('booking_status', '!=', 'cancelled');
+            });
     }
     
     public static function getGlobalSearchResultDetails($record): array
     {
         $phone = $record->userPhoneNumbers->first();
+        
+        // Get latest transaction dates
+        $latestTransaction = $record->transactions()
+            ->where('booking_status', '!=', 'cancelled')
+            ->latest('created_at')
+            ->first();
+            
+        $transactionInfo = '-';
+        if ($latestTransaction) {
+            $startDate = $latestTransaction->start_date ? $latestTransaction->start_date->format('d M Y') : '-';
+            $endDate = $latestTransaction->end_date ? $latestTransaction->end_date->format('d M Y') : '-';
+            $transactionInfo = "{$startDate} - {$endDate}";
+        }
+        
         return [
             'Email' => $record->email,
             'Phone' => $phone ? $phone->phone_number : '-',
-            'Status' => $record->status === 'active' ? '✅ Active' : '❌ Blacklist',
+            'Latest Rental' => $transactionInfo,
         ];
     }
 

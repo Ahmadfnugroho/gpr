@@ -48,14 +48,15 @@ class ProductResource extends Resource
     {
         return [
             'name', // Nama produk (prioritas utama)
-            'items.serial_number', // Serial number produk
         ];
     }
 
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return parent::getGlobalSearchEloquentQuery()
-            ->with(['category:id,name', 'brand:id,name', 'subCategory:id,name', 'items:id,product_id,serial_number'])
+            ->with([
+                'detailTransactions.transaction:id,start_date,end_date,booking_status'
+            ])
             ->where('status', '!=', 'deleted');
     }
 
@@ -69,70 +70,47 @@ class ProductResource extends Resource
             return;
         }
         
-        // Split search into words for better matching
-        $searchWords = array_filter(explode(' ', $searchTerm));
-        
-        // Create different scoring based on match types
-        $exactMatch = $searchTerm;
-        $startsWithMatch = $searchTerm . '%';
-        $containsMatch = '%' . $searchTerm . '%';
-        
-        // For multi-word search, create patterns for word proximity
-        $wordProximityConditions = [];
-        $wordProximityParams = [];
-        
-        if (count($searchWords) > 1) {
-            // All words must be present (in any order)
-            foreach ($searchWords as $word) {
-                $wordProximityConditions[] = "LOWER(name) LIKE ?";
-                $wordProximityParams[] = '%' . $word . '%';
-            }
-            $allWordsCondition = implode(' AND ', $wordProximityConditions);
-            
-            // Sequential words (exact phrase)
-            $sequentialMatch = '%' . implode('%', $searchWords) . '%';
-        }
-        
-        $orderBySQL = "CASE ";
-        $orderByParams = [];
-        
-        // Priority 1: Exact match
-        $orderBySQL .= "WHEN LOWER(name) LIKE ? THEN 1 ";
-        $orderByParams[] = $exactMatch;
-        
-        // Priority 2: Starts with search term
-        $orderBySQL .= "WHEN LOWER(name) LIKE ? THEN 2 ";
-        $orderByParams[] = $startsWithMatch;
-        
-        if (count($searchWords) > 1) {
-            // Priority 3: Sequential match (phrase match)
-            $orderBySQL .= "WHEN LOWER(name) LIKE ? THEN 3 ";
-            $orderByParams[] = $sequentialMatch;
-            
-            // Priority 4: All words present
-            $orderBySQL .= "WHEN {$allWordsCondition} THEN 4 ";
-            $orderByParams = array_merge($orderByParams, $wordProximityParams);
-        }
-        
-        // Priority 5 (or 3 for single word): Contains match
-        $orderBySQL .= "WHEN LOWER(name) LIKE ? THEN " . (count($searchWords) > 1 ? "5" : "3") . " ";
-        $orderByParams[] = $containsMatch;
-        
-        $orderBySQL .= "ELSE 10 END, CHAR_LENGTH(name)";
-        
-        $query->orderByRaw($orderBySQL, $orderByParams);
+        // Override default search behavior to search for exact phrase only
+        $query->where(function ($query) use ($searchTerm) {
+            $query->whereRaw('LOWER(name) LIKE ?', ['%' . $searchTerm . '%']);
+        });
     }
     public static function getGlobalSearchResultDetails(\Illuminate\Database\Eloquent\Model $record): array
     {
         $today = Carbon::now();
-        $available = $record->items()->where('is_available', true)->count();
-        $totalItems = $record->items()->count();
-        
+
+        // Get latest transaction dates
+        $latestTransaction = $record->detailTransactions()
+            ->with('transaction')
+            ->whereHas('transaction', function ($query) {
+                $query->where('booking_status', '!=', 'cancelled');
+            })
+            ->latest('created_at')
+            ->first();
+
+        $transactionInfo = '-';
+        if ($latestTransaction && $latestTransaction->transaction) {
+            $startDate = $latestTransaction->transaction->start_date ? $latestTransaction->transaction->start_date->format('d M Y') : '-';
+            $endDate = $latestTransaction->transaction->end_date ? $latestTransaction->transaction->end_date->format('d M Y') : '-';
+            $transactionInfo = "{$startDate} - {$endDate}";
+        }
+
+        // Check availability based on current active transactions
+        $hasActiveTransaction = $record->detailTransactions()
+            ->whereHas('transaction', function ($query) use ($today) {
+                $query->where('booking_status', '!=', 'cancelled')
+                    ->where('start_date', '<=', $today)
+                    ->where('end_date', '>=', $today);
+            })
+            ->exists();
+
+        // If has active transaction today, then not available, otherwise available
+        $isAvailable = !$hasActiveTransaction;
+        $availabilityStatus = $isAvailable ? '🟢 Tersedia' : '🔴 Tidak Tersedia';
+
         return [
-            'Category' => $record->category?->name ?? '-',
-            'Brand' => $record->brand?->name ?? '-',
-            'Status' => $record->status === 'available' ? '✅ Available' : '❌ Unavailable',
-            'Stock' => "{$available}/{$totalItems} units",
+            'Latest Rental' => $transactionInfo,
+            'Available' => $availabilityStatus,
         ];
     }
 
@@ -298,20 +276,20 @@ class ProductResource extends Resource
 
                         Tables\Columns\TextColumn::make('items.serial_number')
                             ->label('Nomor Seri')
-                            ->formatStateUsing(function($record) {
+                            ->formatStateUsing(function ($record) {
                                 $serialNumbers = $record->items->pluck('serial_number')->toArray();
-                                
+
                                 if (count($serialNumbers) === 0) {
                                     return '-';
                                 }
-                                
+
                                 if (count($serialNumbers) <= 5) {
                                     return implode(', ', $serialNumbers);
                                 }
-                                
+
                                 $first5 = array_slice($serialNumbers, 0, 5);
                                 $remaining = count($serialNumbers) - 5;
-                                
+
                                 return implode(', ', $first5) . " <span style='color: #6b7280; font-style: italic;'>dan {$remaining} lainnya</span>";
                             })
                             ->html()

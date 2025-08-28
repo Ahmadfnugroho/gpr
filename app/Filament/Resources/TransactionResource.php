@@ -60,42 +60,10 @@ class TransactionResource extends Resource
     protected static ?string $model = Transaction::class;
     protected static ?string $recordTitleAttribute = 'booking_transaction_id';
 
-    // ✅ Global Search Configuration
-    public static function getGlobalSearchResultTitle($record): string
-    {
-        return $record->booking_transaction_id;
-    }
-
+    // Global Search disabled for TransactionResource
     public static function getGloballySearchableAttributes(): array
     {
-        return [
-            'booking_transaction_id',
-            'user.name',
-            'user.email',
-            'detailTransactions.product.name',
-            'detailTransactions.bundling.name',
-        ];
-    }
-
-    public static function getGlobalSearchEloquentQuery(): \Illuminate\Database\Eloquent\Builder
-    {
-        return parent::getGlobalSearchEloquentQuery()
-            ->with([
-                'user:id,name,email',
-                'detailTransactions.product:id,name',
-                'detailTransactions.bundling:id,name'
-            ])
-            ->where('booking_status', '!=', 'cancelled');
-    }
-
-    public static function getGlobalSearchResultDetails($record): array
-    {
-        return [
-            'Customer' => $record->user?->name ?? 'Unknown',
-            'Status' => ucfirst($record->booking_status),
-            'Total' => 'Rp ' . number_format($record->grand_total, 0, ',', '.'),
-            'Date' => $record->start_date?->format('d M Y') ?? '-',
-        ];
+        return [];
     }
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
