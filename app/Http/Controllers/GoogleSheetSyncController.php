@@ -16,12 +16,81 @@ use Illuminate\Http\Request;
 class GoogleSheetSyncController
 {
     /**
+     * Helper function to get column value with flexible naming
+     */
+    private function getColumnValue($rowData, $possibleNames)
+    {
+        foreach ($possibleNames as $name) {
+            if (isset($rowData[$name]) && !empty($rowData[$name])) {
+                return $rowData[$name];
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * Convert gender from Sheet format to database enum
+     */
+    private function convertGenderToDb($genderValue)
+    {
+        if (empty($genderValue)) return null;
+        
+        $gender = strtolower(trim($genderValue));
+        if (in_array($gender, ['laki laki', 'laki-laki', 'male'])) {
+            return 'male';
+        } elseif (in_array($gender, ['perempuan', 'female'])) {
+            return 'female';
+        }
+        return null;
+    }
+    
+    /**
+     * Convert gender from database to Sheet format
+     */
+    private function convertGenderToSheet($genderValue)
+    {
+        if ($genderValue === 'male') return 'Laki Laki';
+        if ($genderValue === 'female') return 'Perempuan';
+        return '';
+    }
+    
+    /**
+     * Convert status from Sheet format to database enum
+     */
+    private function convertStatusToDb($statusValue)
+    {
+        if (empty($statusValue)) return 'active';
+        
+        $status = strtolower(trim($statusValue));
+        if (in_array($status, ['active', 'aktif'])) {
+            return 'active';
+        } elseif (in_array($status, ['inactive', 'nonaktif', 'blacklist', 'banned'])) {
+            return 'blacklist';
+        }
+        return 'active'; // default fallback
+    }
+    
+    /**
+     * Convert status from database to Sheet format
+     */
+    private function convertStatusToSheet($statusValue)
+    {
+        if ($statusValue === 'active') return 'Active';
+        if ($statusValue === 'blacklist') return 'Inactive';
+        return 'Active';
+    }
+
+    /**
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
 
     public function sync(Request $request)
     {
+        // ✅ Increase execution time limit for large datasets
+        set_time_limit(300); // 5 minutes
+        ini_set('memory_limit', '512M');
+        
         try {
             $data = $request->json()->all();
 
@@ -31,6 +100,9 @@ class GoogleSheetSyncController
 
             $headers = array_map(fn($header) => trim($header), $data['values'][0]);
             $rows = array_slice($data['values'], 1);
+            
+            Log::info('Sync started: ' . count($rows) . ' rows to process');
+            Log::info('Headers received: ' . json_encode($headers));
 
             DB::transaction(function () use ($headers, $rows) {
                 foreach ($rows as $row) {
@@ -49,6 +121,16 @@ class GoogleSheetSyncController
                     }
 
 
+                    // Use flexible column mapping for better compatibility
+                    $gender = $this->convertGenderToDb($this->getColumnValue($rowData, ['Jenis Kelamin']));
+                    $statusRaw = $this->getColumnValue($rowData, ['Status', 'STATUS', 'status']) ?? 'active';
+                    $status = $this->convertStatusToDb($statusRaw);
+                    
+                    // ✅ DEBUG: Log all possible Status values
+                    Log::info('📊 Processing user: ' . $rowData['Email Address']);
+                    Log::info('📊 Status values - Status: ' . ($rowData['Status'] ?? 'null') . ', STATUS: ' . ($rowData['STATUS'] ?? 'null') . ', status: ' . ($rowData['status'] ?? 'null'));
+                    Log::info('📊 Raw Status: ' . $statusRaw . ' -> Converted: ' . $status . ', Gender: ' . ($gender ?? 'null'));
+
                     $user = User::updateOrCreate(
                         ['email' => $rowData['Email Address']],
                         [
@@ -59,9 +141,9 @@ class GoogleSheetSyncController
                             'instagram_username' => $rowData['Nama akun Instagram penyewa'] ?? null,
                             'emergency_contact_name' => $rowData['Nama Kontak Emergency'] ?? null,
                             'emergency_contact_number' => $rowData['No. Hp Kontak Emergency'] ?? null,
-                            'gender' => $rowData['Jenis Kelamin'] ?? null,
+                            'gender' => $gender,
                             'source_info' => $rowData['Mengetahui Global Photo Rental dari'] ?? null,
-                            'status' => $rowData['STATUS'] ?? 'Aktif',
+                            'status' => $status,
                             'password' => Hash::make('defaultpassword')
                         ]
                     );
@@ -111,7 +193,7 @@ class GoogleSheetSyncController
             'No. Hp Kontak Emergency',
             'Jenis Kelamin',
             'Mengetahui Global Photo Rental dari',
-            'STATUS',
+            'Status',
             'No. Hp1',
             'No. Hp2',
             'updated_at',
@@ -122,6 +204,7 @@ class GoogleSheetSyncController
 
         foreach ($users as $user) {
             $phones = $user->userPhoneNumbers->pluck('phone_number')->values();
+            
             $values[] = [
                 $user->email,
                 $user->name,
@@ -131,9 +214,9 @@ class GoogleSheetSyncController
                 $user->instagram_username,
                 $user->emergency_contact_name,
                 $user->emergency_contact_number,
-                $user->gender,
+                $this->convertGenderToSheet($user->gender),
                 $user->source_info,
-                $user->status,
+                $this->convertStatusToSheet($user->status),
                 $phones[0] ?? '',
                 $phones[1] ?? '',
                 $user->updated_at->toISOString()

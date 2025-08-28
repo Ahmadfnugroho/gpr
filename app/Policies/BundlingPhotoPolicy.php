@@ -3,10 +3,10 @@
 namespace App\Policies;
 
 use App\Models\User;
-use App\Models\Promo;
+use App\Models\BundlingPhoto;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
-class PromoPolicy
+class BundlingPhotoPolicy
 {
     use HandlesAuthorization;
 
@@ -15,15 +15,15 @@ class PromoPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->can('view_any_promo');
+        return $user->can('view_any_bundling::photo');
     }
 
     /**
      * Determine whether the user can view the model.
      */
-    public function view(User $user, Promo $promo): bool
+    public function view(User $user, BundlingPhoto $bundlingPhoto): bool
     {
-        return $user->can('view_promo');
+        return $user->can('view_bundling::photo');
     }
 
     /**
@@ -31,23 +31,23 @@ class PromoPolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('create_promo');
+        return $user->can('create_bundling::photo');
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, Promo $promo): bool
+    public function update(User $user, BundlingPhoto $bundlingPhoto): bool
     {
-        return $user->can('update_promo');
+        return $user->can('update_bundling::photo');
     }
 
     /**
      * Determine whether the user can delete the model.
      */
-    public function delete(User $user, Promo $promo): bool
+    public function delete(User $user, BundlingPhoto $bundlingPhoto): bool
     {
-        return $user->can('delete_promo');
+        return $user->can('delete_bundling::photo');
     }
 
     /**
@@ -55,13 +55,13 @@ class PromoPolicy
      */
     public function deleteAny(User $user): bool
     {
-        return $user->can('delete_any_promo');
+        return $user->can('delete_any_bundling::photo');
     }
 
     /**
      * Determine whether the user can permanently delete.
      */
-    public function forceDelete(User $user, Promo $promo): bool
+    public function forceDelete(User $user, BundlingPhoto $bundlingPhoto): bool
     {
         return $user->can('{{ ForceDelete }}');
     }
@@ -71,13 +71,13 @@ class PromoPolicy
      */
     public function forceDeleteAny(User $user): bool
     {
-        return $user->can('force_delete_any_promo');
+        return $user->can('force_delete_any_bundling::photo');
     }
 
     /**
      * Determine whether the user can restore.
      */
-    public function restore(User $user, Promo $promo): bool
+    public function restore(User $user, BundlingPhoto $bundlingPhoto): bool
     {
         return $user->can('{{ Restore }}');
     }
@@ -93,7 +93,7 @@ class PromoPolicy
     /**
      * Determine whether the user can replicate.
      */
-    public function replicate(User $user, Promo $promo): bool
+    public function replicate(User $user, BundlingPhoto $bundlingPhoto): bool
     {
         return $user->can('{{ Replicate }}');
     }

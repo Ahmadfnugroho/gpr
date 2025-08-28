@@ -1,5 +1,5 @@
-APP_NAME=GPR
-APP_ENV=local
+APP_NAME=Global Photo Rental
+APP_ENV=production
 APP_KEY=base64:OWF+8wcBYD/oAa84Q08IeZFtOwdXoTVu9D+W0BEppXA=
 APP_DEBUG=true # Ubah ke false untuk production
 APP_TIMEZONE=UTC
@@ -38,10 +38,10 @@ REDIS_PORT=6379
 MAIL_MAILER=smtp
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
-MAIL_USERNAME=imam.prabowo1511@gmail.com
-MAIL_PASSWORD=gmxikuyisidgtrqm
+MAIL_USERNAME=global.photorental@gmail.com
+MAIL_PASSWORD=ykwdvpwaftfkijiu
 MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS="imam.prabowo1511@gmail.com"
+MAIL_FROM_ADDRESS="global.photorental@gmail.com"
 MAIL_FROM_NAME="${APP_NAME}"
 
 # Google API

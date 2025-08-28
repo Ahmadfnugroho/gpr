@@ -63,7 +63,7 @@ class TransactionPolicy
      */
     public function forceDelete(User $user, Transaction $transaction): bool
     {
-        return $user->can('force_delete_transaction');
+        return $user->can('{{ ForceDelete }}');
     }
 
     /**
@@ -79,7 +79,7 @@ class TransactionPolicy
      */
     public function restore(User $user, Transaction $transaction): bool
     {
-        return $user->can('restore_transaction');
+        return $user->can('{{ Restore }}');
     }
 
     /**
@@ -87,7 +87,7 @@ class TransactionPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('restore_any_transaction');
+        return $user->can('{{ RestoreAny }}');
     }
 
     /**
@@ -95,7 +95,7 @@ class TransactionPolicy
      */
     public function replicate(User $user, Transaction $transaction): bool
     {
-        return $user->can('replicate_transaction');
+        return $user->can('{{ Replicate }}');
     }
 
     /**
@@ -103,6 +103,6 @@ class TransactionPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('reorder_transaction');
+        return $user->can('{{ Reorder }}');
     }
 }

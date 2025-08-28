@@ -63,7 +63,7 @@ class RentalIncludePolicy
      */
     public function forceDelete(User $user, RentalInclude $rentalInclude): bool
     {
-        return $user->can('force_delete_rental::include');
+        return $user->can('{{ ForceDelete }}');
     }
 
     /**
@@ -79,7 +79,7 @@ class RentalIncludePolicy
      */
     public function restore(User $user, RentalInclude $rentalInclude): bool
     {
-        return $user->can('restore_rental::include');
+        return $user->can('{{ Restore }}');
     }
 
     /**
@@ -87,7 +87,7 @@ class RentalIncludePolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('restore_any_rental::include');
+        return $user->can('{{ RestoreAny }}');
     }
 
     /**
@@ -95,7 +95,7 @@ class RentalIncludePolicy
      */
     public function replicate(User $user, RentalInclude $rentalInclude): bool
     {
-        return $user->can('replicate_rental::include');
+        return $user->can('{{ Replicate }}');
     }
 
     /**
@@ -103,6 +103,6 @@ class RentalIncludePolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('reorder_rental::include');
+        return $user->can('{{ Reorder }}');
     }
 }

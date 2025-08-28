@@ -63,7 +63,7 @@ class UserPhoneNumberPolicy
      */
     public function forceDelete(User $user, UserPhoneNumber $userPhoneNumber): bool
     {
-        return $user->can('force_delete_user::phone::number');
+        return $user->can('{{ ForceDelete }}');
     }
 
     /**
@@ -79,7 +79,7 @@ class UserPhoneNumberPolicy
      */
     public function restore(User $user, UserPhoneNumber $userPhoneNumber): bool
     {
-        return $user->can('restore_user::phone::number');
+        return $user->can('{{ Restore }}');
     }
 
     /**
@@ -87,7 +87,7 @@ class UserPhoneNumberPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('restore_any_user::phone::number');
+        return $user->can('{{ RestoreAny }}');
     }
 
     /**
@@ -95,7 +95,7 @@ class UserPhoneNumberPolicy
      */
     public function replicate(User $user, UserPhoneNumber $userPhoneNumber): bool
     {
-        return $user->can('replicate_user::phone::number');
+        return $user->can('{{ Replicate }}');
     }
 
     /**
@@ -103,6 +103,6 @@ class UserPhoneNumberPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('reorder_user::phone::number');
+        return $user->can('{{ Reorder }}');
     }
 }
