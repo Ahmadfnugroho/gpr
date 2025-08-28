@@ -28,7 +28,7 @@ trait HasSuccessNotification
         return Notification::make()
             ->success()
             ->title($entityName . ' berhasil disimpan!')
-            ->body('Data ' . strtolower($entityName) . ' telah berhasil diperbarui.')
+            ->body('Data ' . strtolower($entityName) . ' telah berhasil diperbaruigit.')
             ->send();
     }
 }
