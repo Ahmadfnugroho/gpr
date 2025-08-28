@@ -18,6 +18,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Actions\ImportAction;
 use Filament\Notifications\Notification;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class ProductSpecificationResource extends Resource
 {
@@ -55,6 +57,9 @@ class ProductSpecificationResource extends Resource
     {
         return $table
             ->defaultPaginationPageOption(50)
+            ->paginationPageOptions([25, 50, 100])
+            ->defaultSort('updated_at', 'desc')
+            ->striped()
             ->headerActions([
                 ImportAction::make()
                     ->importer(ProductSpecificationImporter::class)
@@ -62,22 +67,79 @@ class ProductSpecificationResource extends Resource
             ])
             ->columns([
                 tables\Columns\TextColumn::make('product.name')
+                    ->label('Produk')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->limit(30)
+                    ->tooltip(function (tables\Columns\TextColumn $column): ?string {
+                        $state = $column->getState();
+                        return strlen($state) > 30 ? $state : null;
+                    }),
+                
                 tables\Columns\TextColumn::make('name')
                     ->label('Spesifikasi')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->limit(100)
+                    ->wrap()
+                    ->tooltip(function (tables\Columns\TextColumn $column): ?string {
+                        $state = $column->getState();
+                        return strlen($state) > 100 ? $state : null;
+                    })
+                    ->description(function ($record) {
+                        // Show first 100 characters as description if content is longer
+                        $content = strip_tags($record->name);
+                        return strlen($content) > 100 ? Str::limit($content, 100) : null;
+                    }),
+                    
+                tables\Columns\TextColumn::make('created_at')
+                    ->label('Dibuat')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->toggleable(),
+                    
+                tables\Columns\TextColumn::make('updated_at')
+                    ->label('Diperbarui')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                tables\Filters\SelectFilter::make('product.name')
+                tables\Filters\SelectFilter::make('product_id')
+                    ->label('Produk')
+                    ->relationship('product', 'name')
                     ->searchable()
                     ->multiple()
                     ->preload(),
-                tables\Filters\TrashedFilter::make('name')
-                    ->searchable()
-                    ->multiple()
-                    ->preload(),
+                    
+                tables\Filters\Filter::make('created_at')
+                    ->form([
+                        Forms\Components\DatePicker::make('created_from')
+                            ->label('Dibuat dari tanggal'),
+                        Forms\Components\DatePicker::make('created_until')
+                            ->label('Dibuat sampai tanggal'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when(
+                                $data['created_from'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date),
+                            )
+                            ->when(
+                                $data['created_until'],
+                                fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
+                            );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if ($data['created_from'] ?? null) {
+                            $indicators[] = 'Dibuat dari ' . Carbon::parse($data['created_from'])->toFormattedDateString();
+                        }
+                        if ($data['created_until'] ?? null) {
+                            $indicators[] = 'Dibuat sampai ' . Carbon::parse($data['created_until'])->toFormattedDateString();
+                        }
+                        return $indicators;
+                    }),
 
             ])
             ->actions([
