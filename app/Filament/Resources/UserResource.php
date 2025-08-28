@@ -79,7 +79,7 @@ class UserResource extends Resource
                             'active' => 'Active',
                             'blacklist' => 'Blacklist'
                         ])
-                        ->default('active'),
+                        ->default('blacklist'),
                     Forms\Components\TextInput::make('source_info')
                         ->maxLength(255),
                 ])

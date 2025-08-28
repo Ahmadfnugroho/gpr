@@ -27,7 +27,7 @@ return new class extends Migration
             $table->string('emergency_contact_number')->nullable();
             $table->enum('gender', ['male', 'female'])->nullable();
             $table->string('source_info')->nullable();
-            $table->enum('status', ['active', 'blacklist'])->default('active');
+            $table->enum('status', ['active', 'blacklist'])->default('blacklist');
 
             $table->index('name');
             $table->index('email');

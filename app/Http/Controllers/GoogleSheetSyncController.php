@@ -59,7 +59,7 @@ class GoogleSheetSyncController
      */
     private function convertStatusToDb($statusValue)
     {
-        if (empty($statusValue)) return 'active';
+        if (empty($statusValue)) return 'blacklist';
 
         $status = strtolower(trim($statusValue));
         if (in_array($status, ['active', 'aktif'])) {
@@ -130,7 +130,7 @@ class GoogleSheetSyncController
 
                     // Use flexible column mapping for better compatibility
                     $gender = $this->convertGenderToDb($this->getColumnValue($rowData, ['Jenis Kelamin']));
-                    $statusRaw = $this->getColumnValue($rowData, ['Status', 'STATUS', 'status']) ?? 'active';
+                    $statusRaw = $this->getColumnValue($rowData, ['Status', 'STATUS', 'status']) ?? 'blacklist';
                     $status = $this->convertStatusToDb($statusRaw);
 
                     // ✅ DEBUG: Log all possible Status values
