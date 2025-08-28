@@ -27,14 +27,14 @@ class GoogleSheetSyncController
         }
         return null;
     }
-    
+
     /**
      * Convert gender from Sheet format to database enum
      */
     private function convertGenderToDb($genderValue)
     {
         if (empty($genderValue)) return null;
-        
+
         $gender = strtolower(trim($genderValue));
         if (in_array($gender, ['laki laki', 'laki-laki', 'male'])) {
             return 'male';
@@ -43,7 +43,7 @@ class GoogleSheetSyncController
         }
         return null;
     }
-    
+
     /**
      * Convert gender from database to Sheet format
      */
@@ -53,14 +53,14 @@ class GoogleSheetSyncController
         if ($genderValue === 'female') return 'Perempuan';
         return '';
     }
-    
+
     /**
      * Convert status from Sheet format to database enum
      */
     private function convertStatusToDb($statusValue)
     {
         if (empty($statusValue)) return 'active';
-        
+
         $status = strtolower(trim($statusValue));
         if (in_array($status, ['active', 'aktif'])) {
             return 'active';
@@ -69,7 +69,7 @@ class GoogleSheetSyncController
         }
         return 'active'; // default fallback
     }
-    
+
     /**
      * Convert status from database to Sheet format
      */
@@ -90,7 +90,7 @@ class GoogleSheetSyncController
         // ✅ Increase execution time limit for large datasets
         set_time_limit(300); // 5 minutes
         ini_set('memory_limit', '512M');
-        
+
         try {
             $data = $request->json()->all();
 
@@ -100,7 +100,7 @@ class GoogleSheetSyncController
 
             $headers = array_map(fn($header) => trim($header), $data['values'][0]);
             $rows = array_slice($data['values'], 1);
-            
+
             Log::info('Sync started: ' . count($rows) . ' rows to process');
             Log::info('Headers received: ' . json_encode($headers));
 
@@ -125,7 +125,7 @@ class GoogleSheetSyncController
                     $gender = $this->convertGenderToDb($this->getColumnValue($rowData, ['Jenis Kelamin']));
                     $statusRaw = $this->getColumnValue($rowData, ['Status', 'STATUS', 'status']) ?? 'active';
                     $status = $this->convertStatusToDb($statusRaw);
-                    
+
                     // ✅ DEBUG: Log all possible Status values
                     Log::info('📊 Processing user: ' . $rowData['Email Address']);
                     Log::info('📊 Status values - Status: ' . ($rowData['Status'] ?? 'null') . ', STATUS: ' . ($rowData['STATUS'] ?? 'null') . ', status: ' . ($rowData['status'] ?? 'null'));
@@ -204,7 +204,7 @@ class GoogleSheetSyncController
 
         foreach ($users as $user) {
             $phones = $user->userPhoneNumbers->pluck('phone_number')->values();
-            
+
             $values[] = [
                 $user->email,
                 $user->name,
