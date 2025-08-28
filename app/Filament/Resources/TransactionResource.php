@@ -50,6 +50,10 @@ use Filament\Tables\Actions\DeleteAction;
 
 use Filament\Tables\Columns\TextInputColumn;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
+use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\Section as InfoSection;
+use Filament\Infolists\Components\Grid as InfoGrid;
 
 class TransactionResource extends Resource
 {
@@ -1159,6 +1163,96 @@ class TransactionResource extends Resource
                 ])->columns(2),
         ]);
     }
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                InfoSection::make('Transaction Information')
+                    ->schema([
+                        InfoGrid::make(2)
+                            ->schema([
+                                TextEntry::make('booking_transaction_id')
+                                    ->label('Transaction ID'),
+                                TextEntry::make('user.name')
+                                    ->label('Customer'),
+                                TextEntry::make('start_date')
+                                    ->label('Start Date')
+                                    ->dateTime('d M Y, H:i'),
+                                TextEntry::make('end_date')
+                                    ->label('End Date')
+                                    ->dateTime('d M Y, H:i'),
+                                TextEntry::make('duration')
+                                    ->label('Duration')
+                                    ->suffix(' days'),
+                                TextEntry::make('booking_status')
+                                    ->label('Status')
+                                    ->badge()
+                                    ->color(fn(string $state): string => match ($state) {
+                                        'pending' => 'warning',
+                                        'cancelled' => 'danger',
+                                        'rented' => 'info',
+                                        'finished' => 'success',
+                                        'paid' => 'success',
+                                    }),
+                            ])
+                    ]),
+                
+                InfoSection::make('Products')
+                    ->schema([
+                        TextEntry::make('product_info')
+                            ->label('Products/Bundles')
+                            ->getStateUsing(function ($record) {
+                                $products = [];
+                                
+                                // Use already eager-loaded relationships to avoid N+1 queries
+                                if ($record->relationLoaded('detailTransactions')) {
+                                    foreach ($record->detailTransactions as $detail) {
+                                        if ($detail->bundling_id && $detail->relationLoaded('bundling') && $detail->bundling) {
+                                            $products[] = $detail->bundling->name . ' (Bundle)';
+                                        } elseif ($detail->product_id && $detail->relationLoaded('product') && $detail->product) {
+                                            $products[] = $detail->product->name;
+                                        }
+                                    }
+                                }
+                                
+                                return implode(', ', array_unique($products)) ?: 'N/A';
+                            }),
+                    ]),
+                
+                InfoSection::make('Financial Information')
+                    ->schema([
+                        InfoGrid::make(3)
+                            ->schema([
+                                TextEntry::make('grand_total')
+                                    ->label('Grand Total')
+                                    ->formatStateUsing(fn(string $state): string => 
+                                        'Rp ' . number_format((int) $state, 0, ',', '.')
+                                    ),
+                                TextEntry::make('down_payment')
+                                    ->label('Down Payment')
+                                    ->formatStateUsing(fn(string $state): string => 
+                                        'Rp ' . number_format((int) $state, 0, ',', '.')
+                                    ),
+                                TextEntry::make('remaining_payment')
+                                    ->label('Remaining Payment')
+                                    ->formatStateUsing(fn(string $state): string => 
+                                        $state == '0' ? 'LUNAS' : 'Rp ' . number_format((int) $state, 0, ',', '.')
+                                    ),
+                            ])
+                    ]),
+                    
+                InfoSection::make('Additional Information')
+                    ->schema([
+                        TextEntry::make('promo.name')
+                            ->label('Promo Applied')
+                            ->default('None'),
+                        TextEntry::make('note')
+                            ->label('Notes')
+                            ->default('No notes'),
+                    ])
+            ]);
+    }
+
     public static function getEagerLoadRelations(): array
     {
         return [
@@ -1173,6 +1267,7 @@ class TransactionResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultPaginationPageOption(50)
             ->modifyQueryUsing(function (Builder $query) {
                 return $query->with([
                     'user:id,name,email',
@@ -1210,45 +1305,20 @@ class TransactionResource extends Resource
                     ->limit(20)
                     ->size(TextColumnSize::ExtraSmall)
                     ->getStateUsing(function ($record) {
-                        Log::info('=== PRODUCT_INFO DEBUG START (getStateUsing) ===', [
-                            'transaction_id' => $record->id,
-                        ]);
-
                         $products = [];
-
-                        // Query detail transactions directly from database
-                        $detailTransactions = \App\Models\DetailTransaction::with(['product', 'bundling'])
-                            ->where('transaction_id', $record->id)
-                            ->get();
-
-                        Log::info('Detail transactions query result', [
-                            'count' => $detailTransactions->count(),
-                            'transaction_id' => $record->id,
-                        ]);
-
-                        foreach ($detailTransactions as $detail) {
-                            if ($detail->bundling_id && $detail->bundling) {
-                                $products[] = $detail->bundling->name . ' (Bundle)';
-                                Log::info('Added bundling', ['name' => $detail->bundling->name]);
-                            } elseif ($detail->product_id && $detail->product) {
-                                $products[] = $detail->product->name;
-                                Log::info('Added product', ['name' => $detail->product->name]);
-                            } else {
-                                Log::warning('No product or bundling found for detail', [
-                                    'detail_id' => $detail->id,
-                                    'product_id' => $detail->product_id,
-                                    'bundling_id' => $detail->bundling_id,
-                                ]);
+                        
+                        // Use already eager-loaded relationships to avoid N+1 queries
+                        if ($record->relationLoaded('detailTransactions')) {
+                            foreach ($record->detailTransactions as $detail) {
+                                if ($detail->bundling_id && $detail->relationLoaded('bundling') && $detail->bundling) {
+                                    $products[] = $detail->bundling->name . ' (Bundle)';
+                                } elseif ($detail->product_id && $detail->relationLoaded('product') && $detail->product) {
+                                    $products[] = $detail->product->name;
+                                }
                             }
                         }
-
-                        $result = implode(', ', array_unique($products)) ?: 'N/A';
-                        Log::info('=== PRODUCT_INFO DEBUG END ===', [
-                            'final_result' => $result,
-                            'products_array' => $products,
-                        ]);
-
-                        return $result;
+                        
+                        return implode(', ', array_unique($products)) ?: 'N/A';
                     })
                     ->wrap(),
                 TextColumn::make('detailTransactions.productItems.serial_number')

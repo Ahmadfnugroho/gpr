@@ -56,6 +56,7 @@ class BundlingPhotoResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultPaginationPageOption(50)
             ->headerActions([
                 ImportAction::make()
                     ->importer(BundlingPhotoImporter::class)

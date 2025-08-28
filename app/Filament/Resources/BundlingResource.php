@@ -215,6 +215,7 @@ class BundlingResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->defaultPaginationPageOption(50)
             ->columns([
 
                 Tables\Columns\TextColumn::make('name')
