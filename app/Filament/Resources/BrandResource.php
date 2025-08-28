@@ -22,15 +22,15 @@ class BrandResource extends Resource
 {
     protected static ?string $model = Brand::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-sparkles';
+    protected static ?string $navigationIcon = 'heroicon-o-building-storefront';
 
-    protected static ?string $navigationGroup = 'Product';
+    protected static ?string $navigationGroup = 'Product Catalog';
 
-    protected static ?string $navigationLabel = 'Brand';
+    protected static ?string $navigationLabel = 'Brands';
 
     // protected static bool $shouldRegisterNavigation = false;
 
-    protected static ?int $navigationSort = 23;
+    protected static ?int $navigationSort = 24;
 
     public static function form(Form $form): Form
     {

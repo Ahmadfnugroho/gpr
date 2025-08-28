@@ -68,15 +68,15 @@ class ProductResource extends Resource
         ];
     }
 
-    protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';
+    protected static ?string $navigationIcon = 'heroicon-o-cube-transparent';
 
-    protected static ?string $navigationGroup = 'Product';
+    protected static ?string $navigationGroup = 'Product Catalog';
 
-    protected static ?string $navigationLabel = 'product';
+    protected static ?string $navigationLabel = 'Products';
 
     // protected static bool $shouldRegisterNavigation = false;
 
-    protected static ?int $navigationSort = 24;
+    protected static ?int $navigationSort = 21;
 
     public static function form(Form $form): Form
     {

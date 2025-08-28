@@ -22,15 +22,15 @@ class CategoryResource extends Resource
 {
     protected static ?string $model = Category::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-folder';
 
-    protected static ?string $navigationGroup = 'Product';
+    protected static ?string $navigationGroup = 'Product Catalog';
 
-    protected static ?string $navigationLabel = 'Category';
+    protected static ?string $navigationLabel = 'Categories';
 
     // protected static bool $shouldRegisterNavigation = false;
 
-    protected static ?int $navigationSort = 21;
+    protected static ?int $navigationSort = 22;
 
     public static function form(Form $form): Form
     {

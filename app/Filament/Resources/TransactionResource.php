@@ -55,9 +55,9 @@ class TransactionResource extends Resource
 {
     protected static ?string $model = Transaction::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?string $navigationGroup = 'Transaction';
-    protected static ?string $navigationLabel = 'Transaction';
+    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+    protected static ?string $navigationGroup = 'Sales & Transactions';
+    protected static ?string $navigationLabel = 'Transactions';
     protected static ?int $navigationSort = 31;
     protected static function resolveAvailableProductSerials(Get $get, $set = null): array
     {
