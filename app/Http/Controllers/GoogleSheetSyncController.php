@@ -75,9 +75,16 @@ class GoogleSheetSyncController
      */
     private function convertStatusToSheet($statusValue)
     {
-        if ($statusValue === 'active') return 'Active';
-        if ($statusValue === 'blacklist') return 'Inactive';
-        return 'Active';
+        if (empty($statusValue)) {
+            Log::warning('Status value is empty, using blacklist as default');
+            return 'blacklist';
+        }
+        
+        if ($statusValue === 'active') return 'active';
+        if ($statusValue === 'blacklist') return 'blacklist';
+        
+        Log::warning('Unknown status value: ' . $statusValue . ', using Inactive as default');
+        return 'blacklist';
     }
 
     /**
