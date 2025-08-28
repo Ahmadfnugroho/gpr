@@ -151,7 +151,7 @@ class GoogleSheetSyncController
                             'gender' => $gender,
                             'source_info' => $rowData['Mengetahui Global Photo Rental dari'] ?? null,
                             'status' => $status,
-                            'password' => Hash::make('defaultpassword')
+                            // Password dihapus dari sync - biarkan user pakai password existing atau reset manual
                         ]
                     );
 

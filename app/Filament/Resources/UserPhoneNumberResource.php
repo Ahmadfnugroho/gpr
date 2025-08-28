@@ -25,7 +25,7 @@ class UserPhoneNumberResource extends Resource
     protected static ?string $model = UserPhoneNumber::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-phone';
-    protected static ?string $navigationGroup = 'User';
+    protected static ?string $navigationGroup = 'User Management';
 
     protected static ?string $navigationLabel = 'User Phone Number';
 

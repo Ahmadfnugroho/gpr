@@ -106,4 +106,10 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     {
         return $this->hasMany(Transaction::class, 'user_id', 'id');
     }
+
+    // Accessor untuk phone_number dari relasi userPhoneNumbers
+    public function getPhoneNumberAttribute(): ?string
+    {
+        return $this->userPhoneNumbers->first()?->phone_number;
+    }
 }

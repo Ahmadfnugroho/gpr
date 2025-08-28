@@ -100,7 +100,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->globalSearch(true) // Aktifkan global search
             ->globalSearchKeyBindings(['command+k', 'ctrl+k']) // Shortcut keyboard
-            ->globalSearchDebounce('750ms'); // Debounce untuk mengurangi request
+            ->globalSearchDebounce('500ms'); // Debounce lebih cepat untuk responsivitas
 
     }
 

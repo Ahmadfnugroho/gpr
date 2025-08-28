@@ -24,6 +24,39 @@ use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
+    protected static ?string $recordTitleAttribute = 'name';
+
+    // ✅ Global Search Configuration
+    public static function getGlobalSearchResultTitle($record): string
+    {
+        return $record->name;
+    }
+    
+    public static function getGloballySearchableAttributes(): array
+    {
+        return [
+            'name',
+            'email',
+            'userPhoneNumbers.phone_number',
+        ];
+    }
+    
+    public static function getGlobalSearchEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()
+            ->with(['userPhoneNumbers:id,user_id,phone_number'])
+            ->where('status', '!=', 'deleted');
+    }
+    
+    public static function getGlobalSearchResultDetails($record): array
+    {
+        $phone = $record->userPhoneNumbers->first();
+        return [
+            'Email' => $record->email,
+            'Phone' => $phone ? $phone->phone_number : '-',
+            'Status' => $record->status === 'active' ? '✅ Active' : '❌ Blacklist',
+        ];
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
     protected static ?string $navigationGroup = 'User Management';

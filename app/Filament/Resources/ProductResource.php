@@ -46,31 +46,99 @@ class ProductResource extends Resource
 
     public static function getGloballySearchableAttributes(): array
     {
-        return ['name', 'category.name', 'brand.name', 'subCategory.name']; // Hanya mencari berdasarkan nama produk
+        return [
+            'name', // Nama produk (prioritas utama)
+            'items.serial_number', // Serial number produk
+        ];
     }
 
     public static function getGlobalSearchEloquentQuery(): Builder
     {
-        // Optimize query by eagerly loading related models
-        return parent::getGlobalSearchEloquentQuery()->with(['transactions', 'detailTransactions', 'items']);
+        return parent::getGlobalSearchEloquentQuery()
+            ->with(['category:id,name', 'brand:id,name', 'subCategory:id,name', 'items:id,product_id,serial_number'])
+            ->where('status', '!=', 'deleted');
+    }
+
+    public static function modifyGlobalSearchQuery(Builder $query, string $search): void
+    {
+        // Clean and normalize search term
+        $searchTerm = trim(strtolower($search));
+        
+        // If empty search, do nothing
+        if (empty($searchTerm)) {
+            return;
+        }
+        
+        // Split search into words for better matching
+        $searchWords = array_filter(explode(' ', $searchTerm));
+        
+        // Create different scoring based on match types
+        $exactMatch = $searchTerm;
+        $startsWithMatch = $searchTerm . '%';
+        $containsMatch = '%' . $searchTerm . '%';
+        
+        // For multi-word search, create patterns for word proximity
+        $wordProximityConditions = [];
+        $wordProximityParams = [];
+        
+        if (count($searchWords) > 1) {
+            // All words must be present (in any order)
+            foreach ($searchWords as $word) {
+                $wordProximityConditions[] = "LOWER(name) LIKE ?";
+                $wordProximityParams[] = '%' . $word . '%';
+            }
+            $allWordsCondition = implode(' AND ', $wordProximityConditions);
+            
+            // Sequential words (exact phrase)
+            $sequentialMatch = '%' . implode('%', $searchWords) . '%';
+        }
+        
+        $orderBySQL = "CASE ";
+        $orderByParams = [];
+        
+        // Priority 1: Exact match
+        $orderBySQL .= "WHEN LOWER(name) LIKE ? THEN 1 ";
+        $orderByParams[] = $exactMatch;
+        
+        // Priority 2: Starts with search term
+        $orderBySQL .= "WHEN LOWER(name) LIKE ? THEN 2 ";
+        $orderByParams[] = $startsWithMatch;
+        
+        if (count($searchWords) > 1) {
+            // Priority 3: Sequential match (phrase match)
+            $orderBySQL .= "WHEN LOWER(name) LIKE ? THEN 3 ";
+            $orderByParams[] = $sequentialMatch;
+            
+            // Priority 4: All words present
+            $orderBySQL .= "WHEN {$allWordsCondition} THEN 4 ";
+            $orderByParams = array_merge($orderByParams, $wordProximityParams);
+        }
+        
+        // Priority 5 (or 3 for single word): Contains match
+        $orderBySQL .= "WHEN LOWER(name) LIKE ? THEN " . (count($searchWords) > 1 ? "5" : "3") . " ";
+        $orderByParams[] = $containsMatch;
+        
+        $orderBySQL .= "ELSE 10 END, CHAR_LENGTH(name)";
+        
+        $query->orderByRaw($orderBySQL, $orderByParams);
     }
     public static function getGlobalSearchResultDetails(\Illuminate\Database\Eloquent\Model $record): array
     {
         $today = Carbon::now();
-        $startDate = $today;
-        $endDate = $today->copy()->addDay();
-        $available = $record->getAvailableQuantityForPeriod($startDate, $endDate);
-        $serials = implode(', ', $record->getAvailableSerialNumbersForPeriod($startDate, $endDate));
+        $available = $record->items()->where('is_available', true)->count();
+        $totalItems = $record->items()->count();
+        
         return [
-            'Status' => ($available > 0 ? 'available' : 'unavailable'),
-            'Tersedia' => $available,
-            'Serials' => $serials,
+            'Category' => $record->category?->name ?? '-',
+            'Brand' => $record->brand?->name ?? '-',
+            'Status' => $record->status === 'available' ? '✅ Available' : '❌ Unavailable',
+            'Stock' => "{$available}/{$totalItems} units",
         ];
     }
 
     protected static ?string $navigationIcon = 'heroicon-o-cube-transparent';
 
-    protected static ?string $navigationGroup = 'Product Catalog';
+    protected static ?string $navigationGroup = 'Product';
 
     protected static ?string $navigationLabel = 'Products';
 
@@ -159,13 +227,31 @@ class ProductResource extends Resource
                         $tersedia = $record->items->where('is_available', true)->pluck('serial_number')->toArray();
                         $tidakTersedia = $record->items->where('is_available', false)->pluck('serial_number')->toArray();
 
-                        $tersediaHtml = count($tersedia)
-                            ? '<span style="color:green">Tersedia: ' . implode(', ', array_map('e', $tersedia)) . '</span>'
-                            : '<span style="color:red">Tidak ada serial number tersedia</span>';
+                        // Format tersedia dengan batasan 5 item
+                        $tersediaHtml = '';
+                        if (count($tersedia) > 0) {
+                            if (count($tersedia) <= 5) {
+                                $tersediaHtml = '<span style="color:green">Tersedia: ' . implode(', ', array_map('e', $tersedia)) . '</span>';
+                            } else {
+                                $first5 = array_slice($tersedia, 0, 5);
+                                $remaining = count($tersedia) - 5;
+                                $tersediaHtml = '<span style="color:green">Tersedia: ' . implode(', ', array_map('e', $first5)) . ' <span style="color:#6b7280; font-style:italic;">dan ' . $remaining . ' lainnya</span></span>';
+                            }
+                        } else {
+                            $tersediaHtml = '<span style="color:red">Tidak ada serial number tersedia</span>';
+                        }
 
-                        $tidakTersediaHtml = count($tidakTersedia)
-                            ? '<br><span style="color:gray">Tidak Tersedia: ' . implode(', ', array_map('e', $tidakTersedia)) . '</span>'
-                            : '';
+                        // Format tidak tersedia dengan batasan 5 item
+                        $tidakTersediaHtml = '';
+                        if (count($tidakTersedia) > 0) {
+                            if (count($tidakTersedia) <= 5) {
+                                $tidakTersediaHtml = '<br><span style="color:gray">Tidak Tersedia: ' . implode(', ', array_map('e', $tidakTersedia)) . '</span>';
+                            } else {
+                                $first5 = array_slice($tidakTersedia, 0, 5);
+                                $remaining = count($tidakTersedia) - 5;
+                                $tidakTersediaHtml = '<br><span style="color:gray">Tidak Tersedia: ' . implode(', ', array_map('e', $first5)) . ' <span style="color:#6b7280; font-style:italic;">dan ' . $remaining . ' lainnya</span></span>';
+                            }
+                        }
 
                         return new HtmlString($tersediaHtml . $tidakTersediaHtml);
                     })
@@ -211,8 +297,25 @@ class ProductResource extends Resource
 
                         Tables\Columns\TextColumn::make('items.serial_number')
                             ->label('Nomor Seri')
-                            ->formatStateUsing(fn($record) => $record->items->pluck('serial_number')->implode(', '))
+                            ->formatStateUsing(function($record) {
+                                $serialNumbers = $record->items->pluck('serial_number')->toArray();
+                                
+                                if (count($serialNumbers) === 0) {
+                                    return '-';
+                                }
+                                
+                                if (count($serialNumbers) <= 5) {
+                                    return implode(', ', $serialNumbers);
+                                }
+                                
+                                $first5 = array_slice($serialNumbers, 0, 5);
+                                $remaining = count($serialNumbers) - 5;
+                                
+                                return implode(', ', $first5) . " <span style='color: #6b7280; font-style: italic;'>dan {$remaining} lainnya</span>";
+                            })
+                            ->html()
                             ->searchable()
+                            ->wrap()
                             ->sortable(),
 
                         Tables\Columns\TextColumn::make('price')

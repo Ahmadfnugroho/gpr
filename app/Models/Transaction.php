@@ -116,7 +116,7 @@ class Transaction extends Model
         return $this->hasMany(DetailTransaction::class);
     }
 
-    protected $with = ['detailTransactions'];
+    protected $with = ['detailTransactions.product', 'detailTransactions.bundling'];
 
     // Remove the accessor to avoid overriding relation loading
     // public function getDetailTransactionsAttribute()

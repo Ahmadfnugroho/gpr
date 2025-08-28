@@ -54,6 +54,45 @@ use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 class TransactionResource extends Resource
 {
     protected static ?string $model = Transaction::class;
+    protected static ?string $recordTitleAttribute = 'booking_transaction_id';
+
+    // ✅ Global Search Configuration
+    public static function getGlobalSearchResultTitle($record): string
+    {
+        return $record->booking_transaction_id;
+    }
+
+    public static function getGloballySearchableAttributes(): array
+    {
+        return [
+            'booking_transaction_id',
+            'user.name',
+            'user.email',
+            'detailTransactions.product.name',
+            'detailTransactions.bundling.name',
+        ];
+    }
+
+    public static function getGlobalSearchEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()
+            ->with([
+                'user:id,name,email',
+                'detailTransactions.product:id,name',
+                'detailTransactions.bundling:id,name'
+            ])
+            ->where('booking_status', '!=', 'cancelled');
+    }
+
+    public static function getGlobalSearchResultDetails($record): array
+    {
+        return [
+            'Customer' => $record->user?->name ?? 'Unknown',
+            'Status' => ucfirst($record->booking_status),
+            'Total' => 'Rp ' . number_format($record->grand_total, 0, ',', '.'),
+            'Date' => $record->start_date?->format('d M Y') ?? '-',
+        ];
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
     protected static ?string $navigationGroup = 'Sales & Transactions';
@@ -64,13 +103,13 @@ class TransactionResource extends Resource
         $productId = $get('product_id');
         $quantity = max(1, (int) $get('quantity'));
         $currentUuid = $get('uuid');
-        
+
         // Generate UUID if missing
         if (!$currentUuid && $set) {
             $currentUuid = (string) \Illuminate\Support\Str::uuid();
             $set('uuid', $currentUuid);
         }
-        
+
         $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
         $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
         $allDetailTransactions = $get('../../detailTransactions') ?? [];
@@ -134,7 +173,7 @@ class TransactionResource extends Resource
         if (!$bundling) {
             return ['ids' => [], 'display' => '-'];
         }
-        
+
         // Generate UUID if missing
         if (!$currentUuid) {
             $currentUuid = (string) \Illuminate\Support\Str::uuid();
@@ -222,12 +261,12 @@ class TransactionResource extends Resource
         if (!str_contains($state, '-')) {
             return; // Invalid format
         }
-        
+
         [$type, $id] = explode('-', $state, 2);
         if (!$type || !$id) {
             return; // Invalid parts
         }
-        
+
         $isBundling = $type === 'bundling';
         $set('is_bundling', $isBundling);
 
@@ -237,7 +276,7 @@ class TransactionResource extends Resource
             $uuid = (string) \Illuminate\Support\Str::uuid();
             $set('uuid', $uuid);
         }
-        
+
         $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
         $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
 
@@ -276,15 +315,15 @@ class TransactionResource extends Resource
     protected static function calculateTotalBeforeDiscount(Get $get): int
     {
         $details = collect($get('detailTransactions') ?? []);
-        
+
         return $details->sum(function ($item) {
             $quantity = (int)($item['quantity'] ?? 1);
-            
+
             // Ensure quantity is at least 1
             if ($quantity < 1) $quantity = 1;
-            
+
             $price = 0;
-            
+
             if (!empty($item['is_bundling']) && !empty($item['bundling_id'])) {
                 $bundling = \App\Models\Bundling::find($item['bundling_id']);
                 $price = $bundling ? (int)$bundling->price : 0;
@@ -292,11 +331,11 @@ class TransactionResource extends Resource
                 $product = \App\Models\Product::find($item['product_id']);
                 $price = $product ? (int)$product->price : 0;
             }
-            
+
             return $price * $quantity;
         });
     }
-    
+
     /**
      * Calculate discount amount based on promo rules
      */
@@ -304,28 +343,28 @@ class TransactionResource extends Resource
     {
         $promoId = $get('promo_id');
         if (!$promoId) return 0;
-        
+
         $promo = \App\Models\Promo::find($promoId);
         if (!$promo || !is_array($promo->rules) || empty($promo->rules)) {
             return 0;
         }
-        
+
         $rule = $promo->rules[0] ?? [];
         $duration = (int)($get('duration') ?? 1);
-        
+
         // Apply discount per duration (multiply by duration)
         $totalWithDuration = $totalBeforeDiscount * $duration;
-        
+
         $discount = match ($promo->type) {
             'day_based' => static::calculateDayBasedDiscount($rule, $duration, $totalBeforeDiscount),
             'percentage' => static::calculatePercentageDiscount($rule, $totalWithDuration),
             'nominal' => static::calculateNominalDiscount($rule, $totalWithDuration),
             default => 0,
         };
-        
+
         return max(0, min($discount, $totalWithDuration));
     }
-    
+
     /**
      * Calculate day-based discount
      */
@@ -333,19 +372,19 @@ class TransactionResource extends Resource
     {
         $groupSize = max(1, (int)($rule['group_size'] ?? 1));
         $payDays = max(0, (int)($rule['pay_days'] ?? 0));
-        
+
         $fullGroups = intval($duration / $groupSize);
         $remainingDays = $duration % $groupSize;
-        
+
         $discountedDays = $fullGroups * $payDays;
         $totalDaysToPay = $discountedDays + $remainingDays;
-        
+
         $totalWithoutDiscount = $totalBeforeDiscount * $duration;
         $totalWithDiscount = $totalBeforeDiscount * $totalDaysToPay;
-        
+
         return max(0, $totalWithoutDiscount - $totalWithDiscount);
     }
-    
+
     /**
      * Calculate percentage discount
      */
@@ -354,7 +393,7 @@ class TransactionResource extends Resource
         $percentage = max(0, min(100, (float)($rule['percentage'] ?? 0)));
         return (int)(($totalWithDuration * $percentage) / 100);
     }
-    
+
     /**
      * Calculate nominal discount
      */
@@ -363,7 +402,7 @@ class TransactionResource extends Resource
         $nominal = max(0, (int)($rule['nominal'] ?? 0));
         return min($nominal, $totalWithDuration);
     }
-    
+
     /**
      * Calculate grand total (total before discount - discount + duration)
      */
@@ -371,17 +410,17 @@ class TransactionResource extends Resource
     {
         $duration = max(1, (int)($get('duration') ?? 1));
         $totalBeforeDiscount = static::calculateTotalBeforeDiscount($get);
-        
+
         if ($totalBeforeDiscount <= 0) {
             return 0;
         }
-        
+
         // Apply duration to base price
         $totalWithDuration = $totalBeforeDiscount * $duration;
-        
+
         // Calculate discount
         $discountAmount = static::calculateDiscountAmount($get, $totalBeforeDiscount);
-        
+
         // Final total
         return max(0, $totalWithDuration - $discountAmount);
     }
@@ -390,7 +429,7 @@ class TransactionResource extends Resource
     {
         return static::calculateGrandTotal($get);
     }
-    
+
     /**
      * Update booking status based on payment amounts
      */
@@ -400,7 +439,7 @@ class TransactionResource extends Resource
             $set('booking_status', 'cancelled');
             return;
         }
-        
+
         if ($downPayment <= 0) {
             $set('booking_status', 'cancelled');
         } elseif ($downPayment >= $grandTotal) {
@@ -946,7 +985,7 @@ class TransactionResource extends Resource
                                     function (Get $get) {
                                         $grandTotal = static::calculateGrandTotal($get);
                                         if ($grandTotal <= 0) return ['required', 'min:0'];
-                                        
+
                                         $min = max(0, floor($grandTotal * 0.5)); // 50% minimum
 
                                         return [
@@ -972,8 +1011,8 @@ class TransactionResource extends Resource
                                 ->helperText(function (Get $get) {
                                     $grandTotal = static::calculateGrandTotal($get);
                                     $minPayment = max(0, floor($grandTotal * 0.5));
-                                    return 'Pembayaran minimal 50%: Rp ' . number_format($minPayment, 0, ',', '.') . 
-                                           ' - Maksimal: Rp ' . number_format($grandTotal, 0, ',', '.');
+                                    return 'Pembayaran minimal 50%: Rp ' . number_format($minPayment, 0, ',', '.') .
+                                        ' - Maksimal: Rp ' . number_format($grandTotal, 0, ',', '.');
                                 })
                                 ->minValue(function (Get $get) {
                                     $grandTotal = static::calculateGrandTotal($get);
@@ -983,7 +1022,7 @@ class TransactionResource extends Resource
                                 ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                     $grandTotal = static::calculateGrandTotal($get);
                                     $downPayment = max(0, (int)($state ?? 0));
-                                    
+
                                     // Validasi dan koreksi nilai
                                     if ($grandTotal <= 0) {
                                         $set('down_payment', 0);
@@ -991,9 +1030,9 @@ class TransactionResource extends Resource
                                         $set('booking_status', 'cancelled');
                                         return;
                                     }
-                                    
+
                                     $minPayment = max(0, floor($grandTotal * 0.5));
-                                    
+
                                     // Auto-correct invalid values
                                     if ($downPayment < $minPayment && $downPayment > 0) {
                                         $downPayment = $minPayment;
@@ -1002,12 +1041,12 @@ class TransactionResource extends Resource
                                         $downPayment = $grandTotal;
                                         $set('down_payment', $downPayment);
                                     }
-                                    
+
                                     // Calculate remaining payment
                                     $remaining = max(0, $grandTotal - $downPayment);
                                     $set('remaining_payment', $remaining);
                                     $set('grand_total', $grandTotal);
-                                    
+
                                     // Update booking status based on payment
                                     static::updateBookingStatusBasedOnPayment($set, $downPayment, $grandTotal);
                                 })
@@ -1134,6 +1173,17 @@ class TransactionResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function (Builder $query) {
+                return $query->with([
+                    'user:id,name,email',
+                    'user.userPhoneNumbers:id,user_id,phone_number',
+                    'detailTransactions:id,transaction_id,product_id,bundling_id,quantity',
+                    'detailTransactions.product:id,name',
+                    'detailTransactions.bundling:id,name',
+                    'detailTransactions.productItems:id,serial_number,product_id',
+                    'promo:id,name'
+                ]);
+            })
             ->columns([
                 TextColumn::make('booking_transaction_id')
                     ->label('ID')
@@ -1156,28 +1206,77 @@ class TransactionResource extends Resource
 
                     ->copyable(),
                 TextColumn::make('product_info')
-                    ->label('Prdk')
+                    ->label('Product')
                     ->limit(20)
                     ->size(TextColumnSize::ExtraSmall)
-                    ->formatStateUsing(function ($record) {
+                    ->getStateUsing(function ($record) {
+                        Log::info('=== PRODUCT_INFO DEBUG START (getStateUsing) ===', [
+                            'transaction_id' => $record->id,
+                        ]);
+
                         $products = [];
-                        
-                        foreach ($record->detailTransactions as $detail) {
+
+                        // Query detail transactions directly from database
+                        $detailTransactions = \App\Models\DetailTransaction::with(['product', 'bundling'])
+                            ->where('transaction_id', $record->id)
+                            ->get();
+
+                        Log::info('Detail transactions query result', [
+                            'count' => $detailTransactions->count(),
+                            'transaction_id' => $record->id,
+                        ]);
+
+                        foreach ($detailTransactions as $detail) {
                             if ($detail->bundling_id && $detail->bundling) {
                                 $products[] = $detail->bundling->name . ' (Bundle)';
+                                Log::info('Added bundling', ['name' => $detail->bundling->name]);
                             } elseif ($detail->product_id && $detail->product) {
                                 $products[] = $detail->product->name;
+                                Log::info('Added product', ['name' => $detail->product->name]);
+                            } else {
+                                Log::warning('No product or bundling found for detail', [
+                                    'detail_id' => $detail->id,
+                                    'product_id' => $detail->product_id,
+                                    'bundling_id' => $detail->bundling_id,
+                                ]);
                             }
                         }
-                        
-                        return implode(', ', array_unique($products)) ?: 'N/A';
+
+                        $result = implode(', ', array_unique($products)) ?: 'N/A';
+                        Log::info('=== PRODUCT_INFO DEBUG END ===', [
+                            'final_result' => $result,
+                            'products_array' => $products,
+                        ]);
+
+                        return $result;
                     })
                     ->wrap(),
                 TextColumn::make('detailTransactions.productItems.serial_number')
                     ->label('S/N')
-                    ->limit(20)
                     ->size(TextColumnSize::ExtraSmall)
+                    ->formatStateUsing(function ($record) {
+                        $serialNumbers = [];
 
+                        foreach ($record->detailTransactions as $detail) {
+                            foreach ($detail->productItems as $item) {
+                                $serialNumbers[] = $item->serial_number;
+                            }
+                        }
+
+                        if (empty($serialNumbers)) {
+                            return '-';
+                        }
+
+                        if (count($serialNumbers) <= 5) {
+                            return implode(', ', $serialNumbers);
+                        }
+
+                        $first5 = array_slice($serialNumbers, 0, 5);
+                        $remaining = count($serialNumbers) - 5;
+
+                        return implode(', ', $first5) . " <span style='color: #6b7280; font-style: italic;'>dan {$remaining} lainnya</span>";
+                    })
+                    ->html()
                     ->wrap(),
                 TextColumn::make('start_date')
                     ->label('Start')

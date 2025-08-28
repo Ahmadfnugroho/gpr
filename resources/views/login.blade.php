@@ -39,6 +39,9 @@
             <div class="mb-3 d-grid">
                 <a href="route('google.redirect')" class="btn btn-danger">Login With Google</a>
             </div>
+            <div class="mb-3 text-center">
+                <a href="{{ route('forgot.password') }}" class="text-decoration-none">Lupa Password?</a>
+            </div>
         </form>
        
     </div>

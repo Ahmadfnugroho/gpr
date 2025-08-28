@@ -24,7 +24,7 @@ class UserPhotoResource extends Resource
     protected static ?string $model = UserPhoto::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-photo';
-    protected static ?string $navigationGroup = 'User';
+    protected static ?string $navigationGroup = 'User Management';
 
     protected static ?string $navigationLabel = 'User Photo';
 
