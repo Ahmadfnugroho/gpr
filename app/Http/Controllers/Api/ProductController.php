@@ -12,7 +12,9 @@ class ProductController extends Controller
 {
     /**
      * Fast, filterable, sortable, searchable product list for frontend (landing page, no login)
-     * Query params: ?q=search&sort=price|name&order=asc|desc&category=slug&brand=slug&premiere=1
+     * Query params: ?q=search&sort=price|name&order=asc|desc&category=slug&brand=slug&premiere=1&exclude_rental_includes=true
+     * 
+     * @param exclude_rental_includes boolean - When true, excludes products that are used as rental includes in other products
      */
     public function index(Request $request)
     {
@@ -59,6 +61,15 @@ class ProductController extends Controller
         // ⭐ Filter: Premiere (rekomendasi)
         if ($request->has('premiere')) {
             $query->where('premiere', (bool)$request->query('premiere'));
+        }
+
+        // 🚫 Filter: Exclude products that are rental includes
+        if ($request->boolean('exclude_rental_includes', false)) {
+            $query->whereNotIn('id', function ($subQuery) {
+                $subQuery->select('include_product_id')
+                    ->from('rental_includes')
+                    ->whereNotNull('include_product_id');
+            });
         }
 
         // 🔼 Sorting
