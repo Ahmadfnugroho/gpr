@@ -300,7 +300,7 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
 
         // End/Logout session
         $('#logout-session').click(function() {
-            if (!confirm('Are you sure you want to end the WhatsApp session? This will log out the connected device.')) return;
+            if (!confirm('Are you sure you want to end the WhatsApp session? This will log out the connected device and reset the connection status to "Scan QR Code 📱".')) return;
             
             let $btn = $(this);
             $btn.prop('disabled', true).text('Ending Session...');
@@ -308,16 +308,28 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
             $.post('{{ route("whatsapp.logout") }}')
                 .done(function(data) {
                     if (data.success) {
-                        alert('Session ended successfully! WhatsApp has been logged out.');
+                        alert('✅ ' + data.message);
+                        
+                        // Clear QR code display and reset UI
                         $('#qr-code-display').html('<div class="text-gray-500">Session ended. Click "Get QR Code" to start new session.</div>');
                         $('#phone-info').html('Not connected');
-                        checkStatus();
+                        
+                        // Reset connection status immediately
+                        $('#connection-status').html(
+                            '<span class="status-indicator status-connecting"></span>' +
+                            '<span>Scan QR Code 📱</span>'
+                        );
+                        
+                        // Check status after a short delay to get updated server status
+                        setTimeout(function() {
+                            checkStatus();
+                        }, 2000);
                     } else {
-                        alert('Failed to end session: ' + data.message);
+                        alert('❌ Failed to end session: ' + data.message);
                     }
                 })
                 .fail(function() {
-                    alert('Error ending session');
+                    alert('❌ Error ending session. Please try again or restart the session.');
                 })
                 .always(function() {
                     $btn.prop('disabled', false).text('End Session');

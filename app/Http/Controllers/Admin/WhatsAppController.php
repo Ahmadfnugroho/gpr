@@ -141,10 +141,17 @@ class WhatsAppController extends Controller
             // Logout/stop session default
             $result = $this->wahaService->logoutSession('default');
             
-            return response()->json([
-                'success' => true,
-                'message' => 'Session berhasil diakhiri. WhatsApp telah logout.'
-            ]);
+            if ($result) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Session berhasil diakhiri. WhatsApp telah logout dan akan kembali ke status "Scan QR Code 📱".'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Session logout gagal. Silakan coba lagi atau restart session.'
+                ]);
+            }
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

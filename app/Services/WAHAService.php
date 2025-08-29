@@ -418,19 +418,55 @@ class WAHAService
     public function logoutSession($sessionName = 'default')
     {
         try {
-            // Use the stop endpoint to end/logout the session
-            $response = Http::withHeaders([
-                'X-Api-Key' => $this->apiKey,
-                'Content-Type' => 'application/json',
-            ])->post("{$this->baseUrl}/sessions/{$sessionName}/stop");
-
-            return $response->successful() ? $response->json() : null;
+            // Try multiple methods to ensure session is properly logged out
+            $endpoints = [
+                "{$this->baseUrl}/sessions/{$sessionName}/stop",
+                "{$this->baseUrl}/sessions/{$sessionName}/logout",
+                "{$this->baseUrl}/{$sessionName}/auth/logout"
+            ];
+            
+            $success = false;
+            foreach ($endpoints as $endpoint) {
+                Log::info('Trying logout endpoint', ['endpoint' => $endpoint]);
+                
+                $response = Http::withHeaders([
+                    'X-Api-Key' => $this->apiKey,
+                    'Content-Type' => 'application/json',
+                ])->post($endpoint);
+                
+                Log::info('Logout endpoint response', [
+                    'endpoint' => $endpoint,
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+                
+                if ($response->successful()) {
+                    $success = true;
+                    Log::info('Session logged out successfully', ['endpoint' => $endpoint]);
+                    break;
+                }
+            }
+            
+            // If all logout endpoints fail, try deleting the session entirely
+            if (!$success) {
+                Log::warning('All logout endpoints failed, trying to delete session');
+                $deleteResponse = Http::withHeaders([
+                    'X-Api-Key' => $this->apiKey,
+                ])->delete("{$this->baseUrl}/sessions/{$sessionName}");
+                
+                if ($deleteResponse->successful()) {
+                    Log::info('Session deleted successfully');
+                    $success = true;
+                }
+            }
+            
+            return $success;
         } catch (\Exception $e) {
-            // Log::error('WAHA logout session failed', [
-            //     'session' => $sessionName,
-            //     'error' => $e->getMessage()
-            // ]);
-            return null;
+            Log::error('WAHA logout session failed', [
+                'session' => $sessionName,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 }
