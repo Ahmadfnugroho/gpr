@@ -5,6 +5,7 @@ namespace App\Listeners;
 use App\Events\UserDataChanged;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Carbon;
 
 class SyncUserToGoogleSheet
 {
@@ -30,7 +31,7 @@ class SyncUserToGoogleSheet
             'source_info' => $user->source_info,
             'status' => $user->status,
             'phone_numbers' => $user->userPhoneNumbers->pluck('phone_number')->values()->toArray(),
-            'updated_at' => $user->updated_at->toIso8601String(),
+            'updated_at' => $user->updated_at ? Carbon::parse($user->updated_at)->toIso8601String() : null,
         ];
 
         try {
