@@ -158,19 +158,48 @@ class RegistrationController extends Controller
     private function sendAdminNotification($user)
     {
         $adminEmail = 'ahmadfnugroho@gmail.com';
-        $editUrl = url('/admin/users/' . $user->id . '/edit'); // Sesuaikan dengan URL admin panel Anda
+        $editUrl = url('/admin/users/' . $user->id . '/edit');
+        
+        // Get user phone numbers
+        $phone1 = $user->userPhoneNumbers->first()?->phone_number ?? 'Tidak ada';
+        $phone2 = $user->userPhoneNumbers->skip(1)->first()?->phone_number ?? 'Tidak ada';
+        
+        // Create WhatsApp links
+        $waLink1 = $phone1 !== 'Tidak ada' ? 'https://wa.me/' . preg_replace('/\D/', '', $phone1) : null;
+        $waLink2 = $phone2 !== 'Tidak ada' ? 'https://wa.me/' . preg_replace('/\D/', '', $phone2) : null;
 
         $subject = 'Registrasi User Baru - Global Photo Rental';
         $message = "
-            <h2>Registrasi User Baru</h2>
+            <h2>🆕 Registrasi User Baru</h2>
             <p>User baru telah mendaftar dengan detail:</p>
-            <ul>
-                <li><strong>Nama:</strong> {$user->name}</li>
-                <li><strong>Email:</strong> {$user->email}</li>
-                <li><strong>Status:</strong> {$user->status}</li>
-                <li><strong>Sumber Info:</strong> {$user->source_info}</li>
-            </ul>
-            <p><a href='{$editUrl}' style='background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Edit User</a></p>
+            <table style='border-collapse: collapse; width: 100%;'>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Nama:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$user->name}</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Email:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$user->email}</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>HP 1:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$phone1}</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>HP 2:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$phone2}</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Alamat:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$user->address}</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Status:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'><span style='background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px;'>{$user->status}</span></td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Sumber Info:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$user->source_info}</td></tr>
+            </table>
+            
+            <div style='margin-top: 20px;'>
+                <h3>🔗 Quick Actions:</h3>
+                <p>
+                    <a href='{$editUrl}' style='background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;'>✏️ Edit User</a>";
+                    
+        if ($waLink1) {
+            $message .= "<a href='{$waLink1}' style='background: #25D366; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;'>📱 Chat HP 1</a>";
+        }
+        if ($waLink2) {
+            $message .= "<a href='{$waLink2}' style='background: #25D366; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>📱 Chat HP 2</a>";
+        }
+        
+        $message .= "
+                </p>
+                <p style='margin-top: 15px; padding: 10px; background: #f8f9fa; border-left: 4px solid #007bff; font-style: italic;'>
+                    ✅ Silakan lakukan verifikasi dan ubah status user dari <strong>blacklist</strong> menjadi <strong>active</strong>.
+                </p>
+            </div>
         ";
 
         try {
@@ -187,7 +216,7 @@ class RegistrationController extends Controller
     {
         try {
             $wahaService = new WAHAService();
-            $adminPhone = '6281117095956';
+            $adminPhone = '628111709596';
             $editUrl = url('/admin/users/' . $user->id . '/edit');
 
             // Get user phone numbers

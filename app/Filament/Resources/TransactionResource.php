@@ -437,18 +437,27 @@ class TransactionResource extends Resource
         return $form->schema([
 
             TextInput::make('booking_transaction_id')
-                ->label('Booking Trx Id')
+                ->label('Booking Transaction ID')
                 ->disabled()
+                ->extraAttributes([
+                    'aria-label' => 'Booking Transaction ID (auto-generated)',
+                    'id' => 'booking_transaction_id'
+                ])
                 ->columnSpanFull(),
             Grid::make('Durasi')
                 ->schema([
                     Select::make('user_id')
-                        ->relationship('user', 'name')
+                        ->relationship('user', 'name', fn (Builder $query) => $query->where('status', 'active'))
                         ->required()
                         ->searchable()
                         ->preload()
                         ->live()
                         ->columnSpan(1)
+                        ->extraAttributes([
+                            'aria-label' => 'Select customer for this transaction',
+                            'aria-describedby' => 'user-selection-help',
+                            'id' => 'user_id_select'
+                        ])
                         ->afterStateUpdated(function ($state, callable $set) {
                             $set('user_id', $state);
                             $user = \App\Models\User::find($state);
@@ -487,6 +496,11 @@ class TransactionResource extends Resource
                         ->reactive()
                         ->default(now())
                         ->minDate(now()->subWeek())
+                        ->extraAttributes([
+                            'aria-label' => 'Select rental start date and time',
+                            'aria-describedby' => 'start-date-help',
+                            'id' => 'start_date_picker'
+                        ])
                         ->afterStateUpdated(function ($state, $get, $set) {
                             $set('is_bundling', false);
                             $set('bundling_id', null);
@@ -511,6 +525,11 @@ class TransactionResource extends Resource
                         ->searchable()
                         ->suffix('Hari')
                         ->reactive()
+                        ->extraAttributes([
+                            'aria-label' => 'Select rental duration in days',
+                            'aria-describedby' => 'duration-help',
+                            'id' => 'duration_select'
+                        ])
                         ->afterStateUpdated(function ($state, callable $set, callable $get) {
 
                             $startDate = $get('start_date');
@@ -628,6 +647,10 @@ class TransactionResource extends Resource
                                             return $products->merge($bundlings)->toArray();
                                         })
                                         ->live(debounce: 300)
+                                        ->extraAttributes([
+                                            'aria-label' => 'Select product or bundling package for rental',
+                                            'aria-describedby' => 'product-selection-help'
+                                        ])
 
                                         // Trigger saat awal data dimuat
                                         ->afterStateHydrated(function ($state, Set $set, Get $get) {
@@ -694,6 +717,12 @@ class TransactionResource extends Resource
                                         ->default(1)
                                         ->minValue(1)
                                         ->live(debounce: 300)
+                                        ->extraAttributes([
+                                            'aria-label' => 'Enter quantity of items to rent',
+                                            'aria-describedby' => 'quantity-help',
+                                            'min' => '1',
+                                            'step' => '1'
+                                        ])
                                         ->afterStateUpdated(function ($state, Set $set, Get $get) {
                                             $allDetailTransactions = $get('../../detailTransactions') ?? [];
                                             \App\Filament\Resources\TransactionResource::resolveProductOrBundlingSelection($state, $set, $get, $allDetailTransactions);
@@ -701,7 +730,34 @@ class TransactionResource extends Resource
                                         ->columnSpan(1),
 
                                     CheckboxList::make('productItems')
-                                        ->label('Serial Numbers Tersedia')
+                                        ->label(function (Get $get) {
+                                            $startDate = $get('../../start_date') ? \Carbon\Carbon::parse($get('../../start_date')) : now();
+                                            $endDate = $get('../../end_date') ? \Carbon\Carbon::parse($get('../../end_date')) : now();
+                                            $productId = $get('product_id');
+                                            $bundlingId = $get('bundling_id');
+                                            $quantity = (int) ($get('quantity') ?? 1);
+                                            
+                                            $availableCount = 0;
+                                            if ($productId) {
+                                                $available = \App\Filament\Resources\TransactionResource::resolveAvailableProductSerials($get);
+                                                $availableCount = count($available);
+                                            } elseif ($bundlingId) {
+                                                $result = \App\Filament\Resources\TransactionResource::resolveBundlingProductSerialsDisplay(
+                                                    (int) $bundlingId,
+                                                    $quantity,
+                                                    $startDate,
+                                                    $endDate,
+                                                    $get('uuid'),
+                                                    $get('../../detailTransactions') ?? []
+                                                );
+                                                $availableCount = count($result['ids']);
+                                            }
+                                            
+                                            $status = $availableCount >= $quantity ? '✅ Tersedia' : '⚠️ Terbatas';
+                                            $color = $availableCount >= $quantity ? 'green' : 'orange';
+                                            
+                                            return "Serial Numbers ({$availableCount} tersedia) - <span style='color: {$color}'>{$status}</span>";
+                                        })
                                         ->visible(function (Get $get) {
                                             return !is_null($get('selection_key'));
                                         })
@@ -815,13 +871,17 @@ class TransactionResource extends Resource
                         ->schema([
                             Select::make('promo_id')
                                 ->label('Input kode Promo')
-
                                 ->relationship('promo', 'name')
                                 ->searchable()
                                 ->nullable()
                                 ->preload()
                                 ->live()
                                 ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                ->extraAttributes([
+                                    'aria-label' => 'Select promotional discount code (optional)',
+                                    'aria-describedby' => 'promo-help',
+                                    'id' => 'promo_code_select'
+                                ])
                                 ->columnSpanFull(),
 
                             Placeholder::make('total_before_discount')
@@ -953,6 +1013,11 @@ class TransactionResource extends Resource
                                 ->numeric()
                                 ->default(0)
                                 ->live(debounce: 500)
+                                ->extraAttributes([
+                                    'aria-label' => 'Enter down payment amount in Rupiah',
+                                    'aria-describedby' => 'down-payment-help',
+                                    'id' => 'down_payment_input'
+                                ])
                                 ->rules([
                                     function (Get $get) {
                                         $grandTotal = static::calculateGrandTotal($get);
@@ -1023,7 +1088,7 @@ class TransactionResource extends Resource
                                     static::updateBookingStatusBasedOnPayment($set, $downPayment, $grandTotal);
                                 })
                                 ->columnSpanFull()
-                                ->step(1000),
+                                ->step(500),
                             Placeholder::make('remaining_payment')
                                 ->label('Pelunasan')
                                 ->content(function (Get $get) {
@@ -1061,6 +1126,11 @@ class TransactionResource extends Resource
                                     'cancelled' => 'cancelled',
                                     'rented' => 'rented',
                                     'finished' => 'finished',
+                                ])
+                                ->extraAttributes([
+                                    'aria-label' => 'Select booking status',
+                                    'aria-describedby' => 'booking-status-help',
+                                    'role' => 'radiogroup'
                                 ])
                                 ->icons([
                                     'pending' => 'heroicon-o-clock',
@@ -1118,7 +1188,12 @@ class TransactionResource extends Resource
                                     $set('grand_total', $grandTotal);
                                 }),
                             TextInput::make('note')
-                                ->label('Catatan Sewa'),
+                                ->label('Catatan Sewa')
+                                ->extraAttributes([
+                                    'aria-label' => 'Enter additional rental notes or comments',
+                                    'aria-describedby' => 'note-help',
+                                    'id' => 'rental_note_input'
+                                ]),
 
 
 
