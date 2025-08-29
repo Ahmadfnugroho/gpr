@@ -71,8 +71,12 @@ class UserResource extends Resource
             $transactionInfo = "{$startDate} - {$endDate}";
         }
         
+        // Email verification status
+        $emailVerified = $record->email_verified_at ? '✅ Verified' : '❌ Not Verified';
+        
         return [
             'Email' => $record->email,
+            'Email Status' => $emailVerified,
             'Phone' => $phone ? $phone->phone_number : '-',
             'Latest Rental' => $transactionInfo,
         ];
@@ -104,6 +108,10 @@ class UserResource extends Resource
                         ->required()
                         ->email()
                         ->maxLength(255),
+                    Forms\Components\DateTimePicker::make('email_verified_at')
+                        ->label('Email Verified At')
+                        ->helperText('Leave blank if email is not verified. Set date/time when email was verified.')
+                        ->nullable(),
                     Forms\Components\TextInput::make('password')
                         ->default(function () {
                             return Str::random(8);
@@ -193,6 +201,16 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('email')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\IconColumn::make('email_verified')
+                    ->label('Email Verified')
+                    ->getStateUsing(fn($record) => $record->email_verified_at !== null)
+                    ->trueIcon('heroicon-o-check-badge')
+                    ->falseIcon('heroicon-o-exclamation-triangle')
+                    ->trueColor('success')
+                    ->falseColor('warning')
+                    ->tooltip(fn($record) => $record->email_verified_at 
+                        ? 'Verified on: ' . $record->email_verified_at->format('d M Y H:i')
+                        : 'Email not verified'),
                 Tables\Columns\TextColumn::make('userPhoneNumbers.phone_number')
                     ->label('Phone Number')
                     ->sortable(),
@@ -207,10 +225,60 @@ class UserResource extends Resource
 
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('email_verified')
+                    ->label('Email Verification Status')
+                    ->options([
+                        'verified' => 'Verified',
+                        'not_verified' => 'Not Verified',
+                    ])
+                    ->query(function ($query, $data) {
+                        if ($data['value'] === 'verified') {
+                            return $query->whereNotNull('email_verified_at');
+                        } elseif ($data['value'] === 'not_verified') {
+                            return $query->whereNull('email_verified_at');
+                        }
+                        return $query;
+                    }),
+                Tables\Filters\SelectFilter::make('status')
+                    ->label('User Status')
+                    ->options([
+                        'active' => 'Active',
+                        'blacklist' => 'Blacklist',
+                    ]),
             ])
             ->actions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkActionGroup::make([
+                        Tables\Actions\Action::make('verify_email')
+                            ->icon('heroicon-o-check-badge')
+                            ->color('success')
+                            ->label('Verify Email')
+                            ->requiresConfirmation()
+                            ->visible(fn(User $record) => $record->email_verified_at === null)
+                            ->action(function (User $record) {
+                                $record->update(['email_verified_at' => now()]);
+                                Notification::make()
+                                    ->success()
+                                    ->title('Email Verified Successfully')
+                                    ->body('User email has been marked as verified.')
+                                    ->send();
+                            }),
+                        Tables\Actions\Action::make('unverify_email')
+                            ->icon('heroicon-o-x-mark')
+                            ->color('warning')
+                            ->label('Unverify Email')
+                            ->requiresConfirmation()
+                            ->visible(fn(User $record) => $record->email_verified_at !== null)
+                            ->action(function (User $record) {
+                                $record->update(['email_verified_at' => null]);
+                                Notification::make()
+                                    ->warning()
+                                    ->title('Email Unverified')
+                                    ->body('User email has been marked as unverified.')
+                                    ->send();
+                            })
+                    ])
+                        ->label('Email Actions'),
                     Tables\Actions\BulkActionGroup::make([
                         Tables\Actions\Action::make('active')
                             ->icon('heroicon-o-check-circle')
