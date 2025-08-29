@@ -111,7 +111,6 @@ class RegistrationController extends Controller
 
             return redirect()->route('registration.success')
                 ->with('success', 'Registrasi berhasil! Silakan cek email Anda untuk verifikasi.');
-
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', 'Terjadi kesalahan saat registrasi. Silakan coba lagi.')
@@ -121,7 +120,7 @@ class RegistrationController extends Controller
 
     private function sendAdminNotification($user)
     {
-        $adminEmail = 'imam.prabowo1511@gmail.com';
+        $adminEmail = 'dissamustika96@gmail.com';
         $editUrl = url('/admin/users/' . $user->id . '/edit'); // Sesuaikan dengan URL admin panel Anda
 
         $subject = 'Registrasi User Baru - Global Photo Rental';
@@ -143,7 +142,7 @@ class RegistrationController extends Controller
                     ->subject($subject);
             });
         } catch (\Exception $e) {
-            \Log::error('Failed to send admin notification: ' . $e->getMessage());
+            Log::error('Failed to send admin notification: ' . $e->getMessage());
         }
     }
 
@@ -155,7 +154,7 @@ class RegistrationController extends Controller
     public function verifyEmail(Request $request)
     {
         $user = User::findOrFail($request->route('id'));
-        
+
         if ($user->hasVerifiedEmail()) {
             return redirect()->route('registration.success')
                 ->with('message', 'Email sudah terverifikasi sebelumnya.');
