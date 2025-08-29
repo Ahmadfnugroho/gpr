@@ -152,7 +152,7 @@ class Transaction extends Model
     public function setRelation($key, $value)
     {
         if ($key === 'detailTransactions' && $value === false) {
-            Log::error("Someone set detailTransactions to FALSE! ID: " . $this->id);
+            // Log::error("Someone set detailTransactions to FALSE! ID: " . $this->id);
         }
 
         return parent::setRelation($key, $value);

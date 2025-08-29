@@ -40,9 +40,9 @@ class SyncUserToGoogleSheet
             ])->post('https://global1.work.gd/api/google-sheet-sync', $payload);
 
             if ($response->successful()) {
-                Log::info('SyncUserToGoogleSheet: Successfully synced user ' . $user->email);
+                // Log::info('SyncUserToGoogleSheet: Successfully synced user ' . $user->email);
             } else {
-                Log::error('SyncUserToGoogleSheet: Failed to sync user ' . $user->email . '. Response: ' . $response->body());
+                // Log::error('SyncUserToGoogleSheet: Failed to sync user ' . $user->email . '. Response: ' . $response->body());
             }
 
             // --- Tambahan: Trigger Google Apps Script Web App untuk import data terbaru ---
@@ -51,12 +51,12 @@ class SyncUserToGoogleSheet
             $triggerResponse = Http::post($googleScriptUrl);
 
             if ($triggerResponse->successful()) {
-                Log::info('Triggered Google Apps Script importDataFromDatabase successfully.');
+                // Log::info('Triggered Google Apps Script importDataFromDatabase successfully.');
             } else {
-                Log::error('Failed to trigger Google Apps Script importDataFromDatabase. Response: ' . $triggerResponse->body());
+                // Log::error('Failed to trigger Google Apps Script importDataFromDatabase. Response: ' . $triggerResponse->body());
             }
         } catch (\Exception $e) {
-            Log::error('SyncUserToGoogleSheet: Exception while syncing user ' . $user->email . '. Error: ' . $e->getMessage());
+            // Log::error('SyncUserToGoogleSheet: Exception while syncing user ' . $user->email . '. Error: ' . $e->getMessage());
         }
     }
 }

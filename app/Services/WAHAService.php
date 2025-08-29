@@ -37,25 +37,25 @@ class WAHAService
             ]);
 
             if ($response->successful()) {
-                Log::info('WhatsApp message sent successfully', [
-                    'to' => $formattedTo,
-                    'message_preview' => substr($message, 0, 100),
-                    'response' => $response->json()
-                ]);
+                // Log::info('WhatsApp message sent successfully', [
+                //     'to' => $formattedTo,
+                //     'message_preview' => substr($message, 0, 100),
+                //     'response' => $response->json()
+                // ]);
                 return true;
             } else {
-                Log::error('Failed to send WhatsApp message', [
-                    'to' => $formattedTo,
-                    'status' => $response->status(),
-                    'response' => $response->body()
-                ]);
+                // Log::error('Failed to send WhatsApp message', [
+                //     'to' => $formattedTo,
+                //     'status' => $response->status(),
+                //     'response' => $response->body()
+                // ]);
                 return false;
             }
         } catch (\Exception $e) {
-            Log::error('Exception sending WhatsApp message', [
-                'to' => $to,
-                'error' => $e->getMessage()
-            ]);
+            // Log::error('Exception sending WhatsApp message', [
+            //     'to' => $to,
+            //     'error' => $e->getMessage()
+            // ]);
             return false;
         }
     }
@@ -72,7 +72,7 @@ class WAHAService
 
             return $response->successful() ? $response->json() : null;
         } catch (\Exception $e) {
-            Log::error('Failed to get WAHA session status', ['error' => $e->getMessage()]);
+            // Log::error('Failed to get WAHA session status', ['error' => $e->getMessage()]);
             return null;
         }
     }
@@ -94,17 +94,17 @@ class WAHAService
             ]);
 
             if ($response->successful()) {
-                Log::info('WAHA session started successfully', ['response' => $response->json()]);
+                // Log::info('WAHA session started successfully', ['response' => $response->json()]);
                 return true;
             } else {
-                Log::error('Failed to start WAHA session', [
-                    'status' => $response->status(),
-                    'response' => $response->body()
-                ]);
+                // Log::error('Failed to start WAHA session', [
+                //     'status' => $response->status(),
+                //     'response' => $response->body()
+                // ]);
                 return false;
             }
         } catch (\Exception $e) {
-            Log::error('Exception starting WAHA session', ['error' => $e->getMessage()]);
+            // Log::error('Exception starting WAHA session', ['error' => $e->getMessage()]);
             return false;
         }
     }
@@ -116,22 +116,22 @@ class WAHAService
     {
         // Hapus semua karakter non-digit
         $phone = preg_replace('/\D/', '', $phone);
-        
+
         // Jika dimulai dengan +62, hapus +
         if (strpos($phone, '62') === 0) {
             return $phone;
         }
-        
+
         // Jika dimulai dengan 0, ganti dengan 62
         if (strpos($phone, '0') === 0) {
             return '62' . substr($phone, 1);
         }
-        
+
         // Jika tidak dimulai dengan 62 atau 0, tambahkan 62
         if (strpos($phone, '62') !== 0) {
             return '62' . $phone;
         }
-        
+
         return $phone;
     }
 
@@ -142,14 +142,14 @@ class WAHAService
     {
         $user = $transaction->user;
         $phoneNumber = $user->userPhoneNumbers->first()?->phone_number;
-        
+
         if (!$phoneNumber) {
-            Log::warning('No phone number found for user', ['user_id' => $user->id]);
+            // Log::warning('No phone number found for user', ['user_id' => $user->id]);
             return false;
         }
 
         $message = $this->buildTransactionMessage($transaction, $eventType, $user->name);
-        
+
         return $this->sendMessage($phoneNumber, $message);
     }
 
@@ -212,7 +212,7 @@ class WAHAService
                     $message .= "📸 Bersiaplah untuk sesi foto yang menakjubkan!\n\n";
                     $message .= "Terima kasih! 🙏";
                     break;
-                    
+
                 case 'rented':
                     $message = "📦 *Barang Sudah Diambil*\n\n";
                     $message .= "Halo *{$userName}*,\n\n";
@@ -222,7 +222,7 @@ class WAHAService
                     $message .= "Periode sewa: {$startDate} - {$endDate}\n\n";
                     $message .= "Happy shooting! 📷✨";
                     break;
-                    
+
                 case 'finished':
                     $message = "🎉 *Transaksi Selesai*\n\n";
                     $message .= "Halo *{$userName}*,\n\n";
@@ -233,17 +233,17 @@ class WAHAService
                     $message .= "📱 @globalphotorental\n\n";
                     $message .= "Sampai jumpa lagi! 👋📸";
                     break;
-                    
+
                 case 'cancelled':
                     $message = "❌ *Transaksi Dibatalkan*\n\n";
                     $message .= "Halo *{$userName}*,\n\n";
                     $message .= "Transaksi *{$transactionId}* telah dibatalkan.\n\n";
                     $message .= "Jika Anda merasa tidak melakukan pembatalan ini, segera hubungi admin.\n\n";
-                    $message .= "📞 WhatsApp: +62 811-1709-5956\n";
-                    $message .= "📧 Email: dissamustika96@gmail.com\n\n";
+                    $message .= "📞 WhatsApp: +62 812-1234-9564\n";
+                    $message .= "📧 Email: global.photorental@gmail.com\n\n";
                     $message .= "Terima kasih atas pengertiannya.";
                     break;
-                    
+
                 default:
                     $message = "📋 *Update Transaksi*\n\n";
                     $message .= "Halo *{$userName}*,\n\n";
@@ -269,7 +269,7 @@ class WAHAService
 
             return $response->successful() ? $response->json() : [];
         } catch (\Exception $e) {
-            Log::error('Failed to get WAHA sessions', ['error' => $e->getMessage()]);
+            // Log::error('Failed to get WAHA sessions', ['error' => $e->getMessage()]);
             return [];
         }
     }
@@ -286,7 +286,7 @@ class WAHAService
 
             return $response->successful() ? $response->json() : null;
         } catch (\Exception $e) {
-            Log::error('Failed to get WAHA version', ['error' => $e->getMessage()]);
+            // Log::error('Failed to get WAHA version', ['error' => $e->getMessage()]);
             return null;
         }
     }
@@ -300,7 +300,7 @@ class WAHAService
             $response = Http::withHeaders([
                 'X-Api-Key' => $this->apiKey,
             ])->get("https://whatsapp.globalphotorental.com/api/{$sessionName}/auth/qr");
-            
+
             if ($response->successful()) {
                 // Return base64 encoded image
                 $imageData = $response->body();
@@ -308,9 +308,9 @@ class WAHAService
             }
             return null;
         } catch (\Exception $e) {
-            Log::error('WAHA get QR code failed', [
-                'error' => $e->getMessage()
-            ]);
+            // Log::error('WAHA get QR code failed', [
+            //     'error' => $e->getMessage()
+            // ]);
             return null;
         }
     }
@@ -328,10 +328,10 @@ class WAHAService
 
             return $response->successful() ? $response->json() : null;
         } catch (\Exception $e) {
-            Log::error('WAHA restart session failed', [
-                'session' => $sessionName,
-                'error' => $e->getMessage()
-            ]);
+            // Log::error('WAHA restart session failed', [
+            //     'session' => $sessionName,
+            //     'error' => $e->getMessage()
+            // ]);
             return null;
         }
     }

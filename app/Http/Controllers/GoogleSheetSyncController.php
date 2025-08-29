@@ -76,14 +76,12 @@ class GoogleSheetSyncController
     private function convertStatusToSheet($statusValue)
     {
         if (empty($statusValue)) {
-            Log::warning('Status value is empty, using blacklist as default');
             return 'blacklist';
         }
 
         if ($statusValue === 'active') return 'active';
         if ($statusValue === 'blacklist') return 'blacklist';
 
-        Log::warning('Unknown status value: ' . $statusValue . ', using Inactive as default');
         return 'blacklist';
     }
 
@@ -108,8 +106,6 @@ class GoogleSheetSyncController
             $headers = array_map(fn($header) => trim($header), $data['values'][0]);
             $rows = array_slice($data['values'], 1);
 
-            Log::info('Sync started: ' . count($rows) . ' rows to process');
-            Log::info('Headers received: ' . json_encode($headers));
 
             DB::transaction(function () use ($headers, $rows) {
                 foreach ($rows as $row) {
@@ -134,9 +130,6 @@ class GoogleSheetSyncController
                     $status = $this->convertStatusToDb($statusRaw);
 
                     // ✅ DEBUG: Log all possible Status values
-                    Log::info('📊 Processing user: ' . $rowData['Email Address']);
-                    Log::info('📊 Status values - Status: ' . ($rowData['Status'] ?? 'null') . ', STATUS: ' . ($rowData['STATUS'] ?? 'null') . ', status: ' . ($rowData['status'] ?? 'null'));
-                    Log::info('📊 Raw Status: ' . $statusRaw . ' -> Converted: ' . $status . ', Gender: ' . ($gender ?? 'null'));
 
                     $user = User::updateOrCreate(
                         ['email' => $rowData['Email Address']],
@@ -163,20 +156,11 @@ class GoogleSheetSyncController
                             ['user_id' => $user->id, 'phone_number' => $phone]
                         );
                     }
-                    SyncLog::create([
-                        'direction' => 'from_sheet',
-                        'model' => 'User',
-                        'model_id' => optional($user)->id,
-                        'payload' => $rowData,
-                        'status' => 'success',
-                        'message' => 'Synced from Google Sheet'
-                    ]);
                 }
             });
 
             return response()->json(['message' => 'Data synchronized successfully']);
         } catch (Exception $e) {
-            Log::error('Google Sheet Sync Error: ' . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }

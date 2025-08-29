@@ -30,9 +30,9 @@ class FonnteService
                 'countryCode' => '62',
             ]);
 
-        Log::info('Fonnte API response', [
-            'status' => $response->status(),
-            'body' => $response->body(),
-        ]);
+        // Log::info('Fonnte API response', [
+        //     'status' => $response->status(),
+        //     'body' => $response->body(),
+        // ]);
     }
 }

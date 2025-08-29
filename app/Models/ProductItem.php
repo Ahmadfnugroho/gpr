@@ -57,7 +57,7 @@ class ProductItem extends Model
             ->unique()
             ->toArray();
 
-        Log::info('Unavailable product_item_ids', $productItemIds);
+        // Log::info('Unavailable product_item_ids', $productItemIds);
 
         return ProductItem::whereIn('id', $productItemIds)
             ->pluck('serial_number')

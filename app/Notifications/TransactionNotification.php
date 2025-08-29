@@ -27,12 +27,12 @@ class TransactionNotification extends Notification
     public function via(object $notifiable): array
     {
         $channels = [];
-        
+
         // Email notification
         if (!config('notifications.disable_transaction_email')) {
             $channels[] = 'mail';
         }
-        
+
         // WhatsApp notification - selalu aktif
         $channels[] = WhatsAppChannel::class;
 
@@ -86,22 +86,22 @@ class TransactionNotification extends Notification
         try {
             $wahaService = new WAHAService();
             $result = $wahaService->sendTransactionNotification($this->transaction, $this->eventType);
-            
+
             if ($result) {
-                Log::info('WhatsApp transaction notification sent', [
-                    'user_id' => $notifiable->id,
-                    'transaction_id' => $this->transaction->id,
-                    'event_type' => $this->eventType
-                ]);
+                // Log::info('WhatsApp transaction notification sent', [
+                //     'user_id' => $notifiable->id,
+                //     'transaction_id' => $this->transaction->id,
+                //     'event_type' => $this->eventType
+                // ]);
             }
-            
+
             return $result;
         } catch (\Exception $e) {
-            Log::error('Failed to send WhatsApp transaction notification', [
-                'user_id' => $notifiable->id,
-                'transaction_id' => $this->transaction->id,
-                'error' => $e->getMessage()
-            ]);
+            // Log::error('Failed to send WhatsApp transaction notification', [
+            //     'user_id' => $notifiable->id,
+            //     'transaction_id' => $this->transaction->id,
+            //     'error' => $e->getMessage()
+            // ]);
             return false;
         }
     }

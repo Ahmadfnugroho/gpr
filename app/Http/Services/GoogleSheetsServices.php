@@ -20,7 +20,7 @@ class GoogleSheetsServices
         // Cek apakah spreadsheet_id terbaca
         $this->spreadsheetId = config('google.spreadsheet_id');
         if (!$this->spreadsheetId) {
-            Log::error('Spreadsheet ID is missing. Check your .env file.');
+            // Log::error('Spreadsheet ID is missing. Check your .env file.');
             throw new Exception('Spreadsheet ID is missing.');
         }
 

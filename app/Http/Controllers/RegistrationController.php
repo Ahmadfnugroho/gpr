@@ -181,7 +181,7 @@ class RegistrationController extends Controller
 
     private function sendAdminNotification($user)
     {
-        $adminEmail = 'ahmadfnugroho@gmail.com';
+        $adminEmail = 'global.photorental@gmail.com';
         $editUrl = url('/admin/users/' . $user->id . '/edit');
 
         // Get user phone numbers
@@ -232,7 +232,6 @@ class RegistrationController extends Controller
                     ->subject($subject);
             });
         } catch (\Exception $e) {
-            Log::error('Failed to send admin notification: ' . $e->getMessage());
         }
     }
 
@@ -240,7 +239,7 @@ class RegistrationController extends Controller
     {
         try {
             $wahaService = new WAHAService();
-            $adminPhone = '6282285877424';
+            $adminPhone = '6281212349564';
             $editUrl = url('/admin/users/' . $user->id . '/edit');
 
             // Get user phone numbers
@@ -276,16 +275,8 @@ class RegistrationController extends Controller
             $result = $wahaService->sendMessage($adminPhone, $message);
 
             if ($result) {
-                Log::info('Admin WhatsApp notification sent for new user registration', [
-                    'user_id' => $user->id,
-                    'user_name' => $user->name
-                ]);
             }
         } catch (\Exception $e) {
-            Log::error('Failed to send admin WhatsApp notification', [
-                'user_id' => $user->id,
-                'error' => $e->getMessage()
-            ]);
         }
     }
 
