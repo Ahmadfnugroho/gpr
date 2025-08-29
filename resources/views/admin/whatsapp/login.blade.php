@@ -9,13 +9,13 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <!-- CSS only -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-gH2yIJqKdNHPEq0n4Mqa/HGKIhSkIHeL5AyhkYV8i59U5AR6csBvApHHNl/vI1Bx" crossorigin="anonymous">
-    <title>Global Photo Rental</title>
+    <title>WhatsApp Admin Login - Global Photo Rental</title>
 </head>
 
 <body>
     <div class="container py-5">
         <div class="w-50 center border rounded px-3 py-3 mx-auto">
-            <h1>Login</h1>
+            <h1>WhatsApp Admin Login</h1>
             @if ($errors->any())
             <div class="alert alert-danger">
                 <ul>
@@ -25,25 +25,20 @@
                 </ul>
             </div>
             @endif
-            <form action="" method="POST">
+            <form action="{{ route('whatsapp.login') }}" method="POST">
                 @csrf
                 <div class="mb-3">
-                    <label for="email" class="form-label">Email</label>
-                    <input type="email" value="{{ old('email') }}" name="email" class="form-control" required>
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" value="{{ old('username') }}" name="username" class="form-control" required>
                 </div>
                 <div class="mb-3">
                     <label for="password" class="form-label">Password</label>
-                    <input type="password" name="password" class="form-control">
+                    <input type="password" name="password" class="form-control" required>
                 </div>
                 <div class="mb-3 d-grid">
                     <button name="submit" type="submit" class="btn btn-primary">Login</button>
                 </div>
-                <div class="mb-3 d-grid">
-                </div>
-                <div class="mb-3 text-center">
-                </div>
             </form>
-
         </div>
     </div>
 

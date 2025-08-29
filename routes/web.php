@@ -44,7 +44,16 @@ Route::get('/admin-login', function () {
 
 // WhatsApp Management Routes (protected by auth)
 Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
+    // Root whatsapp route - redirect to dashboard (will be protected by middleware)
+    Route::get('/', function() {
+        return redirect()->route('whatsapp.dashboard');
+    })->middleware('whatsapp.auth')->name('index');
+    
     // Login routes (no middleware)
+    Route::get('/login', function() {
+        return view('admin.whatsapp.login');
+    })->name('login.form');
+    
     Route::post('/login', function(\Illuminate\Http\Request $request) {
         $username = $request->input('username');
         $password = $request->input('password');

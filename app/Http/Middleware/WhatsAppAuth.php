@@ -21,7 +21,7 @@ class WhatsAppAuth
             return $next($request);
         }
 
-        // Show login form
-        return response()->view('admin.whatsapp.login');
+        // Redirect to login form
+        return redirect()->route('whatsapp.login.form');
     }
 }

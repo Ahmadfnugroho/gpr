@@ -38,14 +38,12 @@ class AdminPanelProvider extends PanelProvider
             ->passwordReset()
 
             // === UI Enhancement - Compact Mode ===
-            ->maxContentWidth('full') // Lebih kecil dari 'full'
-            ->sidebarWidth('15rem') // Sidebar lebih kecil (default 20rem)
-            ->sidebarCollapsibleOnDesktop()
-            ->topNavigation() // Navigasi horizontal untuk menghemat space
-            ->font('Inter') // Font lebih compact daripada Poppins
-            ->defaultThemeMode(ThemeMode::Light) // Light mode lebih compact
+            ->maxContentWidth('full') // Use full width for better space utilization
+            ->topNavigation() // Use top navigation for more compact layout
+            ->font('Inter') // Clean, compact font
+            ->defaultThemeMode(ThemeMode::Light) // Light mode for better visibility
             ->colors([
-                'primary' => Color::Blue, // Warna lebih subtle
+                'primary' => Color::Emerald, // Warna lebih subtle
                 'gray' => Color::Slate,
             ])
             // === Branding ===
