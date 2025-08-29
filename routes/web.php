@@ -37,13 +37,17 @@ Route::prefix('api/regions')->group(function () {
     Route::get('/villages/{districtId}', [App\Http\Controllers\Api\RegionController::class, 'getVillages'])->name('api.villages');
 });
 
-// WhatsApp Management Routes (protected by auth if needed)
-Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
+// WhatsApp Management Routes (protected by auth)
+Route::prefix('whatsapp')->name('whatsapp.')->middleware('whatsapp.auth')->group(function () {
     Route::get('/dashboard', [App\Http\Controllers\Admin\WhatsAppController::class, 'dashboard'])->name('dashboard');
     Route::get('/status', [App\Http\Controllers\Admin\WhatsAppController::class, 'getSessionStatus'])->name('status');
     Route::get('/qr', [App\Http\Controllers\Admin\WhatsAppController::class, 'getQrCode'])->name('qr');
     Route::post('/test', [App\Http\Controllers\Admin\WhatsAppController::class, 'sendTestMessage'])->name('test');
     Route::post('/restart', [App\Http\Controllers\Admin\WhatsAppController::class, 'restartSession'])->name('restart');
-    Route::post('/logout', [App\Http\Controllers\Admin\WhatsAppController::class, 'logoutSession'])->name('logout');
+    Route::post('/logout-session', [App\Http\Controllers\Admin\WhatsAppController::class, 'logoutSession'])->name('logout');
     Route::get('/logs', [App\Http\Controllers\Admin\WhatsAppController::class, 'getSessionLogs'])->name('logs');
+    Route::post('/auth-logout', function(\Illuminate\Http\Request $request) {
+        $request->session()->forget('whatsapp_authenticated');
+        return redirect()->route('whatsapp.dashboard');
+    })->name('auth.logout');
 });

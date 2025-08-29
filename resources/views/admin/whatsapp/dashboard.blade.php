@@ -30,10 +30,20 @@
     <div class="container mx-auto px-4 py-8">
         <!-- Header -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">
-                📱 WhatsApp Management Dashboard
-            </h1>
-            <p class="text-gray-600">Global Photo Rental - WhatsApp API Management</p>
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800 mb-2">
+                        📱 WhatsApp Management Dashboard
+                    </h1>
+                    <p class="text-gray-600">Global Photo Rental - WhatsApp API Management</p>
+                </div>
+                <form method="POST" action="{{ route('whatsapp.auth.logout') }}">
+                    @csrf
+                    <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm">
+                        🔐 Logout
+                    </button>
+                </form>
+            </div>
         </div>
 
         @if(isset($error))

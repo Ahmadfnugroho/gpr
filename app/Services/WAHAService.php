@@ -296,21 +296,98 @@ class WAHAService
     public function getQrCode($sessionName = 'default')
     {
         try {
-            $response = Http::withHeaders([
-                'X-Api-Key' => $this->apiKey,
-            ])->get("https://whatsapp.globalphotorental.com/api/{$sessionName}/auth/qr");
-
-            if ($response->successful()) {
-                // Return base64 encoded image
-                $imageData = $response->body();
-                return 'data:image/png;base64,' . base64_encode($imageData);
+            // First check session status
+            $sessions = $this->getSessions();
+            $currentSession = null;
+            
+            foreach ($sessions as $session) {
+                if ($session['name'] === $sessionName) {
+                    $currentSession = $session;
+                    break;
+                }
             }
-            return null;
+            
+            // If session is already working, return message
+            if ($currentSession && $currentSession['status'] === 'WORKING') {
+                throw new \Exception('Session sudah terhubung ke WhatsApp. Tidak perlu scan QR code.');
+            }
+            
+            // If no session exists, create one
+            if (!$currentSession) {
+                $this->startSession();
+                // Wait a moment for session to initialize
+                sleep(2);
+            }
+            
+            // Try different QR endpoint formats
+            $endpoints = [
+                "{$this->baseUrl}/{$sessionName}/auth/qr",
+                "{$this->baseUrl}/sessions/{$sessionName}/auth/qr"
+            ];
+            
+            foreach ($endpoints as $endpoint) {
+                Log::info('Trying QR endpoint', ['endpoint' => $endpoint]);
+                
+                $response = Http::timeout(30)->withHeaders([
+                    'X-Api-Key' => $this->apiKey,
+                ])->get($endpoint);
+                
+                Log::info('QR endpoint response', [
+                    'endpoint' => $endpoint,
+                    'status' => $response->status(),
+                    'content_type' => $response->header('content-type'),
+                    'body_preview' => substr($response->body(), 0, 100)
+                ]);
+                
+                if ($response->successful()) {
+                    $contentType = $response->header('content-type');
+                    
+                    // Check if response is an image
+                    if (strpos($contentType, 'image') !== false) {
+                        $imageData = $response->body();
+                        Log::info('Got QR image', ['size' => strlen($imageData)]);
+                        return 'data:image/png;base64,' . base64_encode($imageData);
+                    }
+                    
+                    // Check if response is JSON with QR data
+                    try {
+                        $jsonData = $response->json();
+                        if (isset($jsonData['qr'])) {
+                            Log::info('Got QR from JSON');
+                            return $jsonData['qr'];
+                        }
+                    } catch (\Exception $e) {
+                        // Not JSON, continue
+                    }
+                    
+                    // If successful but not image, try to get QR from body
+                    $body = $response->body();
+                    if (!empty($body) && strlen($body) > 100) {
+                        // Check if it looks like base64 or image data
+                        if (strpos($body, 'data:image') === 0) {
+                            Log::info('Got base64 QR directly');
+                            return $body;
+                        } else {
+                            // Assume it's raw image data
+                            Log::info('Got raw image data', ['size' => strlen($body)]);
+                            return 'data:image/png;base64,' . base64_encode($body);
+                        }
+                    }
+                } else if ($response->status() === 422) {
+                    // Session might be already connected or in wrong state
+                    $errorBody = $response->body();
+                    Log::warning('QR endpoint returned 422', ['body' => $errorBody]);
+                    throw new \Exception('Session dalam status yang tidak memungkinkan untuk generate QR code. Status: ' . ($currentSession['status'] ?? 'Unknown'));
+                }
+            }
+            
+            Log::error('All QR endpoints failed');
+            throw new \Exception('Tidak dapat mengambil QR Code dari semua endpoint yang tersedia.');
         } catch (\Exception $e) {
-            // Log::error('WAHA get QR code failed', [
-            //     'error' => $e->getMessage()
-            // ]);
-            return null;
+            Log::error('WAHA get QR code failed', [
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 

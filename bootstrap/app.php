@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\FrontApiKey;
+use App\Http\Middleware\WhatsAppAuth;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,7 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'api_key' => FrontApiKey::class
+            'api_key' => FrontApiKey::class,
+            'whatsapp.auth' => WhatsAppAuth::class
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

@@ -40,16 +40,9 @@ class WhatsAppController extends Controller
         try {
             $qrCode = $this->wahaService->getQrCode();
             
-            if ($qrCode) {
-                return response()->json([
-                    'success' => true,
-                    'qr_code' => $qrCode
-                ]);
-            }
-            
             return response()->json([
-                'success' => false,
-                'message' => 'Tidak dapat mengambil QR Code'
+                'success' => true,
+                'qr_code' => $qrCode
             ]);
         } catch (\Exception $e) {
             return response()->json([
