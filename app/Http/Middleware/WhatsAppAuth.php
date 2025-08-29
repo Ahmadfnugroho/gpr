@@ -21,19 +21,6 @@ class WhatsAppAuth
             return $next($request);
         }
 
-        // Check for login attempt
-        if ($request->isMethod('post') && $request->has(['username', 'password'])) {
-            $username = $request->input('username');
-            $password = $request->input('password');
-
-            if ($username === 'wahaadmin' && $password === 'Infrasglobal@100') {
-                $request->session()->put('whatsapp_authenticated', true);
-                return redirect()->route('whatsapp.dashboard');
-            } else {
-                return redirect()->back()->withErrors(['Invalid credentials']);
-            }
-        }
-
         // Show login form
         return response()->view('admin.whatsapp.login');
     }
