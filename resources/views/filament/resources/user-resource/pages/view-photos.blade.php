@@ -17,8 +17,9 @@
                             <img 
                                 src="{{ Storage::url($photo->photo) }}" 
                                 alt="{{ $photo->photo_type }}"
-                                class="w-full h-auto object-contain max-h-96 cursor-pointer"
+                                class="w-full h-auto object-cover min-h-80 max-h-96 cursor-pointer hover:opacity-90 transition-opacity"
                                 onclick="openImageModal('{{ Storage::url($photo->photo) }}', '{{ $photo->photo_type ?: 'Dokumen ID' }}')"
+                                style="aspect-ratio: 4/3;"
                             >
                         @else
                             <div class="w-full h-48 bg-gray-200 flex items-center justify-center">
@@ -90,7 +91,7 @@
             </div>
             
             <div class="text-center">
-                <img id="modalImage" src="" alt="" class="max-w-full max-h-96 mx-auto object-contain">
+                <img id="modalImage" src="" alt="" class="w-full h-auto object-contain max-h-[80vh] mx-auto border border-gray-200 rounded-lg shadow-sm">
             </div>
             
             <div class="mt-4 flex justify-end">

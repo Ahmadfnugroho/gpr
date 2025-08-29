@@ -256,4 +256,83 @@ class WAHAService
 
         return $message;
     }
+
+    /**
+     * Get all sessions
+     */
+    public function getSessions()
+    {
+        try {
+            $response = Http::withHeaders([
+                'X-Api-Key' => $this->apiKey,
+            ])->get("{$this->baseUrl}/sessions");
+
+            return $response->successful() ? $response->json() : [];
+        } catch (\Exception $e) {
+            Log::error('Failed to get WAHA sessions', ['error' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    /**
+     * Get WAHA version
+     */
+    public function getVersion()
+    {
+        try {
+            $response = Http::withHeaders([
+                'X-Api-Key' => $this->apiKey,
+            ])->get("https://whatsapp.globalphotorental.com/version");
+
+            return $response->successful() ? $response->json() : null;
+        } catch (\Exception $e) {
+            Log::error('Failed to get WAHA version', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
+     * Get QR Code for connection
+     */
+    public function getQrCode($sessionName = 'default')
+    {
+        try {
+            $response = Http::withHeaders([
+                'X-Api-Key' => $this->apiKey,
+            ])->get("https://whatsapp.globalphotorental.com/api/{$sessionName}/auth/qr");
+            
+            if ($response->successful()) {
+                // Return base64 encoded image
+                $imageData = $response->body();
+                return 'data:image/png;base64,' . base64_encode($imageData);
+            }
+            return null;
+        } catch (\Exception $e) {
+            Log::error('WAHA get QR code failed', [
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Restart session
+     */
+    public function restartSession($sessionName = 'default')
+    {
+        try {
+            $response = Http::withHeaders([
+                'X-Api-Key' => $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/sessions/{$sessionName}/restart");
+
+            return $response->successful() ? $response->json() : null;
+        } catch (\Exception $e) {
+            Log::error('WAHA restart session failed', [
+                'session' => $sessionName,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
 }

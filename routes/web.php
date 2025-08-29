@@ -36,3 +36,13 @@ Route::prefix('api/regions')->group(function () {
     Route::get('/districts/{regencyId}', [App\Http\Controllers\Api\RegionController::class, 'getDistricts'])->name('api.districts');
     Route::get('/villages/{districtId}', [App\Http\Controllers\Api\RegionController::class, 'getVillages'])->name('api.villages');
 });
+
+// WhatsApp Management Routes (protected by auth if needed)
+Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
+    Route::get('/dashboard', [App\Http\Controllers\Admin\WhatsAppController::class, 'dashboard'])->name('dashboard');
+    Route::get('/status', [App\Http\Controllers\Admin\WhatsAppController::class, 'getSessionStatus'])->name('status');
+    Route::get('/qr', [App\Http\Controllers\Admin\WhatsAppController::class, 'getQrCode'])->name('qr');
+    Route::post('/test', [App\Http\Controllers\Admin\WhatsAppController::class, 'sendTestMessage'])->name('test');
+    Route::post('/restart', [App\Http\Controllers\Admin\WhatsAppController::class, 'restartSession'])->name('restart');
+    Route::get('/logs', [App\Http\Controllers\Admin\WhatsAppController::class, 'getSessionLogs'])->name('logs');
+});
