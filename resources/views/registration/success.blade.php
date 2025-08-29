@@ -70,14 +70,14 @@
                     1. Cek email Anda untuk verifikasi akun<br>
                     2. Klik link verifikasi di email tersebut<br>
                     3. Tunggu konfirmasi dari admin Global Photo Rental<br>
-                    4. Setelah disetujui, Anda dapat mulai menyewa peralatan
+                    4. Setelah data anda divalidasi, Anda dapat mulai menyewa peralatan
                 </p>
             </div>
 
             <div class="alert alert-warning border-0 shadow-sm mb-4">
                 <i class="fas fa-exclamation-triangle me-2"></i>
                 <strong>Status akun Anda saat ini: PENDING</strong><br>
-                <small>Admin akan meninjau data Anda dan mengubah status menjadi ACTIVE jika semua data valid.</small>
+                <small>Admin akan memvalidasi data anda.</small>
             </div>
 
             <div class="d-grid gap-2 d-md-flex justify-content-md-center">
