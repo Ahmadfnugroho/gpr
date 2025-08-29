@@ -52,7 +52,22 @@ class PdfController extends Controller
 
             // return view('pdf', ['record' => $record]);
 
-            return Pdf::loadView('pdf', ['record' => $record])
+            // Get current authenticated user (staff who prints the invoice)
+            $currentUser = auth()->user();
+            
+            // Log current user info for debugging
+            \Log::info('PDF Generation - Current User Info', [
+                'user_id' => $currentUser?->id,
+                'user_name' => $currentUser?->name,
+                'user_email' => $currentUser?->email,
+                'transaction_id' => $record->id
+            ]);
+            
+            return Pdf::loadView('pdf', [
+                'record' => $record,
+                'currentUser' => $currentUser, // Pass current user data to the PDF view
+                'staffName' => $currentUser?->name ?? 'Staff GPR' // Fallback name
+            ])
                 ->stream('order.pdf')
                 // ->download($record->booking_transaction_id . '.pdf')
                 ;

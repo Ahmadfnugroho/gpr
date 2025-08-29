@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\GoogleSheetSyncController;
 use App\Http\Controllers\PdfController;
+use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SessionController;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
@@ -19,3 +20,11 @@ Route::post('/forgot-password', [SessionController::class, 'resetPassword'])->na
 Route::get('pdf/{order}', PdfController::class)->name('pdf');
 Route::get('/auth/google/callback', [GoogleSheetSyncController::class, 'handleCallback'])->name('google.callback');
 Route::get('/sync', [GoogleSheetSyncController::class, 'sync'])->name('sync');
+
+// Registration Routes
+Route::get('/register', [RegistrationController::class, 'showForm'])->name('registration.form');
+Route::post('/register', [RegistrationController::class, 'register'])->name('registration.store');
+Route::get('/registration/success', [RegistrationController::class, 'success'])->name('registration.success');
+Route::get('/email/verify/{id}/{hash}', [RegistrationController::class, 'verifyEmail'])
+    ->middleware(['signed'])
+    ->name('verification.verify');

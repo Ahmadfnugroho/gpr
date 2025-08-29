@@ -372,6 +372,7 @@
         <div class="col col-3 invoice-info text-right">
           <div class="h4">Invoice #: {{ $record->booking_transaction_id ?? 'N/A' }}</div>
           <div class="text-medium font-normal">Tanggal: {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y H:mm') }}</div>
+          <div class="text-small font-normal">Dicetak oleh: {{ $staffName ?? $currentUser?->name ?? 'Staff GPR' }}</div>
         </div>
       </div>
     </div>
@@ -605,7 +606,7 @@
       <tbody>
         <tr>
           <td class="signature-space">
-            <div style="margin-top: 25px;">(Nama Petugas)</div>
+            <div style="margin-top: 25px;">{{ $staffName ?? $currentUser?->name ?? 'Staff GPR' }}</div>
           </td>
           <td class="signature-space">
             <div style="margin-top: 25px;">{{ $record->user?->name ?? 'N/A' }}</div>
@@ -614,7 +615,7 @@
             <div style="margin-top: 25px;">{{ $record->user?->name ?? 'N/A' }}</div>
           </td>
           <td class="signature-space">
-            <div style="margin-top: 25px;">(Nama Petugas)</div>
+            <div style="margin-top: 25px;">{{ $staffName ?? $currentUser?->name ?? 'Staff GPR' }}</div>
           </td>
         </tr>
       </tbody>

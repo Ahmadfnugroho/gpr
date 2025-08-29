@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\VerifyEmailNotification;
 use Filament\Models\Contracts\FilamentUser;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,8 +27,8 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     protected $fillable = [
         'name',
         'google_id',
-
         'email',
+        'email_verified_at',
         'password',
         'address',
         'job',
@@ -111,5 +112,13 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     public function getPhoneNumberAttribute(): ?string
     {
         return $this->userPhoneNumbers->first()?->phone_number;
+    }
+
+    /**
+     * Send the email verification notification.
+     */
+    public function sendEmailVerificationNotification()
+    {
+        $this->notify(new VerifyEmailNotification);
     }
 }
