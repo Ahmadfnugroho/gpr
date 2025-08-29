@@ -28,3 +28,11 @@ Route::get('/registration/success', [RegistrationController::class, 'success'])-
 Route::get('/email/verify/{id}/{hash}', [RegistrationController::class, 'verifyEmail'])
     ->middleware(['signed'])
     ->name('verification.verify');
+
+// Region API Routes
+Route::prefix('api/regions')->group(function () {
+    Route::get('/provinces', [App\Http\Controllers\Api\RegionController::class, 'getProvinces'])->name('api.provinces');
+    Route::get('/regencies/{provinceId}', [App\Http\Controllers\Api\RegionController::class, 'getRegencies'])->name('api.regencies');
+    Route::get('/districts/{regencyId}', [App\Http\Controllers\Api\RegionController::class, 'getDistricts'])->name('api.districts');
+    Route::get('/villages/{districtId}', [App\Http\Controllers\Api\RegionController::class, 'getVillages'])->name('api.villages');
+});

@@ -25,16 +25,21 @@ class RegistrationController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|unique:users,email',
-            'source_info' => 'required|in:Instagram,Teman,Google,Lainnya',
+            'source_info' => 'required|in:Instagram,Teman,Google,Lainnya,TikTok',
             'name' => 'required|string|max:255',
             'gender' => 'required|in:male,female',
-            'address' => 'required|string',
+            'province' => 'required|string|max:255',
+            'city' => 'required|string|max:255',
+            'district' => 'required|string|max:255',
+            'village' => 'required|string|max:255',
+            'address_detail' => 'required|string',
             'phone1' => 'required|string|max:20',
             'phone2' => 'nullable|string|max:20',
             'job' => 'nullable|string|max:255',
             'office_address' => 'nullable|string',
             'instagram_username' => 'nullable|string|max:255',
             'ktp_photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'id_photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
             'emergency_contact_name' => 'required|string|max:255',
             'emergency_contact_number' => 'required|string|max:20',
         ], [
@@ -44,12 +49,20 @@ class RegistrationController extends Controller
             'source_info.required' => 'Silakan pilih dari mana Anda mengetahui Global Photo Rental',
             'name.required' => 'Nama lengkap wajib diisi',
             'gender.required' => 'Jenis kelamin wajib dipilih',
-            'address.required' => 'Alamat tinggal wajib diisi',
+            'province.required' => 'Provinsi wajib dipilih',
+            'city.required' => 'Kab/Kota wajib dipilih',
+            'district.required' => 'Kecamatan wajib dipilih',
+            'village.required' => 'Kelurahan wajib dipilih',
+            'address_detail.required' => 'Alamat lengkap wajib diisi',
             'phone1.required' => 'Nomor HP 1 wajib diisi',
             'ktp_photo.required' => 'Foto KTP wajib diunggah',
-            'ktp_photo.image' => 'File harus berupa gambar',
-            'ktp_photo.mimes' => 'Format foto harus jpeg, png, atau jpg',
-            'ktp_photo.max' => 'Ukuran foto maksimal 2MB',
+            'ktp_photo.image' => 'File KTP harus berupa gambar',
+            'ktp_photo.mimes' => 'Format foto KTP harus jpeg, png, atau jpg',
+            'ktp_photo.max' => 'Ukuran foto KTP maksimal 2MB',
+            'id_photo.required' => 'Foto ID tambahan wajib diunggah',
+            'id_photo.image' => 'File ID harus berupa gambar',
+            'id_photo.mimes' => 'Format foto ID harus jpeg, png, atau jpg',
+            'id_photo.max' => 'Ukuran foto ID maksimal 2MB',
             'emergency_contact_name.required' => 'Nama kontak emergency wajib diisi',
             'emergency_contact_number.required' => 'Nomor HP kontak emergency wajib diisi',
         ]);
@@ -61,13 +74,22 @@ class RegistrationController extends Controller
         }
 
         try {
+            // Gabungkan alamat lengkap
+            $fullAddress = implode(', ', array_filter([
+                $request->address_detail,
+                $request->village,
+                $request->district,
+                $request->city,
+                $request->province
+            ]));
+
             // Buat user baru
             $user = User::create([
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make('default123'), // Password default
                 'gender' => $request->gender,
-                'address' => $request->address,
+                'address' => $fullAddress,
                 'job' => $request->job,
                 'office_address' => $request->office_address,
                 'instagram_username' => $request->instagram_username,
@@ -100,6 +122,19 @@ class RegistrationController extends Controller
                     'user_id' => $user->id,
                     'photo_type' => 'ktp',
                     'photo' => $ktpPath,
+                ]);
+            }
+
+            // Upload dan simpan foto ID tambahan
+            if ($request->hasFile('id_photo')) {
+                $idFile = $request->file('id_photo');
+                $idFileName = 'id_' . $user->id . '_' . time() . '.' . $idFile->getClientOriginalExtension();
+                $idPath = $idFile->storeAs('user_photos', $idFileName, 'public');
+
+                UserPhoto::create([
+                    'user_id' => $user->id,
+                    'photo_type' => 'additional_id',
+                    'photo' => $idPath,
                 ]);
             }
 
