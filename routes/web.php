@@ -37,6 +37,11 @@ Route::prefix('api/regions')->group(function () {
     Route::get('/villages/{districtId}', [App\Http\Controllers\Api\RegionController::class, 'getVillages'])->name('api.villages');
 });
 
+// Admin Panel Redirect
+Route::get('/admin-login', function () {
+    return redirect('/admin');
+});
+
 // WhatsApp Management Routes (protected by auth)
 Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
     // Login routes (no middleware)
