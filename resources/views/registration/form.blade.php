@@ -565,16 +565,53 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
-        // Preview foto KTP
+        // File validation function
+        function validateFile(file, inputElement) {
+            const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+            
+            if (file.size > maxSize) {
+                alert('Ukuran file tidak boleh lebih dari 2MB. Ukuran file Anda: ' + (file.size / 1024 / 1024).toFixed(2) + 'MB');
+                inputElement.value = '';
+                return false;
+            }
+            
+            if (!allowedTypes.includes(file.type)) {
+                alert('Format file tidak didukung. Gunakan format JPG, JPEG, PNG, atau GIF.');
+                inputElement.value = '';
+                return false;
+            }
+            
+            return true;
+        }
+
+        // Preview dan validasi foto KTP
         document.getElementById('ktp_photo').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    // Bisa ditambahkan preview image jika diperlukan
-                    console.log('File selected:', file.name);
-                };
-                reader.readAsDataURL(file);
+                if (validateFile(file, this)) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        // File is valid and ready for upload
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+        });
+
+        // Validasi foto ID tambahan 1
+        document.getElementById('id_photo').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                validateFile(file, this);
+            }
+        });
+
+        // Validasi foto ID tambahan 2
+        document.getElementById('id_photo_2').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                validateFile(file, this);
             }
         });
 

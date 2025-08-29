@@ -37,25 +37,24 @@ class WAHAService
             ]);
 
             if ($response->successful()) {
-                // Log::info('WhatsApp message sent successfully', [
-                //     'to' => $formattedTo,
-                //     'message_preview' => substr($message, 0, 100),
-                //     'response' => $response->json()
-                // ]);
+                Log::info('WhatsApp message sent successfully', [
+                    'to' => $formattedTo,
+                    'status' => 'success'
+                ]);
                 return true;
             } else {
-                // Log::error('Failed to send WhatsApp message', [
-                //     'to' => $formattedTo,
-                //     'status' => $response->status(),
-                //     'response' => $response->body()
-                // ]);
+                Log::error('Failed to send WhatsApp message', [
+                    'to' => $formattedTo,
+                    'status' => $response->status(),
+                    'error' => 'HTTP error'
+                ]);
                 return false;
             }
         } catch (\Exception $e) {
-            // Log::error('Exception sending WhatsApp message', [
-            //     'to' => $to,
-            //     'error' => $e->getMessage()
-            // ]);
+            Log::error('Exception sending WhatsApp message', [
+                'to' => $to,
+                'error' => $e->getMessage()
+            ]);
             return false;
         }
     }
@@ -329,6 +328,28 @@ class WAHAService
             return $response->successful() ? $response->json() : null;
         } catch (\Exception $e) {
             // Log::error('WAHA restart session failed', [
+            //     'session' => $sessionName,
+            //     'error' => $e->getMessage()
+            // ]);
+            return null;
+        }
+    }
+
+    /**
+     * Logout/Stop session
+     */
+    public function logoutSession($sessionName = 'default')
+    {
+        try {
+            // Use the stop endpoint to end/logout the session
+            $response = Http::withHeaders([
+                'X-Api-Key' => $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->post("{$this->baseUrl}/sessions/{$sessionName}/stop");
+
+            return $response->successful() ? $response->json() : null;
+        } catch (\Exception $e) {
+            // Log::error('WAHA logout session failed', [
             //     'session' => $sessionName,
             //     'error' => $e->getMessage()
             // ]);

@@ -108,6 +108,9 @@
                         <button id="restart-session" class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded ml-2">
                             Restart Session
                         </button>
+                        <button id="logout-session" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded ml-2">
+                            End Session
+                        </button>
                     </div>
                 </div>
                 <div>
@@ -282,6 +285,32 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
                 })
                 .always(function() {
                     $btn.prop('disabled', false).text('Restart Session');
+                });
+        });
+
+        // End/Logout session
+        $('#logout-session').click(function() {
+            if (!confirm('Are you sure you want to end the WhatsApp session? This will log out the connected device.')) return;
+            
+            let $btn = $(this);
+            $btn.prop('disabled', true).text('Ending Session...');
+            
+            $.post('{{ route("whatsapp.logout") }}')
+                .done(function(data) {
+                    if (data.success) {
+                        alert('Session ended successfully! WhatsApp has been logged out.');
+                        $('#qr-code-display').html('<div class="text-gray-500">Session ended. Click "Get QR Code" to start new session.</div>');
+                        $('#phone-info').html('Not connected');
+                        checkStatus();
+                    } else {
+                        alert('Failed to end session: ' + data.message);
+                    }
+                })
+                .fail(function() {
+                    alert('Error ending session');
+                })
+                .always(function() {
+                    $btn.prop('disabled', false).text('End Session');
                 });
         });
 

@@ -44,5 +44,6 @@ Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
     Route::get('/qr', [App\Http\Controllers\Admin\WhatsAppController::class, 'getQrCode'])->name('qr');
     Route::post('/test', [App\Http\Controllers\Admin\WhatsAppController::class, 'sendTestMessage'])->name('test');
     Route::post('/restart', [App\Http\Controllers\Admin\WhatsAppController::class, 'restartSession'])->name('restart');
+    Route::post('/logout', [App\Http\Controllers\Admin\WhatsAppController::class, 'logoutSession'])->name('logout');
     Route::get('/logs', [App\Http\Controllers\Admin\WhatsAppController::class, 'getSessionLogs'])->name('logs');
 });

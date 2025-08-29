@@ -39,10 +39,10 @@ class RegistrationController extends Controller
             'job' => 'nullable|string|max:255',
             'office_address' => 'nullable|string',
             'instagram_username' => 'nullable|string|max:255',
-            'ktp_photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
-            'id_photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'ktp_photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'id_photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
             'id_type' => 'required|string|max:50',
-            'id_photo_2' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'id_photo_2' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
             'id_type_2' => 'required|string|max:50',
             'emergency_contact_name' => 'required|string|max:255',
             'emergency_contact_number' => 'required|string|max:20',
@@ -124,43 +124,88 @@ class RegistrationController extends Controller
 
             // Upload dan simpan foto KTP
             if ($request->hasFile('ktp_photo')) {
-                $ktpFile = $request->file('ktp_photo');
-                $ktpFileName = 'ktp_' . $user->id . '_' . time() . '.' . $ktpFile->getClientOriginalExtension();
-                $ktpPath = $ktpFile->storeAs('user_photos', $ktpFileName, 'public');
+                try {
+                    $ktpFile = $request->file('ktp_photo');
+                    Log::info('Registration: Processing KTP photo', ['user_id' => $user->id, 'file_size' => $ktpFile->getSize()]);
+                    
+                    $ktpFileName = 'ktp_' . $user->id . '_' . time() . '.' . $ktpFile->getClientOriginalExtension();
+                    $ktpPath = $ktpFile->storeAs('user_photos', $ktpFileName, 'public');
+                    
+                    if (!$ktpPath) {
+                        throw new \Exception('Failed to store KTP photo');
+                    }
 
-                UserPhoto::create([
-                    'user_id' => $user->id,
-                    'photo_type' => 'ktp',
-                    'photo' => $ktpPath,
-                ]);
+                    UserPhoto::create([
+                        'user_id' => $user->id,
+                        'photo_type' => 'ktp',
+                        'photo' => $ktpPath,
+                    ]);
+                    
+                    Log::info('Registration: KTP photo uploaded successfully', ['path' => $ktpPath]);
+                } catch (\Exception $e) {
+                    Log::error('Registration: Failed to upload KTP photo', ['error' => $e->getMessage(), 'user_id' => $user->id]);
+                    throw new \Exception('Gagal mengunggah foto KTP: ' . $e->getMessage());
+                }
+            } else {
+                Log::warning('Registration: No KTP photo provided', ['user_id' => $user->id]);
             }
 
             // Upload dan simpan foto ID tambahan 1
             if ($request->hasFile('id_photo')) {
-                $idFile = $request->file('id_photo');
-                $idFileName = 'id_1_' . $user->id . '_' . time() . '.' . $idFile->getClientOriginalExtension();
-                $idPath = $idFile->storeAs('user_photos', $idFileName, 'public');
+                try {
+                    $idFile = $request->file('id_photo');
+                    Log::info('Registration: Processing ID photo 1', ['user_id' => $user->id, 'file_size' => $idFile->getSize(), 'id_type' => $request->id_type]);
+                    
+                    $idFileName = 'id_1_' . $user->id . '_' . time() . '.' . $idFile->getClientOriginalExtension();
+                    $idPath = $idFile->storeAs('user_photos', $idFileName, 'public');
+                    
+                    if (!$idPath) {
+                        throw new \Exception('Failed to store ID photo 1');
+                    }
 
-                UserPhoto::create([
-                    'user_id' => $user->id,
-                    'photo_type' => 'additional_id_1',
-                    'photo' => $idPath,
-                    'id_type' => $request->id_type,
-                ]);
+                    UserPhoto::create([
+                        'user_id' => $user->id,
+                        'photo_type' => 'additional_id_1',
+                        'photo' => $idPath,
+                        'id_type' => $request->id_type,
+                    ]);
+                    
+                    Log::info('Registration: ID photo 1 uploaded successfully', ['path' => $idPath, 'id_type' => $request->id_type]);
+                } catch (\Exception $e) {
+                    Log::error('Registration: Failed to upload ID photo 1', ['error' => $e->getMessage(), 'user_id' => $user->id]);
+                    throw new \Exception('Gagal mengunggah foto ID tambahan 1: ' . $e->getMessage());
+                }
+            } else {
+                Log::warning('Registration: No ID photo 1 provided', ['user_id' => $user->id]);
             }
 
             // Upload dan simpan foto ID tambahan 2
             if ($request->hasFile('id_photo_2')) {
-                $idFile2 = $request->file('id_photo_2');
-                $idFileName2 = 'id_2_' . $user->id . '_' . time() . '.' . $idFile2->getClientOriginalExtension();
-                $idPath2 = $idFile2->storeAs('user_photos', $idFileName2, 'public');
+                try {
+                    $idFile2 = $request->file('id_photo_2');
+                    Log::info('Registration: Processing ID photo 2', ['user_id' => $user->id, 'file_size' => $idFile2->getSize(), 'id_type' => $request->id_type_2]);
+                    
+                    $idFileName2 = 'id_2_' . $user->id . '_' . time() . '.' . $idFile2->getClientOriginalExtension();
+                    $idPath2 = $idFile2->storeAs('user_photos', $idFileName2, 'public');
+                    
+                    if (!$idPath2) {
+                        throw new \Exception('Failed to store ID photo 2');
+                    }
 
-                UserPhoto::create([
-                    'user_id' => $user->id,
-                    'photo_type' => 'additional_id_2',
-                    'photo' => $idPath2,
-                    'id_type' => $request->id_type_2,
-                ]);
+                    UserPhoto::create([
+                        'user_id' => $user->id,
+                        'photo_type' => 'additional_id_2',
+                        'photo' => $idPath2,
+                        'id_type' => $request->id_type_2,
+                    ]);
+                    
+                    Log::info('Registration: ID photo 2 uploaded successfully', ['path' => $idPath2, 'id_type' => $request->id_type_2]);
+                } catch (\Exception $e) {
+                    Log::error('Registration: Failed to upload ID photo 2', ['error' => $e->getMessage(), 'user_id' => $user->id]);
+                    throw new \Exception('Gagal mengunggah foto ID tambahan 2: ' . $e->getMessage());
+                }
+            } else {
+                Log::warning('Registration: No ID photo 2 provided', ['user_id' => $user->id]);
             }
 
             // Trigger event untuk verifikasi email
@@ -181,7 +226,7 @@ class RegistrationController extends Controller
 
     private function sendAdminNotification($user)
     {
-        $adminEmail = 'global.photorental@gmail.com';
+        $adminEmail = 'imam.prabowo1511@gmail.com';
         $editUrl = url('/admin/users/' . $user->id . '/edit');
 
         // Get user phone numbers
@@ -239,7 +284,7 @@ class RegistrationController extends Controller
     {
         try {
             $wahaService = new WAHAService();
-            $adminPhone = '6281212349564';
+            $adminPhone = '628111709596';
             $editUrl = url('/admin/users/' . $user->id . '/edit');
 
             // Get user phone numbers

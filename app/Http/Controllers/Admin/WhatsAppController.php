@@ -140,6 +140,27 @@ class WhatsAppController extends Controller
     }
 
     /**
+     * Logout/End session
+     */
+    public function logoutSession()
+    {
+        try {
+            // Logout/stop session default
+            $result = $this->wahaService->logoutSession('default');
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Session berhasil diakhiri. WhatsApp telah logout.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengakhiri session: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
      * Get session logs
      */
     public function getSessionLogs()
