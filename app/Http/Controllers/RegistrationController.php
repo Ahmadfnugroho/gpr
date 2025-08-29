@@ -127,10 +127,10 @@ class RegistrationController extends Controller
                 try {
                     $ktpFile = $request->file('ktp_photo');
                     Log::info('Registration: Processing KTP photo', ['user_id' => $user->id, 'file_size' => $ktpFile->getSize()]);
-                    
+
                     $ktpFileName = 'ktp_' . $user->id . '_' . time() . '.' . $ktpFile->getClientOriginalExtension();
                     $ktpPath = $ktpFile->storeAs('user_photos', $ktpFileName, 'public');
-                    
+
                     if (!$ktpPath) {
                         throw new \Exception('Failed to store KTP photo');
                     }
@@ -140,7 +140,7 @@ class RegistrationController extends Controller
                         'photo_type' => 'ktp',
                         'photo' => $ktpPath,
                     ]);
-                    
+
                     Log::info('Registration: KTP photo uploaded successfully', ['path' => $ktpPath]);
                 } catch (\Exception $e) {
                     Log::error('Registration: Failed to upload KTP photo', ['error' => $e->getMessage(), 'user_id' => $user->id]);
@@ -155,10 +155,10 @@ class RegistrationController extends Controller
                 try {
                     $idFile = $request->file('id_photo');
                     Log::info('Registration: Processing ID photo 1', ['user_id' => $user->id, 'file_size' => $idFile->getSize(), 'id_type' => $request->id_type]);
-                    
+
                     $idFileName = 'id_1_' . $user->id . '_' . time() . '.' . $idFile->getClientOriginalExtension();
                     $idPath = $idFile->storeAs('user_photos', $idFileName, 'public');
-                    
+
                     if (!$idPath) {
                         throw new \Exception('Failed to store ID photo 1');
                     }
@@ -169,7 +169,7 @@ class RegistrationController extends Controller
                         'photo' => $idPath,
                         'id_type' => $request->id_type,
                     ]);
-                    
+
                     Log::info('Registration: ID photo 1 uploaded successfully', ['path' => $idPath, 'id_type' => $request->id_type]);
                 } catch (\Exception $e) {
                     Log::error('Registration: Failed to upload ID photo 1', ['error' => $e->getMessage(), 'user_id' => $user->id]);
@@ -184,10 +184,10 @@ class RegistrationController extends Controller
                 try {
                     $idFile2 = $request->file('id_photo_2');
                     Log::info('Registration: Processing ID photo 2', ['user_id' => $user->id, 'file_size' => $idFile2->getSize(), 'id_type' => $request->id_type_2]);
-                    
+
                     $idFileName2 = 'id_2_' . $user->id . '_' . time() . '.' . $idFile2->getClientOriginalExtension();
                     $idPath2 = $idFile2->storeAs('user_photos', $idFileName2, 'public');
-                    
+
                     if (!$idPath2) {
                         throw new \Exception('Failed to store ID photo 2');
                     }
@@ -198,7 +198,7 @@ class RegistrationController extends Controller
                         'photo' => $idPath2,
                         'id_type' => $request->id_type_2,
                     ]);
-                    
+
                     Log::info('Registration: ID photo 2 uploaded successfully', ['path' => $idPath2, 'id_type' => $request->id_type_2]);
                 } catch (\Exception $e) {
                     Log::error('Registration: Failed to upload ID photo 2', ['error' => $e->getMessage(), 'user_id' => $user->id]);
@@ -226,7 +226,7 @@ class RegistrationController extends Controller
 
     private function sendAdminNotification($user)
     {
-        $adminEmail = 'imam.prabowo1511@gmail.com';
+        $adminEmail = 'global.photorental@gmail.com';
         $editUrl = url('/admin/users/' . $user->id . '/edit');
 
         // Get user phone numbers
@@ -284,7 +284,7 @@ class RegistrationController extends Controller
     {
         try {
             $wahaService = new WAHAService();
-            $adminPhone = '628111709596';
+            $adminPhone = '6281212349564';
             $editUrl = url('/admin/users/' . $user->id . '/edit');
 
             // Get user phone numbers
