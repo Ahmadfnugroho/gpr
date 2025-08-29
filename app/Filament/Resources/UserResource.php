@@ -221,6 +221,13 @@ class UserResource extends Resource
                     ->falseIcon('heroicon-o-x-circle')
                     ->trueColor('success')
                     ->falseColor('danger'),
+                Tables\Columns\TextColumn::make('userPhotos_count')
+                    ->label('Foto')
+                    ->counts('userPhotos')
+                    ->badge()
+                    ->color(fn($state) => $state >= 2 ? 'success' : 'warning')
+                    ->tooltip(fn($record) => $record->userPhotos->pluck('photo_type')->implode(', '))
+                    ->sortable(),
 
 
             ])
@@ -308,6 +315,15 @@ class UserResource extends Resource
                         ->label('Ubah Status User'),
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
+                    Tables\Actions\Action::make('view_photos')
+                        ->label('Lihat Foto')
+                        ->icon('heroicon-o-photo')
+                        ->color('info')
+                        ->modalHeading(fn($record) => 'Foto Dokumen - ' . $record->name)
+                        ->modalContent(fn($record) => view('filament.resources.user-resource.pages.view-photos', ['user' => $record]))
+                        ->modalSubmitAction(false)
+                        ->modalCancelActionLabel('Tutup')
+                        ->visible(fn($record) => $record->userPhotos()->count() > 0),
                     Tables\Actions\DeleteAction::make(),
 
 

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\MoneyCast;
 use App\Events\TransactionUpdated;
+use App\Notifications\TransactionNotification;
 use App\Services\FonnteService;
 use Carbon\Carbon;
 use Filament\Forms\Get;
@@ -98,7 +99,20 @@ class Transaction extends Model
             }
         });
 
-        // ✅ Dipisahkan dari saving
+        // Event listeners for notifications
+        static::created(function ($transaction) {
+            // Send notification after transaction is created
+            if ($transaction->user) {
+                $transaction->user->notify(new TransactionNotification($transaction, 'created'));
+            }
+        });
+
+        static::updated(function ($transaction) {
+            // Send notification only if booking_status changed
+            if ($transaction->wasChanged('booking_status') && $transaction->user) {
+                $transaction->user->notify(new TransactionNotification($transaction, 'updated'));
+            }
+        });
     }
 
 

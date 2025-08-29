@@ -1,4 +1,4 @@
 <?php
 return [
-    'disable_transaction_email' => true,
+    'disable_transaction_email' => false, // Enable email notifications
 ];

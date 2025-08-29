@@ -3,17 +3,13 @@
 namespace App\Notifications;
 
 use App\Models\Transaction;
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
-use Illuminate\Notifications\Messages\MailMessage;
-
-namespace App\Notifications;
-
-use App\Models\Transaction;
+use App\Services\WAHAService;
+use App\Channels\WhatsAppChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Log;
 
 class TransactionNotification extends Notification
 {
@@ -30,11 +26,17 @@ class TransactionNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        if (config('notifications.disable_transaction_email')) {
-            return []; // Tidak kirim notifikasi
+        $channels = [];
+        
+        // Email notification
+        if (!config('notifications.disable_transaction_email')) {
+            $channels[] = 'mail';
         }
+        
+        // WhatsApp notification - selalu aktif
+        $channels[] = WhatsAppChannel::class;
 
-        return ['mail'];
+        return $channels;
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -74,6 +76,34 @@ class TransactionNotification extends Notification
         $mail->line('Terima kasih telah menggunakan layanan kami.');
 
         return $mail;
+    }
+
+    /**
+     * Send WhatsApp notification
+     */
+    public function toWhatsapp($notifiable)
+    {
+        try {
+            $wahaService = new WAHAService();
+            $result = $wahaService->sendTransactionNotification($this->transaction, $this->eventType);
+            
+            if ($result) {
+                Log::info('WhatsApp transaction notification sent', [
+                    'user_id' => $notifiable->id,
+                    'transaction_id' => $this->transaction->id,
+                    'event_type' => $this->eventType
+                ]);
+            }
+            
+            return $result;
+        } catch (\Exception $e) {
+            Log::error('Failed to send WhatsApp transaction notification', [
+                'user_id' => $notifiable->id,
+                'transaction_id' => $this->transaction->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
     }
 
     protected function buildSubjectAndIntro(string $transactionId, string $status, string $eventType, string $userName): array

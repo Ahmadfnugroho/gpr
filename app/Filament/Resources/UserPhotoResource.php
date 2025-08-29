@@ -76,18 +76,49 @@ class UserPhotoResource extends Resource
                     ->label('Import User Photo'),
             ])
             ->columns([
+                Tables\Columns\ImageColumn::make('photo')
+                    ->label('Preview')
+                    ->disk('public')
+                    ->height(80)
+                    ->width(80)
+                    ->defaultImageUrl('/images/placeholder.png'),
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('User')
                     ->searchable()
                     ->sortable(),
-
+                Tables\Columns\TextColumn::make('photo_type')
+                    ->label('Jenis Foto')
+                    ->badge()
+                    ->color(function ($record) {
+                        return match($record->photo_type) {
+                            'KTP' => 'success',
+                            'ktp' => 'success', 
+                            'additional_id' => 'info',
+                            default => 'gray'
+                        };
+                    })
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Diupload')
+                    ->dateTime('d M Y H:i')
+                    ->sortable(),
             ])
             ->filters([
                 //
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('view_full_photo')
+                    ->label('Lihat Besar')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
+                    ->modalHeading(fn($record) => 'Foto ' . ($record->photo_type ?: 'Dokumen') . ' - ' . $record->user->name)
+                    ->modalContent(fn($record) => view('filament.resources.user-photo-resource.pages.view-full-photo', ['userPhoto' => $record]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup'),
+                Tables\Actions\ViewAction::make()
+                    ->label('Detail'),
+                Tables\Actions\EditAction::make()
+                    ->hidden(), // Hide edit to prevent accidental deletion
                 ActivityLogTimelineTableAction::make('Activities')
                     ->timelineIcons([
                         'created' => 'heroicon-m-check-badge',

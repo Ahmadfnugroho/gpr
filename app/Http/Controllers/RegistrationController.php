@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\UserPhoto;
 use App\Models\UserPhoneNumber;
+use App\Services\WAHAService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -141,8 +142,9 @@ class RegistrationController extends Controller
             // Trigger event untuk verifikasi email
             event(new Registered($user));
 
-            // Kirim notifikasi ke admin
+            // Kirim notifikasi ke admin (email + WhatsApp)
             $this->sendAdminNotification($user);
+            $this->sendAdminWhatsAppNotification($user);
 
             return redirect()->route('registration.success')
                 ->with('success', 'Registrasi berhasil! Silakan cek email Anda untuk verifikasi.');
@@ -155,7 +157,7 @@ class RegistrationController extends Controller
 
     private function sendAdminNotification($user)
     {
-        $adminEmail = 'dissamustika96@gmail.com';
+        $adminEmail = 'ahmadfnugroho@gmail.com';
         $editUrl = url('/admin/users/' . $user->id . '/edit'); // Sesuaikan dengan URL admin panel Anda
 
         $subject = 'Registrasi User Baru - Global Photo Rental';
@@ -178,6 +180,59 @@ class RegistrationController extends Controller
             });
         } catch (\Exception $e) {
             Log::error('Failed to send admin notification: ' . $e->getMessage());
+        }
+    }
+
+    private function sendAdminWhatsAppNotification($user)
+    {
+        try {
+            $wahaService = new WAHAService();
+            $adminPhone = '6281117095956';
+            $editUrl = url('/admin/users/' . $user->id . '/edit');
+
+            // Get user phone numbers
+            $phone1 = $user->userPhoneNumbers->first()?->phone_number ?? 'Tidak ada';
+            $phone2 = $user->userPhoneNumbers->skip(1)->first()?->phone_number ?? 'Tidak ada';
+
+            // Create WhatsApp links
+            $waLink1 = $phone1 !== 'Tidak ada' ? 'https://wa.me/' . preg_replace('/\D/', '', $phone1) : 'Tidak ada';
+            $waLink2 = $phone2 !== 'Tidak ada' ? 'https://wa.me/' . preg_replace('/\D/', '', $phone2) : 'Tidak ada';
+
+            $message = "🆕 *USER BARU MENDAFTAR*\n\n";
+            $message .= "👤 *Nama:* {$user->name}\n";
+            $message .= "📧 *Email:* {$user->email}\n";
+            $message .= "📱 *HP 1:* {$phone1}\n";
+            $message .= "📱 *HP 2:* {$phone2}\n";
+            $message .= "🏠 *Alamat:* {$user->address}\n";
+            $message .= "💼 *Pekerjaan:* " . ($user->job ?: 'Tidak diisi') . "\n";
+            $message .= "📍 *Sumber Info:* {$user->source_info}\n";
+            $message .= "⚠️ *Status:* " . strtoupper($user->status) . "\n\n";
+
+            $message .= "🔗 *Quick Actions:*\n";
+            $message .= "• Edit User: {$editUrl}\n";
+
+            if ($waLink1 !== 'Tidak ada') {
+                $message .= "• Chat HP 1: {$waLink1}\n";
+            }
+            if ($waLink2 !== 'Tidak ada') {
+                $message .= "• Chat HP 2: {$waLink2}\n";
+            }
+
+            $message .= "\n✅ Silakan lakukan verifikasi dan ubah status user.";
+
+            $result = $wahaService->sendMessage($adminPhone, $message);
+
+            if ($result) {
+                Log::info('Admin WhatsApp notification sent for new user registration', [
+                    'user_id' => $user->id,
+                    'user_name' => $user->name
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to send admin WhatsApp notification', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 
