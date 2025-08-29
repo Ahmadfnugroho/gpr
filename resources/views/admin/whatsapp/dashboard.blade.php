@@ -275,7 +275,7 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
 
         // Restart session
         $('#restart-session').click(function() {
-            if (!confirm('Are you sure you want to restart the session?')) return;
+            if (!confirm('Are you sure you want to restart the session? This will reset the connection status to "Scan QR Code 📱".')) return;
             
             let $btn = $(this);
             $btn.prop('disabled', true).text('Restarting...');
@@ -283,15 +283,28 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
             $.post('{{ route("whatsapp.restart") }}')
                 .done(function(data) {
                     if (data.success) {
-                        alert('Session restarted successfully!');
-                        $('#qr-code-display').html('<div class="text-gray-500">Click "Get QR Code" to display new QR</div>');
-                        checkStatus();
+                        alert('✅ ' + data.message);
+                        
+                        // Clear QR code display and reset UI
+                        $('#qr-code-display').html('<div class="text-gray-500">Session restarted. Click "Get QR Code" to display new QR code.</div>');
+                        $('#phone-info').html('Not connected');
+                        
+                        // Reset connection status immediately
+                        $('#connection-status').html(
+                            '<span class="status-indicator status-connecting"></span>' +
+                            '<span>Scan QR Code 📱</span>'
+                        );
+                        
+                        // Check status after a short delay to get updated server status
+                        setTimeout(function() {
+                            checkStatus();
+                        }, 2000);
                     } else {
-                        alert('Failed to restart session: ' + data.message);
+                        alert('❌ Failed to restart session: ' + data.message);
                     }
                 })
                 .fail(function() {
-                    alert('Error restarting session');
+                    alert('❌ Error restarting session. Please try again.');
                 })
                 .always(function() {
                     $btn.prop('disabled', false).text('Restart Session');

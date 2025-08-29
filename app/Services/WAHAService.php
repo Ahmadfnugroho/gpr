@@ -397,18 +397,41 @@ class WAHAService
     public function restartSession($sessionName = 'default')
     {
         try {
+            // Use the correct WAHA restart endpoint
+            $endpoint = "{$this->baseUrl}/sessions/{$sessionName}/restart";
+            
+            Log::info('Restarting WAHA session', [
+                'endpoint' => $endpoint,
+                'session' => $sessionName
+            ]);
+            
             $response = Http::withHeaders([
                 'X-Api-Key' => $this->apiKey,
                 'Content-Type' => 'application/json',
-            ])->post("{$this->baseUrl}/sessions/{$sessionName}/restart");
-
-            return $response->successful() ? $response->json() : null;
+            ])->post($endpoint);
+            
+            Log::info('Restart endpoint response', [
+                'endpoint' => $endpoint,
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            
+            if ($response->successful()) {
+                Log::info('Session restarted successfully');
+                return true;
+            } else {
+                Log::error('Failed to restart session', [
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+                return false;
+            }
         } catch (\Exception $e) {
-            // Log::error('WAHA restart session failed', [
-            //     'session' => $sessionName,
-            //     'error' => $e->getMessage()
-            // ]);
-            return null;
+            Log::error('WAHA restart session failed', [
+                'session' => $sessionName,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 
@@ -418,49 +441,48 @@ class WAHAService
     public function logoutSession($sessionName = 'default')
     {
         try {
-            // Try multiple methods to ensure session is properly logged out
-            $endpoints = [
-                "{$this->baseUrl}/sessions/{$sessionName}/stop",
-                "{$this->baseUrl}/sessions/{$sessionName}/logout",
-                "{$this->baseUrl}/{$sessionName}/auth/logout"
-            ];
+            // Use the correct WAHA logout endpoint
+            $endpoint = "{$this->baseUrl}/sessions/{$sessionName}/logout";
             
-            $success = false;
-            foreach ($endpoints as $endpoint) {
-                Log::info('Trying logout endpoint', ['endpoint' => $endpoint]);
-                
-                $response = Http::withHeaders([
-                    'X-Api-Key' => $this->apiKey,
-                    'Content-Type' => 'application/json',
-                ])->post($endpoint);
-                
-                Log::info('Logout endpoint response', [
-                    'endpoint' => $endpoint,
+            Log::info('Logging out WAHA session', [
+                'endpoint' => $endpoint,
+                'session' => $sessionName
+            ]);
+            
+            $response = Http::withHeaders([
+                'X-Api-Key' => $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->post($endpoint);
+            
+            Log::info('Logout endpoint response', [
+                'endpoint' => $endpoint,
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            
+            if ($response->successful()) {
+                Log::info('Session logged out successfully');
+                return true;
+            } else {
+                Log::error('Failed to logout session', [
                     'status' => $response->status(),
                     'body' => $response->body()
                 ]);
                 
-                if ($response->successful()) {
-                    $success = true;
-                    Log::info('Session logged out successfully', ['endpoint' => $endpoint]);
-                    break;
-                }
-            }
-            
-            // If all logout endpoints fail, try deleting the session entirely
-            if (!$success) {
-                Log::warning('All logout endpoints failed, trying to delete session');
-                $deleteResponse = Http::withHeaders([
+                // If logout fails, try to stop the session as fallback
+                Log::warning('Logout failed, trying stop as fallback');
+                $stopResponse = Http::withHeaders([
                     'X-Api-Key' => $this->apiKey,
-                ])->delete("{$this->baseUrl}/sessions/{$sessionName}");
+                    'Content-Type' => 'application/json',
+                ])->post("{$this->baseUrl}/sessions/{$sessionName}/stop");
                 
-                if ($deleteResponse->successful()) {
-                    Log::info('Session deleted successfully');
-                    $success = true;
+                if ($stopResponse->successful()) {
+                    Log::info('Session stopped successfully as fallback');
+                    return true;
                 }
+                
+                return false;
             }
-            
-            return $success;
         } catch (\Exception $e) {
             Log::error('WAHA logout session failed', [
                 'session' => $sessionName,

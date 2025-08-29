@@ -120,10 +120,17 @@ class WhatsAppController extends Controller
             // Restart session default
             $result = $this->wahaService->restartSession('default');
             
-            return response()->json([
-                'success' => true,
-                'message' => 'Session berhasil di-restart. Silakan scan QR code baru.'
-            ]);
+            if ($result) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Session berhasil di-restart. Status akan kembali ke "Scan QR Code 📱". Silakan scan QR code baru.'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Session restart gagal. Silakan coba lagi.'
+                ]);
+            }
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
