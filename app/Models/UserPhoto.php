@@ -16,6 +16,7 @@ class UserPhoto extends Model
         'user_id',
         'photo_type',
         'photo',
+        'id_type',
     ];
     public function getActivitylogOptions(): LogOptions
     {
@@ -24,6 +25,7 @@ class UserPhoto extends Model
                 'user.name',
                 'photo_type',
                 'photo',
+                'id_type',
             ]);
     }
 

@@ -225,8 +225,24 @@ class UserResource extends Resource
                     ->label('Foto')
                     ->counts('userPhotos')
                     ->badge()
-                    ->color(fn($state) => $state >= 2 ? 'success' : 'warning')
-                    ->tooltip(fn($record) => $record->userPhotos->pluck('photo_type')->implode(', '))
+                    ->color(fn($state) => $state >= 3 ? 'success' : ($state >= 1 ? 'warning' : 'danger'))
+                    ->tooltip(function($record) {
+                        $photos = $record->userPhotos->map(function($photo) {
+                            if ($photo->photo_type === 'ktp') {
+                                return '📄 KTP';
+                            } elseif ($photo->photo_type === 'additional_id_1') {
+                                return '🆔 ID 1: ' . ($photo->id_type ?: 'Tidak diisi');
+                            } elseif ($photo->photo_type === 'additional_id_2') {
+                                return '🆔 ID 2: ' . ($photo->id_type ?: 'Tidak diisi');
+                            } elseif ($photo->photo_type === 'additional_id') {
+                                return '🆔 ID Tambahan: ' . ($photo->id_type ?: 'Tidak diisi');
+                            }
+                            return '📋 ' . $photo->photo_type;
+                        })->implode(', ');
+                        
+                        $count = $record->userPhotos->count();
+                        return "Foto ({$count}/3): " . ($photos ?: 'Tidak ada foto');
+                    })
                     ->sortable(),
 
 

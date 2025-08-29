@@ -21,23 +21,40 @@ class UserPhotoRelationManager extends RelationManager
         return $form
             ->schema([
                 Forms\Components\FileUpload::make('photo')
-                ->image()    
-                ->required(),
+                    ->image()
+                    ->directory('user_photos')
+                    ->disk('public')
+                    ->imageResizeMode('cover')
+                    ->imageCropAspectRatio('4:3')
+                    ->imageResizeTargetWidth(800)
+                    ->imageResizeTargetHeight(600)
+                    ->required(),
 
                 Forms\Components\Select::make('photo_type')
                     ->options([
-                        'Kartu Keluarga' => 'Kartu Keluarga',
-                        'SIM' => 'SIM',
+                        'ktp' => '📄 KTP',
+                        'additional_id_1' => '🆔 ID Tambahan 1',
+                        'additional_id_2' => '🆔 ID Tambahan 2',
+                        'additional_id' => '🆔 ID Tambahan',
+                    ])
+                    ->required()
+                    ->live(),
+                    
+                Forms\Components\Select::make('id_type')
+                    ->label('Jenis ID (untuk ID Tambahan)')
+                    ->options([
+                        'KK' => 'Kartu Keluarga (KK)',
+                        'SIM' => 'SIM (Surat Izin Mengemudi)',
                         'NPWP' => 'NPWP',
                         'STNK' => 'STNK',
                         'BPKB' => 'BPKB',
                         'Passport' => 'Passport',
                         'BPJS' => 'BPJS',
-                        'ID Card Kerja' => 'ID Card Kerja',
-                        'KTP' => 'KTP',
-                        'Screenshot Follow' => 'Screenshot Follow',   
+                        'ID_Kerja' => 'ID Card Kerja',
                     ])
-                    ->nullable(),
+                    ->nullable()
+                    ->visible(fn(callable $get) => in_array($get('photo_type'), ['additional_id_1', 'additional_id_2', 'additional_id']))
+                    ->helperText('Pilih jenis ID untuk dokumen tambahan'),
             ]);
     }
 
@@ -46,8 +63,32 @@ class UserPhotoRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('User Photo')
             ->columns([
-                Tables\Columns\ImageColumn::make('photo'),
-                Tables\Columns\TextColumn::make('photo_type'),
+                Tables\Columns\ImageColumn::make('photo')
+                    ->disk('public')
+                    ->height(80)
+                    ->width(80),
+                    
+                Tables\Columns\TextColumn::make('photo_type')
+                    ->label('Tipe Foto')
+                    ->formatStateUsing(function ($state) {
+                        return match($state) {
+                            'ktp' => '📄 KTP',
+                            'additional_id_1' => '🆔 ID Tambahan 1',
+                            'additional_id_2' => '🆔 ID Tambahan 2', 
+                            'additional_id' => '🆔 ID Tambahan',
+                            default => '📋 ' . $state
+                        };
+                    }),
+                    
+                Tables\Columns\TextColumn::make('id_type')
+                    ->label('Jenis ID')
+                    ->placeholder('Tidak diisi')
+                    ->visible(fn($record) => in_array($record->photo_type ?? '', ['additional_id_1', 'additional_id_2', 'additional_id'])),
+                    
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Diupload')
+                    ->dateTime('d M Y H:i')
+                    ->sortable(),
             ])
             ->filters([
                 //

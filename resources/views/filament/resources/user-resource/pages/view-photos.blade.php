@@ -5,11 +5,26 @@
                 <div class="bg-white rounded-lg shadow-md overflow-hidden">
                     <div class="p-4 bg-gray-50">
                         <h3 class="font-semibold text-gray-900 text-sm uppercase">
-                            {{ $photo->photo_type ?: 'Dokumen ID' }}
+                            @if($photo->photo_type === 'ktp')
+                                📄 KTP
+                            @elseif($photo->photo_type === 'additional_id_1')
+                                🆔 ID Tambahan 1: {{ $photo->id_type ?: 'Tidak Diisi' }}
+                            @elseif($photo->photo_type === 'additional_id_2')
+                                🆔 ID Tambahan 2: {{ $photo->id_type ?: 'Tidak Diisi' }}
+                            @elseif($photo->photo_type === 'additional_id')
+                                🆔 ID Tambahan: {{ $photo->id_type ?: 'Tidak Diisi' }}
+                            @else
+                                📋 {{ $photo->photo_type ?: 'Dokumen ID' }}
+                            @endif
                         </h3>
                         <p class="text-gray-600 text-xs">
                             Diupload: {{ $photo->created_at->format('d M Y H:i') }}
                         </p>
+                        @if($photo->id_type)
+                            <p class="text-blue-600 text-xs font-medium">
+                                Jenis: {{ $photo->id_type }}
+                            </p>
+                        @endif
                     </div>
                     
                     <div class="relative">

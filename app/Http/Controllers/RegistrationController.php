@@ -41,6 +41,9 @@ class RegistrationController extends Controller
             'instagram_username' => 'nullable|string|max:255',
             'ktp_photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
             'id_photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'id_type' => 'required|string|max:50',
+            'id_photo_2' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'id_type_2' => 'required|string|max:50',
             'emergency_contact_name' => 'required|string|max:255',
             'emergency_contact_number' => 'required|string|max:20',
         ], [
@@ -60,10 +63,16 @@ class RegistrationController extends Controller
             'ktp_photo.image' => 'File KTP harus berupa gambar',
             'ktp_photo.mimes' => 'Format foto KTP harus jpeg, png, atau jpg',
             'ktp_photo.max' => 'Ukuran foto KTP maksimal 2MB',
-            'id_photo.required' => 'Foto ID tambahan wajib diunggah',
-            'id_photo.image' => 'File ID harus berupa gambar',
-            'id_photo.mimes' => 'Format foto ID harus jpeg, png, atau jpg',
-            'id_photo.max' => 'Ukuran foto ID maksimal 2MB',
+            'id_photo.required' => 'Foto ID tambahan 1 wajib diunggah',
+            'id_photo.image' => 'File ID tambahan 1 harus berupa gambar',
+            'id_photo.mimes' => 'Format foto ID tambahan 1 harus jpeg, png, atau jpg',
+            'id_photo.max' => 'Ukuran foto ID tambahan 1 maksimal 2MB',
+            'id_type.required' => 'Jenis ID tambahan 1 wajib dipilih',
+            'id_photo_2.required' => 'Foto ID tambahan 2 wajib diunggah',
+            'id_photo_2.image' => 'File ID tambahan 2 harus berupa gambar',
+            'id_photo_2.mimes' => 'Format foto ID tambahan 2 harus jpeg, png, atau jpg',
+            'id_photo_2.max' => 'Ukuran foto ID tambahan 2 maksimal 2MB',
+            'id_type_2.required' => 'Jenis ID tambahan 2 wajib dipilih',
             'emergency_contact_name.required' => 'Nama kontak emergency wajib diisi',
             'emergency_contact_number.required' => 'Nomor HP kontak emergency wajib diisi',
         ]);
@@ -126,16 +135,31 @@ class RegistrationController extends Controller
                 ]);
             }
 
-            // Upload dan simpan foto ID tambahan
+            // Upload dan simpan foto ID tambahan 1
             if ($request->hasFile('id_photo')) {
                 $idFile = $request->file('id_photo');
-                $idFileName = 'id_' . $user->id . '_' . time() . '.' . $idFile->getClientOriginalExtension();
+                $idFileName = 'id_1_' . $user->id . '_' . time() . '.' . $idFile->getClientOriginalExtension();
                 $idPath = $idFile->storeAs('user_photos', $idFileName, 'public');
 
                 UserPhoto::create([
                     'user_id' => $user->id,
-                    'photo_type' => 'additional_id',
+                    'photo_type' => 'additional_id_1',
                     'photo' => $idPath,
+                    'id_type' => $request->id_type,
+                ]);
+            }
+
+            // Upload dan simpan foto ID tambahan 2
+            if ($request->hasFile('id_photo_2')) {
+                $idFile2 = $request->file('id_photo_2');
+                $idFileName2 = 'id_2_' . $user->id . '_' . time() . '.' . $idFile2->getClientOriginalExtension();
+                $idPath2 = $idFile2->storeAs('user_photos', $idFileName2, 'public');
+
+                UserPhoto::create([
+                    'user_id' => $user->id,
+                    'photo_type' => 'additional_id_2',
+                    'photo' => $idPath2,
+                    'id_type' => $request->id_type_2,
                 ]);
             }
 
@@ -159,11 +183,11 @@ class RegistrationController extends Controller
     {
         $adminEmail = 'ahmadfnugroho@gmail.com';
         $editUrl = url('/admin/users/' . $user->id . '/edit');
-        
+
         // Get user phone numbers
         $phone1 = $user->userPhoneNumbers->first()?->phone_number ?? 'Tidak ada';
         $phone2 = $user->userPhoneNumbers->skip(1)->first()?->phone_number ?? 'Tidak ada';
-        
+
         // Create WhatsApp links
         $waLink1 = $phone1 !== 'Tidak ada' ? 'https://wa.me/' . preg_replace('/\D/', '', $phone1) : null;
         $waLink2 = $phone2 !== 'Tidak ada' ? 'https://wa.me/' . preg_replace('/\D/', '', $phone2) : null;
@@ -186,14 +210,14 @@ class RegistrationController extends Controller
                 <h3>🔗 Quick Actions:</h3>
                 <p>
                     <a href='{$editUrl}' style='background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;'>✏️ Edit User</a>";
-                    
+
         if ($waLink1) {
             $message .= "<a href='{$waLink1}' style='background: #25D366; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;'>📱 Chat HP 1</a>";
         }
         if ($waLink2) {
             $message .= "<a href='{$waLink2}' style='background: #25D366; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>📱 Chat HP 2</a>";
         }
-        
+
         $message .= "
                 </p>
                 <p style='margin-top: 15px; padding: 10px; background: #f8f9fa; border-left: 4px solid #007bff; font-style: italic;'>
@@ -216,7 +240,7 @@ class RegistrationController extends Controller
     {
         try {
             $wahaService = new WAHAService();
-            $adminPhone = '628111709596';
+            $adminPhone = '6282285877424';
             $editUrl = url('/admin/users/' . $user->id . '/edit');
 
             // Get user phone numbers

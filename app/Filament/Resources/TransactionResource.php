@@ -447,7 +447,7 @@ class TransactionResource extends Resource
             Grid::make('Durasi')
                 ->schema([
                     Select::make('user_id')
-                        ->relationship('user', 'name', fn (Builder $query) => $query->where('status', 'active'))
+                        ->relationship('user', 'name', fn(Builder $query) => $query->where('status', 'active'))
                         ->required()
                         ->searchable()
                         ->preload()
@@ -736,7 +736,7 @@ class TransactionResource extends Resource
                                             $productId = $get('product_id');
                                             $bundlingId = $get('bundling_id');
                                             $quantity = (int) ($get('quantity') ?? 1);
-                                            
+
                                             $availableCount = 0;
                                             if ($productId) {
                                                 $available = \App\Filament\Resources\TransactionResource::resolveAvailableProductSerials($get);
@@ -752,11 +752,10 @@ class TransactionResource extends Resource
                                                 );
                                                 $availableCount = count($result['ids']);
                                             }
-                                            
-                                            $status = $availableCount >= $quantity ? '✅ Tersedia' : '⚠️ Terbatas';
-                                            $color = $availableCount >= $quantity ? 'green' : 'orange';
-                                            
-                                            return "Serial Numbers ({$availableCount} tersedia) - <span style='color: {$color}'>{$status}</span>";
+
+                                            $status = $availableCount >= $quantity ? '✅ Tersedia' : '⚠️ Tidak Tersedia';
+
+                                            return "Jumlah Produk/Serial Number ({$availableCount} tersedia) - {$status}";
                                         })
                                         ->visible(function (Get $get) {
                                             return !is_null($get('selection_key'));
@@ -1239,14 +1238,14 @@ class TransactionResource extends Resource
                                     }),
                             ])
                     ]),
-                
+
                 InfoSection::make('Products')
                     ->schema([
                         TextEntry::make('product_info')
                             ->label('Products/Bundles')
                             ->getStateUsing(function ($record) {
                                 $products = [];
-                                
+
                                 // Use already eager-loaded relationships to avoid N+1 queries
                                 if ($record->relationLoaded('detailTransactions')) {
                                     foreach ($record->detailTransactions as $detail) {
@@ -1257,33 +1256,36 @@ class TransactionResource extends Resource
                                         }
                                     }
                                 }
-                                
+
                                 return implode(', ', array_unique($products)) ?: 'N/A';
                             }),
                     ]),
-                
+
                 InfoSection::make('Financial Information')
                     ->schema([
                         InfoGrid::make(3)
                             ->schema([
                                 TextEntry::make('grand_total')
                                     ->label('Grand Total')
-                                    ->formatStateUsing(fn(string $state): string => 
+                                    ->formatStateUsing(
+                                        fn(string $state): string =>
                                         'Rp ' . number_format((int) $state, 0, ',', '.')
                                     ),
                                 TextEntry::make('down_payment')
                                     ->label('Down Payment')
-                                    ->formatStateUsing(fn(string $state): string => 
+                                    ->formatStateUsing(
+                                        fn(string $state): string =>
                                         'Rp ' . number_format((int) $state, 0, ',', '.')
                                     ),
                                 TextEntry::make('remaining_payment')
                                     ->label('Remaining Payment')
-                                    ->formatStateUsing(fn(string $state): string => 
+                                    ->formatStateUsing(
+                                        fn(string $state): string =>
                                         $state == '0' ? 'LUNAS' : 'Rp ' . number_format((int) $state, 0, ',', '.')
                                     ),
                             ])
                     ]),
-                    
+
                 InfoSection::make('Additional Information')
                     ->schema([
                         TextEntry::make('promo.name')
@@ -1349,7 +1351,7 @@ class TransactionResource extends Resource
                     ->size(TextColumnSize::ExtraSmall)
                     ->getStateUsing(function ($record) {
                         $products = [];
-                        
+
                         // Use already eager-loaded relationships to avoid N+1 queries
                         if ($record->relationLoaded('detailTransactions')) {
                             foreach ($record->detailTransactions as $detail) {
@@ -1360,7 +1362,7 @@ class TransactionResource extends Resource
                                 }
                             }
                         }
-                        
+
                         return implode(', ', array_unique($products)) ?: 'N/A';
                     })
                     ->wrap(),

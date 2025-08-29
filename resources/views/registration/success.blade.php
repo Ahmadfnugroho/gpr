@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,20 +13,23 @@
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+
         .success-container {
             background: white;
             border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             padding: 3rem;
             margin: 2rem auto;
             max-width: 600px;
             text-align: center;
         }
+
         .success-icon {
             font-size: 4rem;
             color: #28a745;
             margin-bottom: 1rem;
         }
+
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
@@ -34,27 +38,28 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="success-container">
             <div class="success-icon">
                 <i class="fas fa-check-circle"></i>
             </div>
-            
+
             <h2 class="fw-bold mb-3">Registrasi Berhasil!</h2>
-            
+
             @if(session('success'))
-                <div class="alert alert-success border-0 shadow-sm">
-                    <i class="fas fa-info-circle me-2"></i>
-                    {{ session('success') }}
-                </div>
+            <div class="alert alert-success border-0 shadow-sm">
+                <i class="fas fa-info-circle me-2"></i>
+                {{ session('success') }}
+            </div>
             @endif
 
             @if(session('message'))
-                <div class="alert alert-info border-0 shadow-sm">
-                    <i class="fas fa-info-circle me-2"></i>
-                    {{ session('message') }}
-                </div>
+            <div class="alert alert-info border-0 shadow-sm">
+                <i class="fas fa-info-circle me-2"></i>
+                {{ session('message') }}
+            </div>
             @endif
 
             <div class="mb-4">
@@ -90,8 +95,8 @@
                 </h6>
                 <p class="text-muted small">
                     Hubungi kami di:<br>
-                    WhatsApp: <a href="https://wa.me/6281234567890" class="text-decoration-none">+62 812-3456-7890</a><br>
-                    Email: <a href="mailto:info@globalphotorental.com" class="text-decoration-none">info@globalphotorental.com</a>
+                    WhatsApp: <a href="https://wa.me/6281212349564" class="text-decoration-none">+62 812-1234-9564</a><br>
+                    Email: <a href="mailto:global.photorental@gmail.com" class="text-decoration-none">global.photorental@gmail.com</a>
                 </p>
             </div>
         </div>
@@ -99,4 +104,5 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>
