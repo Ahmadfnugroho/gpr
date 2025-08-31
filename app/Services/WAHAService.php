@@ -20,18 +20,46 @@ class WAHAService
 
     /**
      * Kirim pesan WhatsApp
+     * 
+     * @param string $to Nomor telepon penerima
+     * @param string $message Pesan yang akan dikirim
+     * @param string|null $sessionName Custom session name (optional)
+     * @return array Response dengan status dan pesan
      */
-    public function sendMessage($to, $message)
+    public function sendMessage($to, $message, $sessionName = null)
     {
         try {
+            // Gunakan session name yang diberikan atau default
+            $session = $sessionName ?: $this->session;
+            
+            // Validasi session name
+            if (empty($session)) {
+                $errorMessage = 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard';
+                Log::error($errorMessage, ['session' => $session]);
+                return ['success' => false, 'message' => $errorMessage];
+            }
+            
             // Format nomor telepon (pastikan format internasional)
             $formattedTo = $this->formatPhoneNumber($to);
+            
+            // Validasi nomor telepon
+            if (empty($formattedTo)) {
+                $errorMessage = 'Invalid phone number format';
+                Log::error($errorMessage, ['to' => $to]);
+                return ['success' => false, 'message' => $errorMessage];
+            }
+
+            Log::info('Sending WhatsApp message', [
+                'session' => $session,
+                'to' => $formattedTo,
+                'message_length' => strlen($message)
+            ]);
 
             $response = Http::withHeaders([
                 'X-Api-Key' => $this->apiKey,
                 'Content-Type' => 'application/json',
             ])->post("{$this->baseUrl}/sendText", [
-                'session' => $this->session,
+                'session' => $session,
                 'chatId' => $formattedTo . '@c.us',
                 'text' => $message,
             ]);
@@ -39,23 +67,54 @@ class WAHAService
             if ($response->successful()) {
                 Log::info('WhatsApp message sent successfully', [
                     'to' => $formattedTo,
+                    'session' => $session,
                     'status' => 'success'
                 ]);
-                return true;
+                return ['success' => true, 'message' => 'Message sent successfully'];
             } else {
-                Log::error('Failed to send WhatsApp message', [
+                $errorMessage = 'Failed to send WhatsApp message';
+                $errorData = [];
+                
+                // Handle error 422 (session not found atau validasi error lainnya)
+                if ($response->status() === 422) {
+                    try {
+                        $errorData = $response->json();
+                        $errorMessage = $errorData['message'] ?? 'Validation error';
+                        
+                        // Cek apakah session tidak valid
+                        if (strpos(strtolower($errorMessage), 'session not found') !== false || 
+                            strpos(strtolower($errorMessage), 'invalid session') !== false) {
+                            $errorMessage = 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard';
+                            
+                            // Coba mulai session otomatis
+                            Log::info('Attempting to start session automatically', ['session' => $session]);
+                            $startResult = $this->startSession($session);
+                            if ($startResult['success']) {
+                                // Coba kirim pesan lagi setelah session dimulai
+                                return $this->sendMessage($to, $message, $session);
+                            }
+                        }
+                    } catch (\Exception $jsonEx) {
+                        $errorMessage = 'Validation error: ' . $response->body();
+                    }
+                }
+                
+                Log::error($errorMessage, [
                     'to' => $formattedTo,
+                    'session' => $session,
                     'status' => $response->status(),
-                    'error' => 'HTTP error'
+                    'error' => $response->body()
                 ]);
-                return false;
+                
+                return ['success' => false, 'message' => $errorMessage, 'status' => $response->status()];
             }
         } catch (\Exception $e) {
-            Log::error('Exception sending WhatsApp message', [
+            $errorMessage = 'Exception sending WhatsApp message: ' . $e->getMessage();
+            Log::error($errorMessage, [
                 'to' => $to,
-                'error' => $e->getMessage()
+                'session' => $sessionName ?: $this->session
             ]);
-            return false;
+            return ['success' => false, 'message' => $errorMessage];
         }
     }
 
@@ -78,33 +137,88 @@ class WAHAService
 
     /**
      * Start session WAHA
+     * 
+     * @param string $sessionName Nama session yang akan dimulai
+     * @return bool|array True jika berhasil, array dengan error jika gagal
      */
-    public function startSession()
+    public function startSession($sessionName = null)
     {
         try {
+            // Gunakan session name yang diberikan atau default
+            $session = $sessionName ?: $this->session;
+            
+            // Validasi session name
+            if (empty($session)) {
+                Log::error('Invalid session name', ['session' => $session]);
+                return ['success' => false, 'message' => 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard'];
+            }
+            
+            // Endpoint untuk memulai session baru
+            $endpoint = "{$this->baseUrl}/sessions";
+            if ($sessionName) {
+                // Endpoint untuk memulai session yang sudah ada
+                $endpoint = "{$this->baseUrl}/sessions/{$session}/start";
+            }
+            
+            Log::info('Starting WAHA session', [
+                'endpoint' => $endpoint,
+                'session' => $session
+            ]);
+            
             $response = Http::withHeaders([
                 'X-Api-Key' => $this->apiKey,
                 'Content-Type' => 'application/json',
-            ])->post("{$this->baseUrl}/sessions", [
-                'name' => $this->session,
+            ])->post($endpoint, [
+                'name' => $session,
                 'config' => [
-                    'webhooks' => []
+                    'webhooks' => [
+                        // Konfigurasi webhook jika diperlukan
+                        // {
+                        //     'url': 'https://example.com/webhook',
+                        //     'events': ['message', 'message.any']
+                        //     'secret': 'your_webhook_secret',
+                        //     'headers': {
+                        //         'Authorization': 'Basic ' . base64_encode('wahaadmin:Infrasglobal@100')
+                        //     }
+                        // }
+                    ]
                 ]
             ]);
 
+            Log::info('Start session response', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+
             if ($response->successful()) {
-                // Log::info('WAHA session started successfully', ['response' => $response->json()]);
-                return true;
+                Log::info('WAHA session started successfully', ['session' => $session]);
+                return ['success' => true, 'message' => 'Session started successfully'];
             } else {
-                // Log::error('Failed to start WAHA session', [
-                //     'status' => $response->status(),
-                //     'response' => $response->body()
-                // ]);
-                return false;
+                $errorMessage = 'Failed to start session';
+                $errorData = [];
+                
+                // Handle error 422 (session already exists or other validation errors)
+                if ($response->status() === 422) {
+                    try {
+                        $errorData = $response->json();
+                        $errorMessage = $errorData['message'] ?? 'Session validation error';
+                    } catch (\Exception $jsonEx) {
+                        $errorMessage = 'Session validation error: ' . $response->body();
+                    }
+                }
+                
+                Log::error($errorMessage, [
+                    'session' => $session,
+                    'status' => $response->status(),
+                    'response' => $response->body()
+                ]);
+                
+                return ['success' => false, 'message' => $errorMessage, 'status' => $response->status()];
             }
         } catch (\Exception $e) {
-            // Log::error('Exception starting WAHA session', ['error' => $e->getMessage()]);
-            return false;
+            $errorMessage = 'Exception starting WAHA session: ' . $e->getMessage();
+            Log::error($errorMessage, ['session' => $sessionName ?: $this->session]);
+            return ['success' => false, 'message' => $errorMessage];
         }
     }
 
@@ -322,7 +436,6 @@ class WAHAService
             // Try different QR endpoint formats
             $endpoints = [
                 "{$this->baseUrl}/{$sessionName}/auth/qr",
-                "{$this->baseUrl}/sessions/{$sessionName}/auth/qr"
             ];
 
             foreach ($endpoints as $endpoint) {
@@ -437,10 +550,20 @@ class WAHAService
 
     /**
      * Logout/Stop session
+     * 
+     * @param string $sessionName Nama session yang akan dilogout
+     * @return array Response dengan status dan pesan
      */
     public function logoutSession($sessionName = 'default')
     {
         try {
+            // Validasi session name
+            if (empty($sessionName)) {
+                $errorMessage = 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard';
+                Log::error($errorMessage, ['session' => $sessionName]);
+                return ['success' => false, 'message' => $errorMessage];
+            }
+            
             // Use the correct WAHA logout endpoint
             $endpoint = "{$this->baseUrl}/sessions/{$sessionName}/logout";
 
@@ -462,9 +585,27 @@ class WAHAService
 
             if ($response->successful()) {
                 Log::info('Session logged out successfully');
-                return true;
+                return ['success' => true, 'message' => 'Session logged out successfully'];
             } else {
-                Log::error('Failed to logout session', [
+                $errorMessage = 'Failed to logout session';
+                
+                // Handle error 422 (session not found atau validasi error lainnya)
+                if ($response->status() === 422) {
+                    try {
+                        $errorData = $response->json();
+                        $errorMessage = $errorData['message'] ?? 'Session validation error';
+                        
+                        // Cek apakah session tidak valid
+                        if (strpos(strtolower($errorMessage), 'session not found') !== false) {
+                            $errorMessage = 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard';
+                        }
+                    } catch (\Exception $jsonEx) {
+                        $errorMessage = 'Session validation error: ' . $response->body();
+                    }
+                }
+                
+                Log::error($errorMessage, [
+                    'session' => $sessionName,
                     'status' => $response->status(),
                     'body' => $response->body()
                 ]);
@@ -478,17 +619,68 @@ class WAHAService
 
                 if ($stopResponse->successful()) {
                     Log::info('Session stopped successfully as fallback');
-                    return true;
+                    return ['success' => true, 'message' => 'Session stopped successfully (fallback method)'];
                 }
 
-                return false;
+                return ['success' => false, 'message' => $errorMessage, 'status' => $response->status()];
             }
         } catch (\Exception $e) {
-            Log::error('WAHA logout session failed', [
-                'session' => $sessionName,
-                'error' => $e->getMessage()
+            $errorMessage = 'WAHA logout session failed: ' . $e->getMessage();
+            Log::error($errorMessage, ['session' => $sessionName]);
+            return ['success' => false, 'message' => $errorMessage];
+        }
+    }
+    
+    /**
+     * Stop WAHA server
+     * 
+     * @return array Response dengan status dan pesan
+     */
+    public function stopServer()
+    {
+        try {
+            // Endpoint untuk menghentikan server
+            $endpoint = "{$this->baseUrl}/server/stop";
+
+            Log::info('Stopping WAHA server', ['endpoint' => $endpoint]);
+
+            $response = Http::withHeaders([
+                'X-Api-Key' => $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->post($endpoint);
+
+            Log::info('Stop server response', [
+                'status' => $response->status(),
+                'body' => $response->body()
             ]);
-            throw $e;
+
+            if ($response->successful()) {
+                Log::info('WAHA server stopped successfully');
+                return ['success' => true, 'message' => 'Server stopped successfully'];
+            } else {
+                $errorMessage = 'Failed to stop server';
+                
+                // Handle error 422 (validasi error)
+                if ($response->status() === 422) {
+                    try {
+                        $errorData = $response->json();
+                        $errorMessage = $errorData['message'] ?? 'Server validation error';
+                    } catch (\Exception $jsonEx) {
+                        $errorMessage = 'Server validation error: ' . $response->body();
+                    }
+                }
+                
+                Log::error($errorMessage, [
+                    'status' => $response->status(),
+                    'response' => $response->body()
+                ]);
+                
+                return ['success' => false, 'message' => $errorMessage, 'status' => $response->status()];
+            }
+        } catch (\Exception $e) {
+            $errorMessage = 'Exception stopping WAHA server: ' . $e->getMessage();
+            Log::error($errorMessage);
+            return ['success' => false, 'message' => $errorMessage];
         }
     }
 }

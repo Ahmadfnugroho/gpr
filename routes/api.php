@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SubCategoryController;
 use App\Http\Controllers\Api\TransactionController;
+use App\Http\Controllers\Admin\WhatsAppController;
 use App\Http\Controllers\GoogleSheetSyncController;
 use App\Http\Controllers\TransactionCheckController;
 use Illuminate\Http\Request;
@@ -14,6 +15,19 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 });
 // ->middleware('auth:sanctum');
+
+// WhatsApp API Routes
+Route::prefix('server')->group(function () {
+    Route::post('/stop', [WhatsAppController::class, 'stopServer']);
+});
+
+Route::prefix('sessions')->group(function () {
+    Route::post('/{session}/restart', [WhatsAppController::class, 'restartSession']);
+    Route::post('/{session}/logout', [WhatsAppController::class, 'logoutSession']);
+    Route::post('/{session}/start', [WhatsAppController::class, 'startSession']);
+});
+
+Route::post('/sendText', [WhatsAppController::class, 'sendTestMessage']);
 
 Route::middleware('api_key')->group(function () {
     Route::get('/product/{product:slug}', [ProductController::class, 'show']);
