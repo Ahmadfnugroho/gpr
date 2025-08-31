@@ -12,7 +12,7 @@ return [
     | other UI elements where an application name needs to be displayed.
     |
     */
-
+    Intervention\Image\Image::class,
     'name' => env('APP_NAME', 'GPR'),
 
     /*

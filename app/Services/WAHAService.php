@@ -281,7 +281,7 @@ class WAHAService
         try {
             $response = Http::withHeaders([
                 'X-Api-Key' => $this->apiKey,
-            ])->get("https://whatsapp.globalphotorental.com/version");
+            ])->get("{$this->baseUrl}/version");
 
             return $response->successful() ? $response->json() : null;
         } catch (\Exception $e) {
@@ -299,56 +299,56 @@ class WAHAService
             // First check session status
             $sessions = $this->getSessions();
             $currentSession = null;
-            
+
             foreach ($sessions as $session) {
                 if ($session['name'] === $sessionName) {
                     $currentSession = $session;
                     break;
                 }
             }
-            
+
             // If session is already working, return message
             if ($currentSession && $currentSession['status'] === 'WORKING') {
                 throw new \Exception('Session sudah terhubung ke WhatsApp. Tidak perlu scan QR code.');
             }
-            
+
             // If no session exists, create one
             if (!$currentSession) {
                 $this->startSession();
                 // Wait a moment for session to initialize
                 sleep(2);
             }
-            
+
             // Try different QR endpoint formats
             $endpoints = [
                 "{$this->baseUrl}/{$sessionName}/auth/qr",
                 "{$this->baseUrl}/sessions/{$sessionName}/auth/qr"
             ];
-            
+
             foreach ($endpoints as $endpoint) {
                 Log::info('Trying QR endpoint', ['endpoint' => $endpoint]);
-                
+
                 $response = Http::timeout(30)->withHeaders([
                     'X-Api-Key' => $this->apiKey,
                 ])->get($endpoint);
-                
+
                 Log::info('QR endpoint response', [
                     'endpoint' => $endpoint,
                     'status' => $response->status(),
                     'content_type' => $response->header('content-type'),
                     'body_preview' => substr($response->body(), 0, 100)
                 ]);
-                
+
                 if ($response->successful()) {
                     $contentType = $response->header('content-type');
-                    
+
                     // Check if response is an image
                     if (strpos($contentType, 'image') !== false) {
                         $imageData = $response->body();
                         Log::info('Got QR image', ['size' => strlen($imageData)]);
                         return 'data:image/png;base64,' . base64_encode($imageData);
                     }
-                    
+
                     // Check if response is JSON with QR data
                     try {
                         $jsonData = $response->json();
@@ -359,7 +359,7 @@ class WAHAService
                     } catch (\Exception $e) {
                         // Not JSON, continue
                     }
-                    
+
                     // If successful but not image, try to get QR from body
                     $body = $response->body();
                     if (!empty($body) && strlen($body) > 100) {
@@ -380,7 +380,7 @@ class WAHAService
                     throw new \Exception('Session dalam status yang tidak memungkinkan untuk generate QR code. Status: ' . ($currentSession['status'] ?? 'Unknown'));
                 }
             }
-            
+
             Log::error('All QR endpoints failed');
             throw new \Exception('Tidak dapat mengambil QR Code dari semua endpoint yang tersedia.');
         } catch (\Exception $e) {
@@ -399,23 +399,23 @@ class WAHAService
         try {
             // Use the correct WAHA restart endpoint
             $endpoint = "{$this->baseUrl}/sessions/{$sessionName}/restart";
-            
+
             Log::info('Restarting WAHA session', [
                 'endpoint' => $endpoint,
                 'session' => $sessionName
             ]);
-            
+
             $response = Http::withHeaders([
                 'X-Api-Key' => $this->apiKey,
                 'Content-Type' => 'application/json',
             ])->post($endpoint);
-            
+
             Log::info('Restart endpoint response', [
                 'endpoint' => $endpoint,
                 'status' => $response->status(),
                 'body' => $response->body()
             ]);
-            
+
             if ($response->successful()) {
                 Log::info('Session restarted successfully');
                 return true;
@@ -443,23 +443,23 @@ class WAHAService
         try {
             // Use the correct WAHA logout endpoint
             $endpoint = "{$this->baseUrl}/sessions/{$sessionName}/logout";
-            
+
             Log::info('Logging out WAHA session', [
                 'endpoint' => $endpoint,
                 'session' => $sessionName
             ]);
-            
+
             $response = Http::withHeaders([
                 'X-Api-Key' => $this->apiKey,
                 'Content-Type' => 'application/json',
             ])->post($endpoint);
-            
+
             Log::info('Logout endpoint response', [
                 'endpoint' => $endpoint,
                 'status' => $response->status(),
                 'body' => $response->body()
             ]);
-            
+
             if ($response->successful()) {
                 Log::info('Session logged out successfully');
                 return true;
@@ -468,19 +468,19 @@ class WAHAService
                     'status' => $response->status(),
                     'body' => $response->body()
                 ]);
-                
+
                 // If logout fails, try to stop the session as fallback
                 Log::warning('Logout failed, trying stop as fallback');
                 $stopResponse = Http::withHeaders([
                     'X-Api-Key' => $this->apiKey,
                     'Content-Type' => 'application/json',
                 ])->post("{$this->baseUrl}/sessions/{$sessionName}/stop");
-                
+
                 if ($stopResponse->successful()) {
                     Log::info('Session stopped successfully as fallback');
                     return true;
                 }
-                
+
                 return false;
             }
         } catch (\Exception $e) {

@@ -263,8 +263,8 @@
                     <!-- Sumber Info -->
                     <div class="mb-3">
                         <label for="source_info" class="form-label">Mengetahui Global Photo Rental dari <span class="required">*</span></label>
-                        <select class="form-select @error('source_info') is-invalid @enderror" 
-                                id="source_info" name="source_info" required>
+                        <select class="form-select @error('source_info') is-invalid @enderror"
+                            id="source_info" name="source_info" required>
                             <option value="">Pilih Sumber Info</option>
                             <option value="Instagram" {{ old('source_info') == 'Instagram' ? 'selected' : '' }}>Instagram</option>
                             <option value="TikTok" {{ old('source_info') == 'TikTok' ? 'selected' : '' }}>TikTok</option>
@@ -273,292 +273,292 @@
                             <option value="Lainnya" {{ old('source_info') == 'Lainnya' ? 'selected' : '' }}>Lainnya</option>
                         </select>
                         @error('source_info')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <!-- Nama Lengkap -->
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nama Lengkap (Sesuai KTP) <span class="required">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                            <input type="text" class="form-control @error('name') is-invalid @enderror"
+                                id="name" name="name" value="{{ old('name') }}" required>
+                        </div>
+                        @error('name')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <!-- Jenis Kelamin -->
+                    <div class="mb-3">
+                        <label class="form-label">Jenis Kelamin <span class="required">*</span></label>
+                        <div class="mt-2">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input @error('gender') is-invalid @enderror"
+                                    type="radio" name="gender" id="male" value="male"
+                                    {{ old('gender') == 'male' ? 'checked' : '' }} required>
+                                <label class="form-check-label" for="male">
+                                    <i class="fas fa-male text-primary me-1"></i>Laki-laki
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input @error('gender') is-invalid @enderror"
+                                    type="radio" name="gender" id="female" value="female"
+                                    {{ old('gender') == 'female' ? 'checked' : '' }} required>
+                                <label class="form-check-label" for="female">
+                                    <i class="fas fa-female text-danger me-1"></i>Perempuan
+                                </label>
+                            </div>
+                        </div>
+                        @error('gender')
+                        <div class="text-danger small">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <!-- Alamat Bertingkat -->
+                    <div class="mb-3">
+                        <label class="form-label">Alamat Tinggal Sekarang <span class="required">*</span></label>
+
+                        <!-- Provinsi -->
+                        <div class="mb-2">
+                            <select class="form-select @error('province') is-invalid @enderror"
+                                id="province" name="province" required>
+                                <option value="">Pilih Provinsi</option>
+                            </select>
+                            @error('province')
                             <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                <!-- Nama Lengkap -->
-                <div class="mb-3">
-                    <label for="name" class="form-label">Nama Lengkap (Sesuai KTP) <span class="required">*</span></label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-id-card"></i></span>
-                        <input type="text" class="form-control @error('name') is-invalid @enderror"
-                            id="name" name="name" value="{{ old('name') }}" required>
-                    </div>
-                    @error('name')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <!-- Jenis Kelamin -->
-                <div class="mb-3">
-                    <label class="form-label">Jenis Kelamin <span class="required">*</span></label>
-                    <div class="mt-2">
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input @error('gender') is-invalid @enderror"
-                                type="radio" name="gender" id="male" value="male"
-                                {{ old('gender') == 'male' ? 'checked' : '' }} required>
-                            <label class="form-check-label" for="male">
-                                <i class="fas fa-male text-primary me-1"></i>Laki-laki
-                            </label>
+                            @enderror
                         </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input @error('gender') is-invalid @enderror"
-                                type="radio" name="gender" id="female" value="female"
-                                {{ old('gender') == 'female' ? 'checked' : '' }} required>
-                            <label class="form-check-label" for="female">
-                                <i class="fas fa-female text-danger me-1"></i>Perempuan
-                            </label>
+
+                        <!-- Kab/Kota -->
+                        <div class="mb-2">
+                            <select class="form-select @error('city') is-invalid @enderror"
+                                id="city" name="city" required disabled>
+                                <option value="">Pilih Kab/Kota</option>
+                            </select>
+                            @error('city')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Kecamatan -->
+                        <div class="mb-2">
+                            <select class="form-select @error('district') is-invalid @enderror"
+                                id="district" name="district" required disabled>
+                                <option value="">Pilih Kecamatan</option>
+                            </select>
+                            @error('district')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Kelurahan -->
+                        <div class="mb-2">
+                            <select class="form-select @error('village') is-invalid @enderror"
+                                id="village" name="village" required disabled>
+                                <option value="">Pilih Kelurahan</option>
+                            </select>
+                            @error('village')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Alamat Detail -->
+                        <div class="mb-2">
+                            <textarea class="form-control @error('address_detail') is-invalid @enderror"
+                                id="address_detail" name="address_detail" rows="3"
+                                placeholder="Tulis alamat lengkap (RT/RW, Nama Jalan, No. Rumah, dll)" required>{{ old('address_detail') }}</textarea>
+                            @error('address_detail')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
                         </div>
                     </div>
-                    @error('gender')
-                    <div class="text-danger small">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <!-- Alamat Bertingkat -->
-                <div class="mb-3">
-                    <label class="form-label">Alamat Tinggal Sekarang <span class="required">*</span></label>
-
-                    <!-- Provinsi -->
-                    <div class="mb-2">
-                        <select class="form-select @error('province') is-invalid @enderror"
-                            id="province" name="province" required>
-                            <option value="">Pilih Provinsi</option>
-                        </select>
-                        @error('province')
+                    <!-- No HP 1 -->
+                    <div class="mb-3">
+                        <label for="phone1" class="form-label">No. HP 1 <span class="required">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                            <input type="tel" class="form-control @error('phone1') is-invalid @enderror"
+                                id="phone1" name="phone1" value="{{ old('phone1') }}" required>
+                        </div>
+                        @error('phone1')
                         <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
 
-                    <!-- Kab/Kota -->
-                    <div class="mb-2">
-                        <select class="form-select @error('city') is-invalid @enderror"
-                            id="city" name="city" required disabled>
-                            <option value="">Pilih Kab/Kota</option>
-                        </select>
-                        @error('city')
+                    <!-- No HP 2 -->
+                    <div class="mb-3">
+                        <label for="phone2" class="form-label">No. HP 2</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                            <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
+                                id="phone2" name="phone2" value="{{ old('phone2') }}">
+                        </div>
+                        @error('phone2')
                         <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
 
-                    <!-- Kecamatan -->
-                    <div class="mb-2">
-                        <select class="form-select @error('district') is-invalid @enderror"
-                            id="district" name="district" required disabled>
-                            <option value="">Pilih Kecamatan</option>
-                        </select>
-                        @error('district')
+                    <!-- Pekerjaan -->
+                    <div class="mb-3">
+                        <label for="job" class="form-label">Pekerjaan</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-briefcase"></i></span>
+                            <input type="text" class="form-control @error('job') is-invalid @enderror"
+                                id="job" name="job" value="{{ old('job') }}">
+                        </div>
+                        @error('job')
                         <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
 
-                    <!-- Kelurahan -->
-                    <div class="mb-2">
-                        <select class="form-select @error('village') is-invalid @enderror"
-                            id="village" name="village" required disabled>
-                            <option value="">Pilih Kelurahan</option>
-                        </select>
-                        @error('village')
+                    <!-- Instagram -->
+                    <div class="mb-3">
+                        <label for="instagram_username" class="form-label">Nama akun Instagram penyewa<span class="required">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fab fa-instagram"></i></span>
+                            <input type="text" class="form-control @error('instagram_username') is-invalid @enderror"
+                                id="instagram_username" name="instagram_username" value="{{ old('instagram_username') }}"
+                                placeholder="@username">
+                        </div>
+                        @error('instagram_username')
                         <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
 
-                    <!-- Alamat Detail -->
-                    <div class="mb-2">
-                        <textarea class="form-control @error('address_detail') is-invalid @enderror"
-                            id="address_detail" name="address_detail" rows="3"
-                            placeholder="Tulis alamat lengkap (RT/RW, Nama Jalan, No. Rumah, dll)" required>{{ old('address_detail') }}</textarea>
-                        @error('address_detail')
+                    <!-- Alamat Kantor -->
+                    <div class="mb-3">
+                        <label for="office_address" class="form-label">Alamat Kantor</label>
+                        <textarea class="form-control @error('office_address') is-invalid @enderror"
+                            id="office_address" name="office_address" rows="2">{{ old('office_address') }}</textarea>
+                        @error('office_address')
                         <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
-                </div>
-                <!-- No HP 1 -->
-                <div class="mb-3">
-                    <label for="phone1" class="form-label">No. HP 1 <span class="required">*</span></label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-phone"></i></span>
-                        <input type="tel" class="form-control @error('phone1') is-invalid @enderror"
-                            id="phone1" name="phone1" value="{{ old('phone1') }}" required>
+
+                    <!-- Section: Upload Dokumen -->
+                    <div class="form-section">
+                        <h4 class="section-title">
+                            <i class="fas fa-images"></i>
+                            Upload Dokumen Identitas
+                        </h4>
+                        <p class="section-subtitle">Unggah foto dokumen identitas yang diperlukan (3 dokumen wajib)</p>
+
+                        <!-- Foto KTP -->
+                        <div class="mb-3">
+                            <label for="ktp_photo" class="form-label">1. Foto KTP <span class="required">*</span></label>
+                            <input type="file" class="form-control @error('ktp_photo') is-invalid @enderror"
+                                id="ktp_photo" name="ktp_photo" accept="image/*" required>
+                            <div class="form-text">Format: JPG, JPEG, PNG. Maksimal 10MB</div>
+                            @error('ktp_photo')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Foto ID Tambahan 1 -->
+                        <div class="mb-3">
+                            <label for="id_photo" class="form-label">2. Foto ID Tambahan 1 <span class="required">*</span></label>
+                            <select class="form-select mb-2 @error('id_type') is-invalid @enderror" id="id_type" name="id_type" required>
+                                <option value="">Pilih Jenis ID</option>
+                                <option value="KK" {{ old('id_type') == 'KK' ? 'selected' : '' }}>Kartu Keluarga (KK)</option>
+                                <option value="SIM" {{ old('id_type') == 'SIM' ? 'selected' : '' }}>SIM (Surat Izin Mengemudi)</option>
+                                <option value="NPWP" {{ old('id_type') == 'NPWP' ? 'selected' : '' }}>NPWP</option>
+                                <option value="STNK" {{ old('id_type') == 'STNK' ? 'selected' : '' }}>STNK</option>
+                                <option value="BPKB" {{ old('id_type') == 'BPKB' ? 'selected' : '' }}>BPKB</option>
+                                <option value="Passport" {{ old('id_type') == 'Passport' ? 'selected' : '' }}>Passport</option>
+                                <option value="BPJS" {{ old('id_type') == 'BPJS' ? 'selected' : '' }}>BPJS</option>
+                                <option value="ID_Kerja" {{ old('id_type') == 'ID_Kerja' ? 'selected' : '' }}>ID Card Kerja</option>
+                            </select>
+                            @error('id_type')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <input type="file" class="form-control @error('id_photo') is-invalid @enderror"
+                                id="id_photo" name="id_photo" accept="image/*" required>
+                            <div class="form-text">Boleh diwatermark. Format: JPG, JPEG, PNG. Maksimal 10MB</div>
+                            @error('id_photo')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Foto ID Tambahan 2 -->
+                        <div class="mb-4">
+                            <label for="id_photo_2" class="form-label">3. Foto ID Tambahan 2 <span class="required">*</span></label>
+                            <select class="form-select mb-2 @error('id_type_2') is-invalid @enderror" id="id_type_2" name="id_type_2" required>
+                                <option value="">Pilih Jenis ID</option>
+                                <option value="KK" {{ old('id_type_2') == 'KK' ? 'selected' : '' }}>Kartu Keluarga (KK)</option>
+                                <option value="SIM" {{ old('id_type_2') == 'SIM' ? 'selected' : '' }}>SIM (Surat Izin Mengemudi)</option>
+                                <option value="NPWP" {{ old('id_type_2') == 'NPWP' ? 'selected' : '' }}>NPWP</option>
+                                <option value="STNK" {{ old('id_type_2') == 'STNK' ? 'selected' : '' }}>STNK</option>
+                                <option value="BPKB" {{ old('id_type_2') == 'BPKB' ? 'selected' : '' }}>BPKB</option>
+                                <option value="Passport" {{ old('id_type_2') == 'Passport' ? 'selected' : '' }}>Passport</option>
+                                <option value="BPJS" {{ old('id_type_2') == 'BPJS' ? 'selected' : '' }}>BPJS</option>
+                                <option value="ID_Kerja" {{ old('id_type_2') == 'ID_Kerja' ? 'selected' : '' }}>ID Card Kerja</option>
+                            </select>
+                            @error('id_type_2')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <input type="file" class="form-control @error('id_photo_2') is-invalid @enderror"
+                                id="id_photo_2" name="id_photo_2" accept="image/*" required>
+                            <div class="form-text">Boleh diwatermark. Format: JPG, JPEG, PNG. Maksimal 10MB</div>
+                            @error('id_photo_2')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
                     </div>
-                    @error('phone1')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
 
-                <!-- No HP 2 -->
-                <div class="mb-3">
-                    <label for="phone2" class="form-label">No. HP 2</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-phone"></i></span>
-                        <input type="tel" class="form-control @error('phone2') is-invalid @enderror"
-                            id="phone2" name="phone2" value="{{ old('phone2') }}">
+                    <!-- Section: Kontak Emergency -->
+                    <div class="form-section">
+                        <h4 class="section-title">
+                            <i class="fas fa-phone-alt"></i>
+                            Kontak Emergency <span class="required">*</span>
+                        </h4>
+                        <p class="section-subtitle">(Orang Tua/Suami/Istri/Saudara Kandung)</p>
+
+                        <!-- Nama Kontak Emergency -->
+                        <div class="mb-3">
+                            <label for="emergency_contact_name" class="form-label">Nama Kontak Emergency <span class="required">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-user-friends"></i></span>
+                                <input type="text" class="form-control @error('emergency_contact_name') is-invalid @enderror"
+                                    id="emergency_contact_name" name="emergency_contact_name"
+                                    value="{{ old('emergency_contact_name') }}" required>
+                            </div>
+                            @error('emergency_contact_name')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <!-- No HP Kontak Emergency -->
+                        <div class="mb-3">
+                            <label for="emergency_contact_number" class="form-label">No. HP Kontak Emergency <span class="required">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-phone-alt"></i></span>
+                                <input type="tel" class="form-control @error('emergency_contact_number') is-invalid @enderror"
+                                    id="emergency_contact_number" name="emergency_contact_number"
+                                    value="{{ old('emergency_contact_number') }}" required>
+                            </div>
+                            @error('emergency_contact_number')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
                     </div>
-                    @error('phone2')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
 
-                <!-- Pekerjaan -->
-                <div class="mb-3">
-                    <label for="job" class="form-label">Pekerjaan</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fas fa-briefcase"></i></span>
-                        <input type="text" class="form-control @error('job') is-invalid @enderror"
-                            id="job" name="job" value="{{ old('job') }}">
+                    <!-- Submit Button -->
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg px-5">
+                            <i class="fas fa-paper-plane me-2"></i>Daftar Sekarang
+                        </button>
                     </div>
-                    @error('job')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
 
-                <!-- Instagram -->
-                <div class="mb-3">
-                    <label for="instagram_username" class="form-label">Nama akun Instagram penyewa</label>
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="fab fa-instagram"></i></span>
-                        <input type="text" class="form-control @error('instagram_username') is-invalid @enderror"
-                            id="instagram_username" name="instagram_username" value="{{ old('instagram_username') }}"
-                            placeholder="@username">
+                    <div class="text-center mt-3">
+                        <small class="text-muted">
+                            Dengan mendaftar, Anda menyetujui syarat dan ketentuan Global Photo Rental
+                        </small>
                     </div>
-                    @error('instagram_username')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
-
-                <!-- Alamat Kantor -->
-                <div class="mb-3">
-                    <label for="office_address" class="form-label">Alamat Kantor</label>
-                    <textarea class="form-control @error('office_address') is-invalid @enderror"
-                        id="office_address" name="office_address" rows="2">{{ old('office_address') }}</textarea>
-                    @error('office_address')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                    @enderror
-                </div>
-                
-                <!-- Section: Upload Dokumen -->
-                <div class="form-section">
-                    <h4 class="section-title">
-                        <i class="fas fa-images"></i>
-                        Upload Dokumen Identitas
-                    </h4>
-            <p class="section-subtitle">Unggah foto dokumen identitas yang diperlukan (3 dokumen wajib)</p>
-
-            <!-- Foto KTP -->
-            <div class="mb-3">
-                <label for="ktp_photo" class="form-label">1. Foto KTP <span class="required">*</span></label>
-                <input type="file" class="form-control @error('ktp_photo') is-invalid @enderror"
-                    id="ktp_photo" name="ktp_photo" accept="image/*" required>
-                <div class="form-text">Format: JPG, JPEG, PNG. Maksimal 2MB</div>
-                @error('ktp_photo')
-                <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <!-- Foto ID Tambahan 1 -->
-            <div class="mb-3">
-                <label for="id_photo" class="form-label">2. Foto ID Tambahan 1 <span class="required">*</span></label>
-                <select class="form-select mb-2 @error('id_type') is-invalid @enderror" id="id_type" name="id_type" required>
-                    <option value="">Pilih Jenis ID</option>
-                    <option value="KK" {{ old('id_type') == 'KK' ? 'selected' : '' }}>Kartu Keluarga (KK)</option>
-                    <option value="SIM" {{ old('id_type') == 'SIM' ? 'selected' : '' }}>SIM (Surat Izin Mengemudi)</option>
-                    <option value="NPWP" {{ old('id_type') == 'NPWP' ? 'selected' : '' }}>NPWP</option>
-                    <option value="STNK" {{ old('id_type') == 'STNK' ? 'selected' : '' }}>STNK</option>
-                    <option value="BPKB" {{ old('id_type') == 'BPKB' ? 'selected' : '' }}>BPKB</option>
-                    <option value="Passport" {{ old('id_type') == 'Passport' ? 'selected' : '' }}>Passport</option>
-                    <option value="BPJS" {{ old('id_type') == 'BPJS' ? 'selected' : '' }}>BPJS</option>
-                    <option value="ID_Kerja" {{ old('id_type') == 'ID_Kerja' ? 'selected' : '' }}>ID Card Kerja</option>
-                </select>
-                @error('id_type')
-                <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-                <input type="file" class="form-control @error('id_photo') is-invalid @enderror"
-                    id="id_photo" name="id_photo" accept="image/*" required>
-                <div class="form-text">Boleh diwatermark. Format: JPG, JPEG, PNG. Maksimal 2MB</div>
-                @error('id_photo')
-                <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <!-- Foto ID Tambahan 2 -->
-            <div class="mb-4">
-                <label for="id_photo_2" class="form-label">3. Foto ID Tambahan 2 <span class="required">*</span></label>
-                <select class="form-select mb-2 @error('id_type_2') is-invalid @enderror" id="id_type_2" name="id_type_2" required>
-                    <option value="">Pilih Jenis ID</option>
-                    <option value="KK" {{ old('id_type_2') == 'KK' ? 'selected' : '' }}>Kartu Keluarga (KK)</option>
-                    <option value="SIM" {{ old('id_type_2') == 'SIM' ? 'selected' : '' }}>SIM (Surat Izin Mengemudi)</option>
-                    <option value="NPWP" {{ old('id_type_2') == 'NPWP' ? 'selected' : '' }}>NPWP</option>
-                    <option value="STNK" {{ old('id_type_2') == 'STNK' ? 'selected' : '' }}>STNK</option>
-                    <option value="BPKB" {{ old('id_type_2') == 'BPKB' ? 'selected' : '' }}>BPKB</option>
-                    <option value="Passport" {{ old('id_type_2') == 'Passport' ? 'selected' : '' }}>Passport</option>
-                    <option value="BPJS" {{ old('id_type_2') == 'BPJS' ? 'selected' : '' }}>BPJS</option>
-                    <option value="ID_Kerja" {{ old('id_type_2') == 'ID_Kerja' ? 'selected' : '' }}>ID Card Kerja</option>
-                </select>
-                @error('id_type_2')
-                <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-                <input type="file" class="form-control @error('id_photo_2') is-invalid @enderror"
-                    id="id_photo_2" name="id_photo_2" accept="image/*" required>
-                <div class="form-text">Boleh diwatermark. Format: JPG, JPEG, PNG. Maksimal 2MB</div>
-                @error('id_photo_2')
-                <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-
-                </div>
-                
-                <!-- Section: Kontak Emergency -->
-                <div class="form-section">
-                    <h4 class="section-title">
-                        <i class="fas fa-phone-alt"></i>
-                        Kontak Emergency <span class="required">*</span>
-                    </h4>
-            <p class="section-subtitle">(Orang Tua/Suami/Istri/Saudara Kandung)</p>
-
-            <!-- Nama Kontak Emergency -->
-            <div class="mb-3">
-                <label for="emergency_contact_name" class="form-label">Nama Kontak Emergency <span class="required">*</span></label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-user-friends"></i></span>
-                    <input type="text" class="form-control @error('emergency_contact_name') is-invalid @enderror"
-                        id="emergency_contact_name" name="emergency_contact_name"
-                        value="{{ old('emergency_contact_name') }}" required>
-                </div>
-                @error('emergency_contact_name')
-                <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-
-            <!-- No HP Kontak Emergency -->
-            <div class="mb-3">
-                <label for="emergency_contact_number" class="form-label">No. HP Kontak Emergency <span class="required">*</span></label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-phone-alt"></i></span>
-                    <input type="tel" class="form-control @error('emergency_contact_number') is-invalid @enderror"
-                        id="emergency_contact_number" name="emergency_contact_number"
-                        value="{{ old('emergency_contact_number') }}" required>
-                </div>
-                @error('emergency_contact_number')
-                <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-                </div>
-
-                <!-- Submit Button -->
-        <div class="text-center mt-4">
-            <button type="submit" class="btn btn-primary btn-lg px-5">
-                <i class="fas fa-paper-plane me-2"></i>Daftar Sekarang
-            </button>
+            </form>
         </div>
-
-        <div class="text-center mt-3">
-            <small class="text-muted">
-                Dengan mendaftar, Anda menyetujui syarat dan ketentuan Global Photo Rental
-            </small>
-        </div>
-        </form>
-    </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -567,21 +567,21 @@
     <script>
         // File validation function
         function validateFile(file, inputElement) {
-            const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+            const maxSize = 10 * 1024 * 1024; // 2MB in bytes
             const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
-            
+
             if (file.size > maxSize) {
-                alert('Ukuran file tidak boleh lebih dari 2MB. Ukuran file Anda: ' + (file.size / 1024 / 1024).toFixed(2) + 'MB');
+                alert('Ukuran file tidak boleh lebih dari 10MB. Ukuran file Anda: ' + (file.size / 1024 / 1024).toFixed(2) + 'MB');
                 inputElement.value = '';
                 return false;
             }
-            
+
             if (!allowedTypes.includes(file.type)) {
                 alert('Format file tidak didukung. Gunakan format JPG, JPEG, PNG, atau GIF.');
                 inputElement.value = '';
                 return false;
             }
-            
+
             return true;
         }
 

@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\UserPhoto;
 use App\Models\UserPhoneNumber;
 use App\Services\WAHAService;
+use App\Helpers\ImageCompressor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -24,6 +25,10 @@ class RegistrationController extends Controller
 
     public function register(Request $request)
     {
+        // Meningkatkan batas waktu eksekusi untuk upload file besar
+        set_time_limit(300); // 5 menit
+        ini_set('memory_limit', '256M');
+        
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|unique:users,email',
             'source_info' => 'required|in:Instagram,Teman,Google,Lainnya,TikTok',
@@ -39,10 +44,10 @@ class RegistrationController extends Controller
             'job' => 'nullable|string|max:255',
             'office_address' => 'nullable|string',
             'instagram_username' => 'nullable|string|max:255',
-            'ktp_photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'id_photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'ktp_photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240',
+            'id_photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240',
             'id_type' => 'required|string|max:50',
-            'id_photo_2' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'id_photo_2' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240',
             'id_type_2' => 'required|string|max:50',
             'emergency_contact_name' => 'required|string|max:255',
             'emergency_contact_number' => 'required|string|max:20',
@@ -62,16 +67,16 @@ class RegistrationController extends Controller
             'ktp_photo.required' => 'Foto KTP wajib diunggah',
             'ktp_photo.image' => 'File KTP harus berupa gambar',
             'ktp_photo.mimes' => 'Format foto KTP harus jpeg, png, atau jpg',
-            'ktp_photo.max' => 'Ukuran foto KTP maksimal 2MB',
+            'ktp_photo.max' => 'Ukuran foto KTP maksimal 10MB',
             'id_photo.required' => 'Foto ID tambahan 1 wajib diunggah',
             'id_photo.image' => 'File ID tambahan 1 harus berupa gambar',
             'id_photo.mimes' => 'Format foto ID tambahan 1 harus jpeg, png, atau jpg',
-            'id_photo.max' => 'Ukuran foto ID tambahan 1 maksimal 2MB',
+            'id_photo.max' => 'Ukuran foto ID tambahan 1 maksimal 10MB',
             'id_type.required' => 'Jenis ID tambahan 1 wajib dipilih',
             'id_photo_2.required' => 'Foto ID tambahan 2 wajib diunggah',
             'id_photo_2.image' => 'File ID tambahan 2 harus berupa gambar',
             'id_photo_2.mimes' => 'Format foto ID tambahan 2 harus jpeg, png, atau jpg',
-            'id_photo_2.max' => 'Ukuran foto ID tambahan 2 maksimal 2MB',
+            'id_photo_2.max' => 'Ukuran foto ID tambahan 2 maksimal 10MB',
             'id_type_2.required' => 'Jenis ID tambahan 2 wajib dipilih',
             'emergency_contact_name.required' => 'Nama kontak emergency wajib diisi',
             'emergency_contact_number.required' => 'Nomor HP kontak emergency wajib diisi',
@@ -127,6 +132,12 @@ class RegistrationController extends Controller
                 try {
                     $ktpFile = $request->file('ktp_photo');
                     Log::info('Registration: Processing KTP photo', ['user_id' => $user->id, 'file_size' => $ktpFile->getSize()]);
+                    
+                    // Kompresi gambar jika ukurannya > 1MB
+                    if ($ktpFile->getSize() > 1024 * 1024) {
+                        $ktpFile = ImageCompressor::compressIfNeeded($ktpFile);
+                        Log::info('Registration: KTP photo compressed', ['user_id' => $user->id, 'new_size' => $ktpFile->getSize()]);
+                    }
 
                     $ktpFileName = 'ktp_' . $user->id . '_' . time() . '.' . $ktpFile->getClientOriginalExtension();
                     $ktpPath = $ktpFile->storeAs('user_photos', $ktpFileName, 'public');
@@ -155,6 +166,12 @@ class RegistrationController extends Controller
                 try {
                     $idFile = $request->file('id_photo');
                     Log::info('Registration: Processing ID photo 1', ['user_id' => $user->id, 'file_size' => $idFile->getSize(), 'id_type' => $request->id_type]);
+                    
+                    // Kompresi gambar jika ukurannya > 1MB
+                    if ($idFile->getSize() > 1024 * 1024) {
+                        $idFile = ImageCompressor::compressIfNeeded($idFile);
+                        Log::info('Registration: ID photo 1 compressed', ['user_id' => $user->id, 'new_size' => $idFile->getSize()]);
+                    }
 
                     $idFileName = 'id_1_' . $user->id . '_' . time() . '.' . $idFile->getClientOriginalExtension();
                     $idPath = $idFile->storeAs('user_photos', $idFileName, 'public');
@@ -184,6 +201,12 @@ class RegistrationController extends Controller
                 try {
                     $idFile2 = $request->file('id_photo_2');
                     Log::info('Registration: Processing ID photo 2', ['user_id' => $user->id, 'file_size' => $idFile2->getSize(), 'id_type' => $request->id_type_2]);
+                    
+                    // Kompresi gambar jika ukurannya > 1MB
+                    if ($idFile2->getSize() > 1024 * 1024) {
+                        $idFile2 = ImageCompressor::compressIfNeeded($idFile2);
+                        Log::info('Registration: ID photo 2 compressed', ['user_id' => $user->id, 'new_size' => $idFile2->getSize()]);
+                    }
 
                     $idFileName2 = 'id_2_' . $user->id . '_' . time() . '.' . $idFile2->getClientOriginalExtension();
                     $idPath2 = $idFile2->storeAs('user_photos', $idFileName2, 'public');

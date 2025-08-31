@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,17 +16,131 @@
             display: inline-block;
             margin-right: 8px;
         }
-        .status-connected { background-color: #10B981; }
-        .status-connecting { background-color: #F59E0B; animation: pulse 2s infinite; }
-        .status-disconnected { background-color: #EF4444; }
-        .status-unknown { background-color: #6B7280; }
-        
+
+        .status-connected {
+            background-color: #10B981;
+        }
+
+        .status-connecting {
+            background-color: #F59E0B;
+            animation: pulse 2s infinite;
+        }
+
+        .status-disconnected {
+            background-color: #EF4444;
+        }
+
+        .status-unknown {
+            background-color: #6B7280;
+        }
+
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
     </style>
 </head>
+<script>
+    // WebSocket Configuration
+    const wsApiKey = 'gbTnWu4oBizYlgeZ0OPJlgeZ0OPJlbpnG11ARjsf'; // Ganti jika berbeda
+    const wsBaseUrl = 'wss://whatsapp.globalphotorental.com/ws';
+    const sessionName = 'default';
+    const events = ['session.status', 'message']; // Event yang ingin didengar
+
+    // Buat URL WebSocket dengan parameter
+    const queryParams = new URLSearchParams({
+        'x-api-key': wsApiKey,
+        session: sessionName,
+    });
+    events.forEach(event => queryParams.append('events', event));
+
+    const wsUrl = `${wsBaseUrl}?${queryParams.toString()}`;
+    let socket = null;
+
+    function connectWebSocket() {
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+            console.log('WebSocket connected:', wsUrl);
+            // Opsional: kirim log ke UI
+        };
+
+        socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('WebSocket event received:', data);
+
+                // Update status jika event session.status
+                if (data.event === 'session.status') {
+                    const status = data.data?.status || 'UNKNOWN';
+
+                    let statusClass = 'status-unknown';
+                    let statusText = status;
+
+                    if (status === 'CONNECTED') {
+                        statusClass = 'status-connected';
+                        statusText = 'Connected ✅';
+                    } else if (status === 'CONNECTING' || status === 'PAIRING' || status.includes('QRCODE')) {
+                        statusClass = 'status-connecting';
+                        statusText = 'Scan QR Code 📱';
+                    } else if (status === 'DISCONNECTED') {
+                        statusClass = 'status-disconnected';
+                        statusText = 'Disconnected';
+                    }
+
+                    $('#connection-status').html(
+                        '<span class="status-indicator ' + statusClass + '"></span>' +
+                        '<span>' + statusText + '</span>'
+                    );
+
+                    // Update info perangkat jika tersedia
+                    if (data.data?.me) {
+                        const me = data.data.me;
+                        $('#phone-info').html(
+                            '<div>Phone: ' + (me.pushname || 'N/A') + '</div>' +
+                            '<div>Number: ' + me.id.replace('@c.us', '') + '</div>'
+                        );
+                    } else if (status !== 'CONNECTED') {
+                        $('#phone-info').html('Not connected');
+                    }
+                }
+
+                // Opsional: log event lain
+                addLogToDashboard(`[WS] ${data.event}: ${JSON.stringify(data.data).substring(0, 100)}`);
+            } catch (err) {
+                console.error('WebSocket message error:', err);
+            }
+        };
+
+        socket.onclose = () => {
+            console.log('WebSocket disconnected. Reconnecting in 5s...');
+            setTimeout(connectWebSocket, 5000); // Reconnect otomatis
+        };
+
+        socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            // Jangan reconnect otomatis jika error parah
+        };
+    }
+
+    // Start WebSocket connection
+    connectWebSocket();
+
+    // Optional: tambahkan log ke UI
+    function addLogToDashboard(message) {
+        const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        const logEntry = `<div class="mb-1 text-xs"><span class="text-gray-500">${now}</span> ${message}</div>`;
+        $('#logs-container').prepend(logEntry);
+    }
+</script>
+
 <body class="bg-gray-100">
     <div class="container mx-auto px-4 py-8">
         <!-- Header -->
@@ -149,14 +264,14 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                        <input type="text" id="test-phone" class="w-full p-3 border border-gray-300 rounded-lg" 
-                               placeholder="6281234567890" value="6281117095956">
+                        <input type="text" id="test-phone" class="w-full p-3 border border-gray-300 rounded-lg"
+                            placeholder="6281234567890" value="6281117095956">
                         <p class="text-xs text-gray-500 mt-1">Format: 628xxxxxxxxx (international format)</p>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                        <textarea id="test-message" rows="3" class="w-full p-3 border border-gray-300 rounded-lg" 
-                                  placeholder="Enter your test message...">🧪 Test message from Global Photo Rental WhatsApp Dashboard!
+                        <textarea id="test-message" rows="3" class="w-full p-3 border border-gray-300 rounded-lg"
+                            placeholder="Enter your test message...">🧪 Test message from Global Photo Rental WhatsApp Dashboard!
 
 ✅ System is working properly.
 📱 WhatsApp API is connected and ready to send notifications.
@@ -195,7 +310,6 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
         });
 
         // Auto-refresh status every 30 seconds
-        let statusInterval = setInterval(checkStatus, 30000);
 
         // Initial load
         $(document).ready(function() {
@@ -211,7 +325,7 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
                     if (data.success) {
                         let statusClass = 'status-unknown';
                         let statusText = data.status;
-                        
+
                         if (data.connected) {
                             statusClass = 'status-connected';
                             statusText = 'Connected ✅';
@@ -222,7 +336,7 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
                             statusClass = 'status-disconnected';
                             statusText = data.status;
                         }
-                        
+
                         $('#connection-status').html(
                             '<span class="status-indicator ' + statusClass + '"></span>' +
                             '<span>' + statusText + '</span>'
@@ -256,7 +370,7 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
         $('#get-qr-code').click(function() {
             let $btn = $(this);
             $btn.prop('disabled', true).text('Getting QR Code...');
-            
+
             $.get('{{ route("whatsapp.qr") }}')
                 .done(function(data) {
                     if (data.success && data.qr_code) {
@@ -276,25 +390,25 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
         // Restart session
         $('#restart-session').click(function() {
             if (!confirm('Are you sure you want to restart the session? This will reset the connection status to "Scan QR Code 📱".')) return;
-            
+
             let $btn = $(this);
             $btn.prop('disabled', true).text('Restarting...');
-            
+
             $.post('{{ route("whatsapp.restart") }}')
                 .done(function(data) {
                     if (data.success) {
                         alert('✅ ' + data.message);
-                        
+
                         // Clear QR code display and reset UI
                         $('#qr-code-display').html('<div class="text-gray-500">Session restarted. Click "Get QR Code" to display new QR code.</div>');
                         $('#phone-info').html('Not connected');
-                        
+
                         // Reset connection status immediately
                         $('#connection-status').html(
                             '<span class="status-indicator status-connecting"></span>' +
                             '<span>Scan QR Code 📱</span>'
                         );
-                        
+
                         // Check status after a short delay to get updated server status
                         setTimeout(function() {
                             checkStatus();
@@ -314,25 +428,25 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
         // End/Logout session
         $('#logout-session').click(function() {
             if (!confirm('Are you sure you want to end the WhatsApp session? This will log out the connected device and reset the connection status to "Scan QR Code 📱".')) return;
-            
+
             let $btn = $(this);
             $btn.prop('disabled', true).text('Ending Session...');
-            
+
             $.post('{{ route("whatsapp.logout") }}')
                 .done(function(data) {
                     if (data.success) {
                         alert('✅ ' + data.message);
-                        
+
                         // Clear QR code display and reset UI
                         $('#qr-code-display').html('<div class="text-gray-500">Session ended. Click "Get QR Code" to start new session.</div>');
                         $('#phone-info').html('Not connected');
-                        
+
                         // Reset connection status immediately
                         $('#connection-status').html(
                             '<span class="status-indicator status-connecting"></span>' +
                             '<span>Scan QR Code 📱</span>'
                         );
-                        
+
                         // Check status after a short delay to get updated server status
                         setTimeout(function() {
                             checkStatus();
@@ -352,39 +466,39 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
         // Send test message
         $('#test-message-form').submit(function(e) {
             e.preventDefault();
-            
+
             let phone = $('#test-phone').val();
             let message = $('#test-message').val();
-            
+
             if (!phone || !message) {
                 alert('Please fill in both phone number and message');
                 return;
             }
-            
+
             let $btn = $('#send-test');
             $btn.prop('disabled', true).text('Sending...');
-            
+
             $.post('{{ route("whatsapp.test") }}', {
-                phone_number: phone,
-                message: message
-            })
-            .done(function(data) {
-                if (data.success) {
-                    alert('Test message sent successfully!');
-                } else {
-                    alert('Failed to send message: ' + data.message);
-                }
-            })
-            .fail(function(xhr) {
-                let errorMsg = 'Error sending message';
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    errorMsg += ': ' + xhr.responseJSON.message;
-                }
-                alert(errorMsg);
-            })
-            .always(function() {
-                $btn.prop('disabled', false).text('Send Test Message');
-            });
+                    phone_number: phone,
+                    message: message
+                })
+                .done(function(data) {
+                    if (data.success) {
+                        alert('Test message sent successfully!');
+                    } else {
+                        alert('Failed to send message: ' + data.message);
+                    }
+                })
+                .fail(function(xhr) {
+                    let errorMsg = 'Error sending message';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg += ': ' + xhr.responseJSON.message;
+                    }
+                    alert(errorMsg);
+                })
+                .always(function() {
+                    $btn.prop('disabled', false).text('Send Test Message');
+                });
         });
 
         // Refresh status button
@@ -422,4 +536,5 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
         $('#refresh-logs').click(loadLogs);
     </script>
 </body>
+
 </html>

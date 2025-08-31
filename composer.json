@@ -18,6 +18,7 @@
         "filament/notifications": "^3.2",
         "filament/widgets": "^3.2",
         "getbrevo/brevo-php": "2.0",
+        "intervention/image": "^3.11",
         "laravel/framework": "^11.31",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.16",

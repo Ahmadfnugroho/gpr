@@ -17,6 +17,7 @@ use App\Models\DetailTransaction;
 
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Get;
+use Illuminate\Support\Number as SupportNumber;
 
 class DetailTransactionsRelationManager extends RelationManager
 {
@@ -158,13 +159,13 @@ class DetailTransactionsRelationManager extends RelationManager
 
                 TextColumn::make('price')
                     ->label('Harga Satuan')
-                    ->formatStateUsing(fn($state) => Number::currency($state, 'IDR'))
+                    ->formatStateUsing(fn($state) => SupportNumber::currency($state, 'IDR'))
                     ->icon('heroicon-o-currency-dollar')
                     ->alignRight(),
 
                 TextColumn::make('total_price')
                     ->label('Total')
-                    ->formatStateUsing(fn($state) => Number::currency($state, 'IDR'))
+                    ->formatStateUsing(fn($state) => SupportNumber::currency($state, 'IDR'))
                     ->icon('heroicon-o-banknotes')
                     ->alignRight(),
 
