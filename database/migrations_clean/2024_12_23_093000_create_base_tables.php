@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -11,51 +12,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Users table with all additional fields
+
+        // Users table
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('google_id')->nullable()->index();
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password', 255)->default('123456789');
-            $table->text('address')->nullable();
-            $table->string('job')->nullable();
-            $table->text('office_address')->nullable();
-            $table->string('instagram_username')->nullable();
-            $table->string('facebook_username')->nullable();
-            $table->string('emergency_contact_name')->nullable();
-            $table->string('emergency_contact_number')->nullable();
-            $table->enum('gender', ['male', 'female'])->nullable();
-            $table->string('source_info')->nullable();
-            $table->enum('status', ['active', 'blacklist'])->default('blacklist');
+            $table->string('password');
             $table->rememberToken();
             $table->timestamps();
-
-            // Indexes for performance
-            $table->index('name');
+            
             $table->index('email');
-            $table->index('status');
         });
 
-        // Password reset tokens table
-        Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->string('email')->primary();
-            $table->string('token');
-            $table->timestamp('created_at')->nullable();
-        });
-
-        // Sessions table
-        Schema::create('sessions', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->foreignId('user_id')->nullable()->index();
-            $table->string('ip_address', 45)->nullable();
-            $table->text('user_agent')->nullable();
-            $table->longText('payload');
-            $table->integer('last_activity')->index();
-        });
-
-        // Categories table - Base for products
+        // Categories table
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -65,7 +36,7 @@ return new class extends Migration
             $table->index('slug');
         });
 
-        // Brands table - Product brands
+        // Brands table
         Schema::create('brands', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -78,7 +49,7 @@ return new class extends Migration
             $table->index('premiere');
         });
 
-        // Sub categories table - Product subcategories
+        // Sub categories table
         Schema::create('sub_categories', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -90,7 +61,7 @@ return new class extends Migration
             $table->index('category_id');
         });
 
-        // API Keys table - For API authentication
+        // API Keys table
         Schema::create('api_keys', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -101,6 +72,53 @@ return new class extends Migration
             
             $table->index(['key', 'active']);
         });
+
+        // Cache table
+        Schema::create('cache', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->mediumText('value');
+            $table->integer('expiration');
+        });
+
+        Schema::create('cache_locks', function (Blueprint $table) {
+            $table->string('key')->primary();
+            $table->string('owner');
+            $table->integer('expiration');
+        });
+
+        // Jobs table
+        Schema::create('jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('queue')->index();
+            $table->longText('payload');
+            $table->unsignedTinyInteger('attempts');
+            $table->unsignedInteger('reserved_at')->nullable();
+            $table->unsignedInteger('available_at');
+            $table->unsignedInteger('created_at');
+        });
+
+        Schema::create('job_batches', function (Blueprint $table) {
+            $table->string('id')->primary();
+            $table->string('name');
+            $table->integer('total_jobs');
+            $table->integer('pending_jobs');
+            $table->integer('failed_jobs');
+            $table->longText('failed_job_ids');
+            $table->mediumText('options')->nullable();
+            $table->integer('cancelled_at')->nullable();
+            $table->integer('created_at');
+            $table->integer('finished_at')->nullable();
+        });
+
+        Schema::create('failed_jobs', function (Blueprint $table) {
+            $table->id();
+            $table->string('uuid')->unique();
+            $table->text('connection');
+            $table->text('queue');
+            $table->longText('payload');
+            $table->longText('exception');
+            $table->timestamp('failed_at')->useCurrent();
+        });
     }
 
     /**
@@ -108,8 +126,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('sessions');
-        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('jobs');
+        Schema::dropIfExists('cache');
         Schema::dropIfExists('api_keys');
         Schema::dropIfExists('sub_categories');
         Schema::dropIfExists('brands');
