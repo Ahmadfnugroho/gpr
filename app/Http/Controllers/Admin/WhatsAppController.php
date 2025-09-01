@@ -96,7 +96,7 @@ class WhatsAppController extends Controller
             // Find the requested session
             $sessionData = null;
             foreach ($sessions as $s) {
-                if ($s['id'] === $session) {
+                if (($s['id'] ?? $s['name'] ?? '') === $session) {
                     $sessionData = $s;
                     break;
                 }

@@ -105,7 +105,7 @@
                         const me = data.data.me;
                         $('#phone-info').html(
                             '<div>Phone: ' + (me.pushname || 'N/A') + '</div>' +
-                            '<div>Number: ' + me.id.replace('@c.us', '') + '</div>'
+                            '<div>Number: ' + (me.id ? me.id.replace('@c.us', '') : 'N/A') + '</div>'
                         );
                     } else if (status !== 'CONNECTED') {
                         $('#phone-info').html('Not connected');
@@ -182,13 +182,13 @@
                     <div class="text-3xl">🔗</div>
                 </div>
                 <div class="mt-4">
-                        <button id="refresh-status" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
-                            Refresh Status
-                        </button>
-                        <button id="stop-server" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm ml-2">
+                    <button id="refresh-status" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
+                        Refresh Status
+                    </button>
+                    <!-- <button id="stop-server" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm ml-2">
                             Stop Server
-                        </button>
-                    </div>
+                        </button> -->
+                </div>
             </div>
 
             <!-- Server Info -->
@@ -349,7 +349,7 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
                         if (data.me) {
                             $('#phone-info').html(
                                 '<div>Phone: ' + (data.me.pushname || 'N/A') + '</div>' +
-                                '<div>Number: ' + (data.me.id || 'N/A').replace('@c.us', '') + '</div>'
+                                '<div>Number: ' + ((data.me.id ? data.me.id.replace('@c.us', '') : 'N/A')) + '</div>'
                             );
                         } else {
                             $('#phone-info').html('Not connected');
