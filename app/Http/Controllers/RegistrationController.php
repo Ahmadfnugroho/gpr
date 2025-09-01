@@ -6,15 +6,17 @@ use App\Models\User;
 use App\Models\UserPhoto;
 use App\Models\UserPhoneNumber;
 use App\Services\WAHAService;
-use App\Helpers\ImageCompressor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
 
 class RegistrationController extends Controller
 {
@@ -28,7 +30,8 @@ class RegistrationController extends Controller
         // Meningkatkan batas waktu eksekusi untuk upload file besar
         set_time_limit(300); // 5 menit
         ini_set('memory_limit', '256M');
-        
+        $manager = new ImageManager(new Driver());
+
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|unique:users,email',
             'source_info' => 'required|in:Instagram,Teman,Google,Lainnya,TikTok',
@@ -133,17 +136,45 @@ class RegistrationController extends Controller
                     $ktpFile = $request->file('ktp_photo');
                     Log::info('Registration: Processing KTP photo', ['user_id' => $user->id, 'file_size' => $ktpFile->getSize()]);
                     
+                    // Simpan file sementara
+                    $tempPath = storage_path('app/public/temp/' . Str::random(20) . '.' . $ktpFile->getClientOriginalExtension());
+                    $ktpFile->move(dirname($tempPath), basename($tempPath));
+                    
                     // Kompresi gambar jika ukurannya > 1MB
                     if ($ktpFile->getSize() > 1024 * 1024) {
-                        $ktpFile = ImageCompressor::compressIfNeeded($ktpFile);
-                        Log::info('Registration: KTP photo compressed', ['user_id' => $user->id, 'new_size' => $ktpFile->getSize()]);
+                        // Gunakan fungsi compressImage untuk kompresi
+                        $compressedFileName = $this->compressImage($tempPath);
+                        $compressedPath = storage_path('app/public/' . $compressedFileName);
+                        
+                        // Hapus file temp asli
+                        if (file_exists($tempPath)) {
+                            @unlink($tempPath);
+                        }
+                        
+                        $tempPath = $compressedPath;
+                    }
+                    
+                    $ktpFileName = 'ktp_' . $user->id . '_' . time() . '.' . pathinfo($tempPath, PATHINFO_EXTENSION);
+                    
+                    // Buat instance UploadedFile dari file yang sudah dikompres
+                    $compressedFile = new UploadedFile(
+                        $tempPath,
+                        $ktpFileName,
+                        mime_content_type($tempPath),
+                        null,
+                        false
+                    );
+
+                    // Simpan ke storage
+                    $ktpPath = $compressedFile->storeAs('user_photos', $ktpFileName, 'public');
+
+                    // Hapus file temp
+                    if (file_exists($tempPath)) {
+                        @unlink($tempPath);
                     }
 
-                    $ktpFileName = 'ktp_' . $user->id . '_' . time() . '.' . $ktpFile->getClientOriginalExtension();
-                    $ktpPath = $ktpFile->storeAs('user_photos', $ktpFileName, 'public');
-
                     if (!$ktpPath) {
-                        throw new \Exception('Failed to store KTP photo');
+                        throw new \Exception('Gagal menyimpan foto KTP.');
                     }
 
                     UserPhoto::create([
@@ -154,27 +185,65 @@ class RegistrationController extends Controller
 
                     Log::info('Registration: KTP photo uploaded successfully', ['path' => $ktpPath]);
                 } catch (\Exception $e) {
-                    Log::error('Registration: Failed to upload KTP photo', ['error' => $e->getMessage(), 'user_id' => $user->id]);
+                    Log::error('Registration: Failed to upload KTP photo', [
+                        'error' => $e->getMessage(),
+                        'user_id' => $user->id
+                    ]);
                     throw new \Exception('Gagal mengunggah foto KTP: ' . $e->getMessage());
                 }
-            } else {
-                Log::warning('Registration: No KTP photo provided', ['user_id' => $user->id]);
             }
+
+            // Upload dan simpan foto ID tambahan 1
+
+
+            // ...
 
             // Upload dan simpan foto ID tambahan 1
             if ($request->hasFile('id_photo')) {
                 try {
                     $idFile = $request->file('id_photo');
-                    Log::info('Registration: Processing ID photo 1', ['user_id' => $user->id, 'file_size' => $idFile->getSize(), 'id_type' => $request->id_type]);
+                    Log::info('Registration: Processing ID photo 1', [
+                        'user_id' => $user->id,
+                        'original_size' => $idFile->getSize(),
+                        'id_type' => $request->id_type,
+                        'extension' => $idFile->getClientOriginalExtension()
+                    ]);
+                    
+                    // Simpan file sementara
+                    $tempPath = storage_path('app/public/temp/' . Str::random(20) . '.' . $idFile->getClientOriginalExtension());
+                    $idFile->move(dirname($tempPath), basename($tempPath));
                     
                     // Kompresi gambar jika ukurannya > 1MB
                     if ($idFile->getSize() > 1024 * 1024) {
-                        $idFile = ImageCompressor::compressIfNeeded($idFile);
-                        Log::info('Registration: ID photo 1 compressed', ['user_id' => $user->id, 'new_size' => $idFile->getSize()]);
+                        // Gunakan fungsi compressImage untuk kompresi
+                        $compressedFileName = $this->compressImage($tempPath);
+                        $compressedPath = storage_path('app/public/' . $compressedFileName);
+                        
+                        // Hapus file temp asli
+                        if (file_exists($tempPath)) {
+                            @unlink($tempPath);
+                        }
+                        
+                        $tempPath = $compressedPath;
                     }
+                    
+                    $idFileName = 'id_1_' . $user->id . '_' . time() . '.' . pathinfo($tempPath, PATHINFO_EXTENSION);
+                    
+                    // Buat instance UploadedFile dari file yang sudah dikompres
+                    $compressedFile = new UploadedFile(
+                        $tempPath,
+                        $idFileName,
+                        mime_content_type($tempPath),
+                        null,
+                        false
+                    );
 
-                    $idFileName = 'id_1_' . $user->id . '_' . time() . '.' . $idFile->getClientOriginalExtension();
-                    $idPath = $idFile->storeAs('user_photos', $idFileName, 'public');
+                    $idPath = $compressedFile->storeAs('user_photos', $idFileName, 'public');
+
+                    // Hapus file sementara
+                    if (file_exists($tempPath)) {
+                        @unlink($tempPath);
+                    }
 
                     if (!$idPath) {
                         throw new \Exception('Failed to store ID photo 1');
@@ -187,9 +256,15 @@ class RegistrationController extends Controller
                         'id_type' => $request->id_type,
                     ]);
 
-                    Log::info('Registration: ID photo 1 uploaded successfully', ['path' => $idPath, 'id_type' => $request->id_type]);
+                    Log::info('Registration: ID photo 1 uploaded successfully', [
+                        'path' => $idPath,
+                        'id_type' => $request->id_type
+                    ]);
                 } catch (\Exception $e) {
-                    Log::error('Registration: Failed to upload ID photo 1', ['error' => $e->getMessage(), 'user_id' => $user->id]);
+                    Log::error('Registration: Failed to upload ID photo 1', [
+                        'error' => $e->getMessage(),
+                        'user_id' => $user->id
+                    ]);
                     throw new \Exception('Gagal mengunggah foto ID tambahan 1: ' . $e->getMessage());
                 }
             } else {
@@ -197,19 +272,50 @@ class RegistrationController extends Controller
             }
 
             // Upload dan simpan foto ID tambahan 2
+            // Upload dan simpan foto ID tambahan 2
             if ($request->hasFile('id_photo_2')) {
                 try {
                     $idFile2 = $request->file('id_photo_2');
-                    Log::info('Registration: Processing ID photo 2', ['user_id' => $user->id, 'file_size' => $idFile2->getSize(), 'id_type' => $request->id_type_2]);
+                    Log::info('Registration: Processing ID photo 2', [
+                        'user_id' => $user->id,
+                        'original_size' => $idFile2->getSize(),
+                        'id_type' => $request->id_type_2,
+                        'extension' => $idFile2->getClientOriginalExtension()
+                    ]);
+                    
+                    // Simpan file sementara
+                    $tempPath2 = storage_path('app/public/temp/' . Str::random(20) . '.' . $idFile2->getClientOriginalExtension());
+                    $idFile2->move(dirname($tempPath2), basename($tempPath2));
                     
                     // Kompresi gambar jika ukurannya > 1MB
                     if ($idFile2->getSize() > 1024 * 1024) {
-                        $idFile2 = ImageCompressor::compressIfNeeded($idFile2);
-                        Log::info('Registration: ID photo 2 compressed', ['user_id' => $user->id, 'new_size' => $idFile2->getSize()]);
+                        // Gunakan fungsi compressImage untuk kompresi
+                        $compressedFileName = $this->compressImage($tempPath2);
+                        $compressedPath = storage_path('app/public/' . $compressedFileName);
+                        
+                        // Hapus file temp asli
+                        if (file_exists($tempPath2)) {
+                            @unlink($tempPath2);
+                        }
+                        
+                        $tempPath2 = $compressedPath;
                     }
+                    
+                    $idFileName2 = 'id_2_' . $user->id . '_' . time() . '.' . pathinfo($tempPath2, PATHINFO_EXTENSION);
 
-                    $idFileName2 = 'id_2_' . $user->id . '_' . time() . '.' . $idFile2->getClientOriginalExtension();
-                    $idPath2 = $idFile2->storeAs('user_photos', $idFileName2, 'public');
+                    $compressedFile2 = new UploadedFile(
+                        $tempPath2,
+                        $idFileName2,
+                        mime_content_type($tempPath2),
+                        null,
+                        false
+                    );
+
+                    $idPath2 = $compressedFile2->storeAs('user_photos', $idFileName2, 'public');
+
+                    if (file_exists($tempPath2)) {
+                        @unlink($tempPath2);
+                    }
 
                     if (!$idPath2) {
                         throw new \Exception('Failed to store ID photo 2');
@@ -222,9 +328,15 @@ class RegistrationController extends Controller
                         'id_type' => $request->id_type_2,
                     ]);
 
-                    Log::info('Registration: ID photo 2 uploaded successfully', ['path' => $idPath2, 'id_type' => $request->id_type_2]);
+                    Log::info('Registration: ID photo 2 uploaded successfully', [
+                        'path' => $idPath2,
+                        'id_type' => $request->id_type_2
+                    ]);
                 } catch (\Exception $e) {
-                    Log::error('Registration: Failed to upload ID photo 2', ['error' => $e->getMessage(), 'user_id' => $user->id]);
+                    Log::error('Registration: Failed to upload ID photo 2', [
+                        'error' => $e->getMessage(),
+                        'user_id' => $user->id
+                    ]);
                     throw new \Exception('Gagal mengunggah foto ID tambahan 2: ' . $e->getMessage());
                 }
             } else {
@@ -368,5 +480,19 @@ class RegistrationController extends Controller
 
         return redirect()->route('registration.success')
             ->with('success', 'Email berhasil diverifikasi!');
+    }
+
+    public function compressImage($imagePath) {
+        $manager = new ImageManager(new Driver());
+        $image = $manager->read($imagePath);
+        
+        // Scale gambar secara proporsional
+        $image->scale(width: 800); // Atur lebar maksimum 800px
+        
+        // Simpan gambar yang telah dikompresi
+        $compressedPath = 'compressed_'.basename($imagePath);
+        $image->save(storage_path('app/public/'.$compressedPath));
+        
+        return $compressedPath;
     }
 }
