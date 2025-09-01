@@ -105,7 +105,7 @@
                         const me = data.data.me;
                         $('#phone-info').html(
                             '<div>Phone: ' + (me.pushname || 'N/A') + '</div>' +
-                            '<div>Number: ' + (me.id ? me.id.replace('@c.us', '') : 'N/A') + '</div>'
+                            '<div>Number: ' + me.id.replace('@c.us', '') + '</div>'
                         );
                     } else if (status !== 'CONNECTED') {
                         $('#phone-info').html('Not connected');
@@ -349,7 +349,7 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
                         if (data.me) {
                             $('#phone-info').html(
                                 '<div>Phone: ' + (data.me.pushname || 'N/A') + '</div>' +
-                                '<div>Number: ' + ((data.me.id ? data.me.id.replace('@c.us', '') : 'N/A')) + '</div>'
+                                '<div>Number: ' + (data.me.id || 'N/A').replace('@c.us', '') + '</div>'
                             );
                         } else {
                             $('#phone-info').html('Not connected');

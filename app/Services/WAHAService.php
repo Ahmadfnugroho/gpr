@@ -550,20 +550,10 @@ class WAHAService
 
     /**
      * Logout/Stop session
-     * 
-     * @param string $sessionName Nama session yang akan dilogout
-     * @return array Response dengan status dan pesan
      */
     public function logoutSession($sessionName = 'default')
     {
         try {
-            // Validasi session name
-            if (empty($sessionName)) {
-                $errorMessage = 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard';
-                Log::error($errorMessage, ['session' => $sessionName]);
-                return ['success' => false, 'message' => $errorMessage];
-            }
-            
             // Use the correct WAHA logout endpoint
             $endpoint = "{$this->baseUrl}/sessions/{$sessionName}/logout";
 
@@ -585,27 +575,9 @@ class WAHAService
 
             if ($response->successful()) {
                 Log::info('Session logged out successfully');
-                return ['success' => true, 'message' => 'Session logged out successfully'];
+                return true;
             } else {
-                $errorMessage = 'Failed to logout session';
-                
-                // Handle error 422 (session not found atau validasi error lainnya)
-                if ($response->status() === 422) {
-                    try {
-                        $errorData = $response->json();
-                        $errorMessage = $errorData['message'] ?? 'Session validation error';
-                        
-                        // Cek apakah session tidak valid
-                        if (strpos(strtolower($errorMessage), 'session not found') !== false) {
-                            $errorMessage = 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard';
-                        }
-                    } catch (\Exception $jsonEx) {
-                        $errorMessage = 'Session validation error: ' . $response->body();
-                    }
-                }
-                
-                Log::error($errorMessage, [
-                    'session' => $sessionName,
+                Log::error('Failed to logout session', [
                     'status' => $response->status(),
                     'body' => $response->body()
                 ]);
@@ -619,68 +591,17 @@ class WAHAService
 
                 if ($stopResponse->successful()) {
                     Log::info('Session stopped successfully as fallback');
-                    return ['success' => true, 'message' => 'Session stopped successfully (fallback method)'];
+                    return true;
                 }
 
-                return ['success' => false, 'message' => $errorMessage, 'status' => $response->status()];
+                return false;
             }
         } catch (\Exception $e) {
-            $errorMessage = 'WAHA logout session failed: ' . $e->getMessage();
-            Log::error($errorMessage, ['session' => $sessionName]);
-            return ['success' => false, 'message' => $errorMessage];
-        }
-    }
-    
-    /**
-     * Stop WAHA server
-     * 
-     * @return array Response dengan status dan pesan
-     */
-    public function stopServer()
-    {
-        try {
-            // Endpoint untuk menghentikan server
-            $endpoint = "{$this->baseUrl}/server/stop";
-
-            Log::info('Stopping WAHA server', ['endpoint' => $endpoint]);
-
-            $response = Http::withHeaders([
-                'X-Api-Key' => $this->apiKey,
-                'Content-Type' => 'application/json',
-            ])->post($endpoint);
-
-            Log::info('Stop server response', [
-                'status' => $response->status(),
-                'body' => $response->body()
+            Log::error('WAHA logout session failed', [
+                'session' => $sessionName,
+                'error' => $e->getMessage()
             ]);
-
-            if ($response->successful()) {
-                Log::info('WAHA server stopped successfully');
-                return ['success' => true, 'message' => 'Server stopped successfully'];
-            } else {
-                $errorMessage = 'Failed to stop server';
-                
-                // Handle error 422 (validasi error)
-                if ($response->status() === 422) {
-                    try {
-                        $errorData = $response->json();
-                        $errorMessage = $errorData['message'] ?? 'Server validation error';
-                    } catch (\Exception $jsonEx) {
-                        $errorMessage = 'Server validation error: ' . $response->body();
-                    }
-                }
-                
-                Log::error($errorMessage, [
-                    'status' => $response->status(),
-                    'response' => $response->body()
-                ]);
-                
-                return ['success' => false, 'message' => $errorMessage, 'status' => $response->status()];
-            }
-        } catch (\Exception $e) {
-            $errorMessage = 'Exception stopping WAHA server: ' . $e->getMessage();
-            Log::error($errorMessage);
-            return ['success' => false, 'message' => $errorMessage];
+            throw $e;
         }
     }
 }

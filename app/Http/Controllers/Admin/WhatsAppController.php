@@ -19,22 +19,14 @@ class WhatsAppController extends Controller
     /**
      * Dashboard WhatsApp Management
      */
-    public function dashboard(Request $request)
+    public function dashboard()
     {
         try {
             // Get session status
             $sessions = $this->wahaService->getSessions();
             $version = $this->wahaService->getVersion();
-            
-            // Get active session from query parameter or use default
-            $activeSession = $request->query('session', 'default');
-            
-            // Validate session name
-            if (empty($activeSession) || !is_string($activeSession)) {
-                $activeSession = 'default';
-            }
-            
-            return view('admin.whatsapp.dashboard', compact('sessions', 'version', 'activeSession'));
+
+            return view('admin.whatsapp.dashboard', compact('sessions', 'version'));
         } catch (\Exception $e) {
             return view('admin.whatsapp.dashboard')->with('error', 'Tidak dapat terhubung ke WAHA server: ' . $e->getMessage());
         }
@@ -49,17 +41,17 @@ class WhatsAppController extends Controller
         if ($request->has('session')) {
             $session = $request->session;
         }
-        
+
         if (empty($session) || !is_string($session)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard'
             ], 400);
         }
-        
+
         try {
             $qrCode = $this->wahaService->getQrCode($session);
-            
+
             return response()->json([
                 'success' => true,
                 'qr_code' => $qrCode,
@@ -82,36 +74,36 @@ class WhatsAppController extends Controller
         if ($request->has('session')) {
             $session = $request->session;
         }
-        
+
         if (empty($session) || !is_string($session)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard'
             ], 400);
         }
-        
+
         try {
             $sessions = $this->wahaService->getSessions();
-            
+
             // Find the requested session
             $sessionData = null;
             foreach ($sessions as $s) {
-                if (($s['id'] ?? $s['name'] ?? '') === $session) {
+                if ($s['id'] === $session) {
                     $sessionData = $s;
                     break;
                 }
             }
-            
+
             if (!$sessionData) {
                 return response()->json([
                     'success' => false,
                     'message' => "Session '{$session}' tidak ditemukan"
                 ]);
             }
-            
+
             $status = $sessionData['status'] ?? 'UNKNOWN';
             $me = $sessionData['me'] ?? null;
-            
+
             return response()->json([
                 'success' => true,
                 'session' => $session,
@@ -141,7 +133,7 @@ class WhatsAppController extends Controller
         if ($request->has('session')) {
             $session = $request->session;
         }
-        
+
         if (empty($session) || !is_string($session)) {
             return response()->json([
                 'success' => false,
@@ -188,10 +180,10 @@ class WhatsAppController extends Controller
                     'message' => 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard'
                 ], 400);
             }
-            
+
             // Restart session with specified name
             $result = $this->wahaService->restartSession($session);
-            
+
             if ($result['success']) {
                 return response()->json([
                     'success' => true,
@@ -224,10 +216,10 @@ class WhatsAppController extends Controller
                     'message' => 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard'
                 ], 400);
             }
-            
+
             // Logout/stop session with specified name
             $result = $this->wahaService->logoutSession($session);
-            
+
             if ($result['success']) {
                 return response()->json([
                     'success' => true,
@@ -256,11 +248,11 @@ class WhatsAppController extends Controller
             // Get recent logs from Laravel log
             $logFile = storage_path('logs/laravel.log');
             $logs = [];
-            
+
             if (file_exists($logFile)) {
                 $lines = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
                 $lines = array_slice($lines, -50); // Last 50 lines
-                
+
                 foreach ($lines as $line) {
                     if (strpos($line, 'WhatsApp') !== false || strpos($line, 'WAHA') !== false) {
                         $logs[] = $line;
@@ -279,35 +271,35 @@ class WhatsAppController extends Controller
             ]);
         }
     }
-    
+
     /**
      * Stop WAHA server
      */
-    public function stopServer()
-    {
-        try {
-            // Stop WAHA server
-            $result = $this->wahaService->stopServer();
-            
-            if ($result['success']) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Server berhasil dihentikan. Semua sesi WhatsApp telah terputus.'
-                ]);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Gagal menghentikan server: ' . ($result['message'] ?? 'Unknown error')
-                ]);
-            }
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal menghentikan server: ' . $e->getMessage()
-            ]);
-        }
-    }
-    
+    // public function stopServer()
+    // {
+    //     try {
+    //         // Stop WAHA server
+    //         $result = $this->wahaService->stopServer();
+
+    //         if ($result['success']) {
+    //             return response()->json([
+    //                 'success' => true,
+    //                 'message' => 'Server berhasil dihentikan. Semua sesi WhatsApp telah terputus.'
+    //             ]);
+    //         } else {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Gagal menghentikan server: ' . ($result['message'] ?? 'Unknown error')
+    //             ]);
+    //         }
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Gagal menghentikan server: ' . $e->getMessage()
+    //         ]);
+    //     }
+    // }
+
     /**
      * Start session with specific session name
      */
@@ -321,10 +313,10 @@ class WhatsAppController extends Controller
                     'message' => 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard'
                 ], 400);
             }
-            
+
             // Start session with specified name
             $result = $this->wahaService->startSession($session);
-            
+
             if ($result['success']) {
                 return response()->json([
                     'success' => true,

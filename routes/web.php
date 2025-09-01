@@ -79,7 +79,6 @@ Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
         Route::post('/test', [App\Http\Controllers\Admin\WhatsAppController::class, 'sendTestMessage'])->name('test');
         Route::post('/restart', [App\Http\Controllers\Admin\WhatsAppController::class, 'restartSession'])->name('restart');
         Route::post('/logout-session', [App\Http\Controllers\Admin\WhatsAppController::class, 'logoutSession'])->name('logout');
-        Route::post('/stop-server', [App\Http\Controllers\Admin\WhatsAppController::class, 'stopServer'])->name('stop.server');
         Route::get('/logs', [App\Http\Controllers\Admin\WhatsAppController::class, 'getSessionLogs'])->name('logs');
     });
 });
