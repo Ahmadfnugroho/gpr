@@ -15,8 +15,8 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 
 class RegistrationController extends Controller
 {
@@ -30,7 +30,6 @@ class RegistrationController extends Controller
         // Meningkatkan batas waktu eksekusi untuk upload file besar
         set_time_limit(300); // 5 menit
         ini_set('memory_limit', '256M');
-        $manager = new ImageManager(new Driver());
 
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|unique:users,email',
