@@ -481,18 +481,96 @@ class RegistrationController extends Controller
             ->with('success', 'Email berhasil diverifikasi!');
     }
 
+    /**
+     * Kompres gambar untuk mengurangi ukuran file
+     * Target ukuran: < 1MB (800-900KB)
+     * 
+     * @param string $imagePath Path ke file gambar yang akan dikompresi
+     * @return string Path relatif ke file hasil kompresi
+     */
     public function compressImage($imagePath)
     {
+        // Buat instance ImageManager dengan driver GD
         $manager = new ImageManager(new Driver());
-        $image = $manager->read($imagePath);
 
-        // Scale gambar secara proporsional
-        $image->scale(width: 800); // Atur lebar maksimum 800px
+        try {
+            // Dapatkan ukuran file asli dalam KB
+            $originalSize = filesize($imagePath) / 1024;
 
-        // Simpan gambar yang telah dikompresi
-        $compressedPath = 'compressed_' . basename($imagePath);
-        $image->save(storage_path('app/public/' . $compressedPath));
+            // Baca gambar
+            $image = $manager->read($imagePath);
 
-        return $compressedPath;
+            // Hapus metadata untuk mengurangi ukuran file
+
+            // Tentukan kualitas kompresi berdasarkan ukuran file asli
+            $quality = 60; // Default quality
+            $targetWidth = 800; // Default width
+
+            if ($originalSize > 5000) { // Jika lebih dari 5MB
+                $quality = 35;
+                $targetWidth = 650;
+            } elseif ($originalSize > 2000) { // Jika lebih dari 2MB
+                $quality = 45;
+                $targetWidth = 700;
+            } elseif ($originalSize > 1000) { // Jika lebih dari 1MB
+                $quality = 55;
+                $targetWidth = 750;
+            }
+
+            // Scale gambar secara proporsional
+            $image->scale(width: $targetWidth);
+
+            // Dapatkan ekstensi file
+            $extension = pathinfo($imagePath, PATHINFO_EXTENSION);
+
+            // Simpan gambar yang telah dikompresi
+            $compressedPath = 'compressed_' . basename($imagePath);
+
+            // Konversi ke format jpg jika bukan jpg
+            if (strtolower($extension) !== 'jpg' && strtolower($extension) !== 'jpeg') {
+                $compressedPath = str_replace('.' . $extension, '.jpg', $compressedPath);
+            }
+
+            // Simpan dengan kualitas yang telah ditentukan
+            $image->toJpeg($quality)->save(storage_path('app/public/' . $compressedPath));
+
+            // Periksa ukuran hasil kompresi
+            $compressedSize = filesize(storage_path('app/public/' . $compressedPath)) / 1024; // KB
+
+            // Jika masih lebih dari 900KB, coba kompresi lebih agresif
+            if ($compressedSize > 900) {
+                // Hapus file kompresi sebelumnya
+                @unlink(storage_path('app/public/' . $compressedPath));
+
+                // Coba dengan kualitas lebih rendah dan ukuran lebih kecil
+                $image = $manager->read($imagePath);
+                $image->scale(width: 600);
+                $image->toJpeg(25)->save(storage_path('app/public/' . $compressedPath));
+
+                // Update ukuran setelah kompresi kedua
+                $compressedSize = filesize(storage_path('app/public/' . $compressedPath)) / 1024;
+
+                // Jika masih lebih dari 900KB, coba kompresi paling agresif
+                if ($compressedSize > 900) {
+                    @unlink(storage_path('app/public/' . $compressedPath));
+
+                    $image = $manager->read($imagePath);
+                    $image->scale(width: 500);
+                    $image->toJpeg(20)->save(storage_path('app/public/' . $compressedPath));
+
+                    $compressedSize = filesize(storage_path('app/public/' . $compressedPath)) / 1024;
+                }
+            }
+
+            // Log ukuran file sebelum dan sesudah kompresi
+            $compressionRatio = $originalSize > 0 ? round(($originalSize - $compressedSize) / $originalSize * 100) : 0;
+            Log::info("Kompresi gambar: {$originalSize}KB → {$compressedSize}KB (Kompresi: {$compressionRatio}%, Width: {$targetWidth}px, Quality: {$quality}%)");
+
+            return $compressedPath;
+        } catch (\Exception $e) {
+            Log::error('Gagal mengkompresi gambar: ' . $e->getMessage());
+            // Jika gagal kompresi, kembalikan file asli
+            return basename($imagePath);
+        }
     }
 }
