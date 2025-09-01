@@ -63,7 +63,7 @@ class CustomerPolicy
      */
     public function forceDelete(User $user, Customer $customer): bool
     {
-        return $user->can('{{ ForceDelete }}');
+        return $user->can('force_delete_customer');
     }
 
     /**
@@ -79,7 +79,7 @@ class CustomerPolicy
      */
     public function restore(User $user, Customer $customer): bool
     {
-        return $user->can('{{ Restore }}');
+        return false; // Restore not enabled in Shield config
     }
 
     /**
@@ -87,7 +87,7 @@ class CustomerPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('{{ RestoreAny }}');
+        return false; // Restore not enabled in Shield config
     }
 
     /**
@@ -95,7 +95,7 @@ class CustomerPolicy
      */
     public function replicate(User $user, Customer $customer): bool
     {
-        return $user->can('{{ Replicate }}');
+        return false; // Replicate not enabled in Shield config
     }
 
     /**
@@ -103,6 +103,6 @@ class CustomerPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('{{ Reorder }}');
+        return false; // Reorder not enabled in Shield config
     }
 }
