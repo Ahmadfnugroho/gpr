@@ -446,68 +446,74 @@
                         <p class="section-subtitle">Unggah foto dokumen identitas yang diperlukan (3 dokumen wajib)</p>
 
                         <!-- Foto KTP -->
-        <div class="mb-3">
-            <label for="ktp_photo" class="form-label">1. Foto KTP <span class="required">*</span></label>
-            <input type="file" class="form-control @error('ktp_photo') is-invalid @enderror"
-                id="ktp_photo" name="ktp_photo" accept="image/*" required>
-            <div class="form-text">Format: JPG, JPEG, PNG. Maksimal 10MB</div>
-            <div id="ktp_photo-notification" class="alert alert-info mt-2" style="display: none;"></div>
-            @error('ktp_photo')
-            <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
-        </div>
+                        <div class="mb-3">
+                            <label for="ktp_photo" class="form-label">1. Foto KTP <span class="required">*</span></label>
+                            <input type="file" class="form-control image-upload @error('ktp_photo') is-invalid @enderror"
+                                id="ktp_photo" name="ktp_photo" accept="image/*" required>
+                            <div class="form-text">Format: JPG, JPEG, PNG, WebP. Maksimal 10MB. File akan dioptimalkan secara otomatis.</div>
+                            <div id="ktp_photo-notification" class="alert alert-info mt-2" style="display: none;"></div>
+                            <div class="progress mt-2" style="display: none;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            @error('ktp_photo')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
 
                         <!-- Foto ID Tambahan 1 -->
-        <div class="mb-3">
-            <label for="id_photo" class="form-label">2. Foto ID Tambahan 1 <span class="required">*</span></label>
-            <select class="form-select mb-2 @error('id_type') is-invalid @enderror" id="id_type" name="id_type" required>
-                <option value="">Pilih Jenis ID</option>
-                <option value="KK" {{ old('id_type') == 'KK' ? 'selected' : '' }}>Kartu Keluarga (KK)</option>
-                <option value="SIM" {{ old('id_type') == 'SIM' ? 'selected' : '' }}>SIM (Surat Izin Mengemudi)</option>
-                <option value="NPWP" {{ old('id_type') == 'NPWP' ? 'selected' : '' }}>NPWP</option>
-                <option value="STNK" {{ old('id_type') == 'STNK' ? 'selected' : '' }}>STNK</option>
-                <option value="BPKB" {{ old('id_type') == 'BPKB' ? 'selected' : '' }}>BPKB</option>
-                <option value="Passport" {{ old('id_type') == 'Passport' ? 'selected' : '' }}>Passport</option>
-                <option value="BPJS" {{ old('id_type') == 'BPJS' ? 'selected' : '' }}>BPJS</option>
-                <option value="ID_Kerja" {{ old('id_type') == 'ID_Kerja' ? 'selected' : '' }}>ID Card Kerja</option>
-            </select>
-            @error('id_type')
-            <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
-            <input type="file" class="form-control @error('id_photo') is-invalid @enderror"
-                id="id_photo" name="id_photo" accept="image/*" required>
-            <div class="form-text">Boleh diwatermark. Format: JPG, JPEG, PNG. Maksimal 10MB</div>
-            <div id="id_photo-notification" class="alert alert-info mt-2" style="display: none;"></div>
-            @error('id_photo')
-            <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
-        </div>
+                        <div class="mb-3">
+                            <label for="id_photo" class="form-label">2. Foto ID Tambahan 1 <span class="required">*</span></label>
+                            <select class="form-select mb-2 @error('id_type') is-invalid @enderror" id="id_type" name="id_type" required>
+                                <option value="">Pilih Jenis ID</option>
+                                <option value="KK" {{ old('id_type') == 'KK' ? 'selected' : '' }}>Kartu Keluarga (KK)</option>
+                                <option value="SIM" {{ old('id_type') == 'SIM' ? 'selected' : '' }}>SIM (Surat Izin Mengemudi)</option>
+                                <option value="NPWP" {{ old('id_type') == 'NPWP' ? 'selected' : '' }}>NPWP</option>
+                                <option value="STNK" {{ old('id_type') == 'STNK' ? 'selected' : '' }}>STNK</option>
+                                <option value="BPKB" {{ old('id_type') == 'BPKB' ? 'selected' : '' }}>BPKB</option>
+                                <option value="Passport" {{ old('id_type') == 'Passport' ? 'selected' : '' }}>Passport</option>
+                                <option value="BPJS" {{ old('id_type') == 'BPJS' ? 'selected' : '' }}>BPJS</option>
+                                <option value="ID_Kerja" {{ old('id_type') == 'ID_Kerja' ? 'selected' : '' }}>ID Card Kerja</option>
+                            </select>
+                            @error('id_type')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <input type="file" class="form-control image-upload @error('id_photo') is-invalid @enderror"
+                                id="id_photo" name="id_photo" accept="image/*" required>
+                            <div class="form-text">Format: JPG, JPEG, PNG, WebP. Maksimal 10MB. File akan dioptimalkan secara otomatis.</div>
+                            <div id="id_photo-notification" class="alert alert-info mt-2" style="display: none;"></div>
+                            <div class="progress mt-2" style="display: none;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            @error('id_photo')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
 
                         <!-- Foto ID Tambahan 2 -->
-        <div class="mb-4">
-            <label for="id_photo_2" class="form-label">3. Foto ID Tambahan 2 <span class="required">*</span></label>
-            <select class="form-select mb-2 @error('id_type_2') is-invalid @enderror" id="id_type_2" name="id_type_2" required>
-                <option value="">Pilih Jenis ID</option>
-                <option value="KK" {{ old('id_type_2') == 'KK' ? 'selected' : '' }}>Kartu Keluarga (KK)</option>
-                <option value="SIM" {{ old('id_type_2') == 'SIM' ? 'selected' : '' }}>SIM (Surat Izin Mengemudi)</option>
-                <option value="NPWP" {{ old('id_type_2') == 'NPWP' ? 'selected' : '' }}>NPWP</option>
-                <option value="STNK" {{ old('id_type_2') == 'STNK' ? 'selected' : '' }}>STNK</option>
-                <option value="BPKB" {{ old('id_type_2') == 'BPKB' ? 'selected' : '' }}>BPKB</option>
-                <option value="Passport" {{ old('id_type_2') == 'Passport' ? 'selected' : '' }}>Passport</option>
-                <option value="BPJS" {{ old('id_type_2') == 'BPJS' ? 'selected' : '' }}>BPJS</option>
-                <option value="ID_Kerja" {{ old('id_type_2') == 'ID_Kerja' ? 'selected' : '' }}>ID Card Kerja</option>
-            </select>
-            @error('id_type_2')
-            <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
-            <input type="file" class="form-control @error('id_photo_2') is-invalid @enderror"
-                id="id_photo_2" name="id_photo_2" accept="image/*" required>
-            <div class="form-text">Boleh diwatermark. Format: JPG, JPEG, PNG. Maksimal 10MB</div>
-            <div id="id_photo_2-notification" class="alert alert-info mt-2" style="display: none;"></div>
-            @error('id_photo_2')
-            <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
-        </div>
+                        <div class="mb-4">
+                            <label for="id_photo_2" class="form-label">3. Foto ID Tambahan 2 <span class="required">*</span></label>
+                            <select class="form-select mb-2 @error('id_type_2') is-invalid @enderror" id="id_type_2" name="id_type_2" required>
+                                <option value="">Pilih Jenis ID</option>
+                                <option value="KK" {{ old('id_type_2') == 'KK' ? 'selected' : '' }}>Kartu Keluarga (KK)</option>
+                                <option value="SIM" {{ old('id_type_2') == 'SIM' ? 'selected' : '' }}>SIM (Surat Izin Mengemudi)</option>
+                                <option value="NPWP" {{ old('id_type_2') == 'NPWP' ? 'selected' : '' }}>NPWP</option>
+                                <option value="STNK" {{ old('id_type_2') == 'STNK' ? 'selected' : '' }}>STNK</option>
+                                <option value="BPKB" {{ old('id_type_2') == 'BPKB' ? 'selected' : '' }}>BPKB</option>
+                                <option value="Passport" {{ old('id_type_2') == 'Passport' ? 'selected' : '' }}>Passport</option>
+                                <option value="BPJS" {{ old('id_type_2') == 'BPJS' ? 'selected' : '' }}>BPJS</option>
+                                <option value="ID_Kerja" {{ old('id_type_2') == 'ID_Kerja' ? 'selected' : '' }}>ID Card Kerja</option>
+                            </select>
+                            @error('id_type_2')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <input type="file" class="form-control @error('id_photo_2') is-invalid @enderror"
+                                id="id_photo_2" name="id_photo_2" accept="image/*" required>
+                            <div class="form-text">Boleh diwatermark. Format: JPG, JPEG, PNG. Maksimal 10MB</div>
+                            <div id="id_photo_2-notification" class="alert alert-info mt-2" style="display: none;"></div>
+                            @error('id_photo_2')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
 
                     </div>
 
@@ -568,11 +574,22 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
+        // Function to check if browser supports WebP
+        function browserSupportsWebP() {
+            const elem = document.createElement('canvas');
+            if (!!(elem.getContext && elem.getContext('2d'))) {
+                // Was able or not to get WebP representation
+                return elem.toDataURL('image/webp').indexOf('data:image/webp') === 0;
+            }
+            // Very old browser like IE 8, canvas not supported
+            return false;
+        }
+
         // File validation and compression function
         async function validateFile(file, inputElement) {
             const maxSize = 10 * 1024 * 1024; // 10MB in bytes
             const serverMaxSize = 1 * 1024 * 1024; // 1MB in bytes (server limit)
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
 
             if (file.size > maxSize) {
                 alert('Ukuran file tidak boleh lebih dari 10MB. Ukuran file Anda: ' + (file.size / 1024 / 1024).toFixed(2) + 'MB');
@@ -581,43 +598,50 @@
             }
 
             if (!allowedTypes.includes(file.type)) {
-                alert('Format file tidak didukung. Gunakan format JPG, JPEG, PNG, atau GIF.');
+                alert('Format file tidak didukung. Gunakan format JPG, JPEG, PNG, WebP, atau GIF.');
                 inputElement.value = '';
                 return false;
             }
 
-            // If file size is larger than server limit (1MB), compress it
-            if (file.size > serverMaxSize) {
-                try {
-                    const compressedFile = await compressImage(file);
-                    
-                    // Replace the file in the input element with the compressed one
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(compressedFile);
-                    inputElement.files = dataTransfer.files;
-                    
-                    console.log(`File compressed: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
-                    
-                    // Show compression notification
-                    const fileId = inputElement.id;
-                    const notificationElement = document.getElementById(`${fileId}-notification`);
-                    if (notificationElement) {
-                        notificationElement.textContent = `File dikompresi: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`;
-                        notificationElement.style.display = 'block';
-                    }
-                    
-                    return true;
-                } catch (error) {
-                    console.error('Compression error:', error);
-                    // If compression fails, continue with original file if under 10MB
-                    return true;
-                }
-            }
+            // Always compress images for optimal size, regardless of original size
+            try {
+                const compressedFile = await compressImage(file);
 
-            return true;
+                // Replace the file in the input element with the compressed one
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(compressedFile);
+                inputElement.files = dataTransfer.files;
+
+                console.log(`File optimized: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+
+                // Show compression notification
+                const fileId = inputElement.id;
+                const notificationElement = document.getElementById(`${fileId}-notification`);
+
+                // Calculate compression percentage
+                const compressionPercent = Math.round((1 - (compressedFile.size / file.size)) * 100);
+                const formatInfo = compressedFile.type.includes('webp') ? ' (WebP)' : '';
+                const sizeInfo = `${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (${compressionPercent}% lebih kecil${formatInfo})`;
+
+                if (notificationElement) {
+                    notificationElement.textContent = `File dioptimalkan: ${sizeInfo}`;
+                    notificationElement.style.display = 'block';
+                    notificationElement.className = 'alert alert-success mt-2';
+                }
+
+                return true;
+            } catch (error) {
+                console.error('Compression error:', error);
+                // If compression fails, continue with original file if under 10MB
+                return true;
+            }
         }
-        
-        // Image compression function
+
+        return true;
+
+
+
+        // Image compression function with WebP support and adaptive compression
         async function compressImage(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -629,53 +653,51 @@
                         const canvas = document.createElement('canvas');
                         let width = img.width;
                         let height = img.height;
-                        
-                        // Calculate the compression ratio needed
-                        const targetSize = 900 * 1024; // Target 900KB to be safe under 1MB
-                        const currentSize = file.size;
-                        let quality = Math.min(0.9, targetSize / currentSize); // Start with quality based on size ratio, max 0.9
-                        
-                        // If image is very large, also resize dimensions
-                        if (width > 1920 || height > 1920) {
-                            const aspectRatio = width / height;
-                            if (width > height) {
-                                width = 1920;
-                                height = width / aspectRatio;
-                            } else {
-                                height = 1920;
-                                width = height * aspectRatio;
-                            }
+                        const targetWidth = 800;
+
+                        // Resize proporsional
+                        if (width > targetWidth) {
+                            const ratio = width / height;
+                            width = targetWidth;
+                            height = Math.round(targetWidth / ratio);
                         }
-                        
+
                         canvas.width = width;
                         canvas.height = height;
-                        
                         const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, width, height);
                         ctx.drawImage(img, 0, 0, width, height);
-                        
-                        // Convert to blob with compression
-                        canvas.toBlob(function(blob) {
-                            if (!blob) {
-                                reject(new Error('Canvas to Blob conversion failed'));
-                                return;
-                            }
-                            
-                            // Create a new file from the blob
-                            const compressedFile = new File([blob], file.name, {
-                                type: file.type,
-                                lastModified: new Date().getTime()
-                            });
-                            
-                            resolve(compressedFile);
-                        }, file.type, quality);
+
+                        // Format: WebP jika didukung, else JPG
+                        const supportsWebP = browserSupportsWebP();
+                        const mimeType = supportsWebP ? 'image/webp' : 'image/jpeg';
+
+                        // Fungsi rekursif untuk turunkan kualitas
+                        function tryCompress(quality) {
+                            canvas.toBlob(function(blob) {
+                                if (!blob) return reject(new Error('Compression failed'));
+
+                                if (blob.size < 900 * 1024 || quality <= 0.2) {
+                                    // Sukses <900KB atau kualitas terlalu rendah
+                                    const fileName = file.name.replace(/\.[^/.]+$/, '') + (supportsWebP ? '.webp' : '.jpg');
+                                    const compressedFile = new File([blob], fileName, {
+                                        type: mimeType,
+                                        lastModified: Date.now()
+                                    });
+                                    resolve(compressedFile);
+                                } else {
+                                    // Coba lagi dengan kualitas lebih rendah
+                                    tryCompress(quality - 0.1);
+                                }
+                            }, mimeType, quality);
+                        }
+
+                        tryCompress(0.7); // Mulai dari 70%
                     };
-                    img.onerror = function() {
-                        reject(new Error('Image loading error'));
-                    };
+                    img.onerror = () => reject(new Error('Image load failed'));
                 };
-                reader.onerror = function() {
-                    reject(new Error('File reading error'));
-                };
+                reader.onerror = () => reject(new Error('File read failed'));
             });
         }
 
@@ -730,6 +752,35 @@
         document.getElementById('emergency_contact_number').addEventListener('blur', function() {
             formatPhoneNumber(this);
         });
+
+        // Form validation with image optimization
+        (function() {
+            'use strict';
+            window.addEventListener('load', function() {
+                // Add event listeners to image upload inputs for client-side compression
+                const imageInputs = document.querySelectorAll('.image-upload');
+                imageInputs.forEach(input => {
+                    input.addEventListener('change', async function(event) {
+                        if (this.files && this.files[0]) {
+                            // Show progress bar
+                            const progressContainer = this.nextElementSibling.nextElementSibling.nextElementSibling;
+                            const progressBar = progressContainer.querySelector('.progress-bar');
+                            progressContainer.style.display = 'block';
+                            progressBar.style.width = '50%';
+
+                            // Validate and compress the file
+                            await validateFile(this.files[0], this);
+
+                            // Hide progress bar after completion
+                            progressBar.style.width = '100%';
+                            setTimeout(() => {
+                                progressContainer.style.display = 'none';
+                            }, 1000);
+                        }
+                    });
+                });
+            });
+        })();
 
         // Region Dropdown API Integration
         document.addEventListener('DOMContentLoaded', function() {

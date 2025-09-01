@@ -484,93 +484,111 @@ class RegistrationController extends Controller
     /**
      * Kompres gambar untuk mengurangi ukuran file
      * Target ukuran: < 1MB (800-900KB)
+     * Mendukung format WebP jika browser mendukung
      * 
      * @param string $imagePath Path ke file gambar yang akan dikompresi
      * @return string Path relatif ke file hasil kompresi
      */
-    public function compressImage($imagePath)
+    /**
+     * Deteksi apakah browser mendukung format WebP
+     * 
+     * @return bool True jika browser mendukung WebP, false jika tidak
+     */
+    protected function browserSupportsWebP()
     {
-        // Buat instance ImageManager dengan driver GD
+        // Deteksi dukungan WebP berdasarkan header User-Agent
+        $userAgent = request()->header('User-Agent');
+
+        // Browser yang mendukung WebP
+        $supportsWebP = false;
+
+        // Chrome 9+, Opera 12+, Firefox 65+, Edge 18+, Safari 14+
+        if (
+            preg_match('/Chrome\/[9-9][0-9]|Chrome\/[1-9][0-9]{2,}/', $userAgent) ||
+            preg_match('/Opera\/[1-9][2-9]|Opera\/[2-9][0-9]/', $userAgent) ||
+            preg_match('/Firefox\/[6-9][5-9]|Firefox\/[7-9][0-9]/', $userAgent) ||
+            preg_match('/Edg\/[1-9][8-9]|Edg\/[2-9][0-9]/', $userAgent) ||
+            preg_match('/Version\/1[4-9].*Safari/', $userAgent)
+        ) {
+            $supportsWebP = true;
+        }
+
+        // Jika header Accept tersedia, periksa apakah mencakup image/webp
+        if (request()->header('Accept') && strpos(request()->header('Accept'), 'image/webp') !== false) {
+            $supportsWebP = true;
+        }
+
+        return $supportsWebP;
+    }
+
+    private function compressImage($imagePath)
+    {
         $manager = new ImageManager(new Driver());
 
         try {
-            // Dapatkan ukuran file asli dalam KB
-            $originalSize = filesize($imagePath) / 1024;
+            $originalSize = filesize($imagePath);
 
             // Baca gambar
             $image = $manager->read($imagePath);
 
-            // Hapus metadata untuk mengurangi ukuran file
-
-            // Tentukan kualitas kompresi berdasarkan ukuran file asli
-            $quality = 60; // Default quality
-            $targetWidth = 800; // Default width
-
-            if ($originalSize > 5000) { // Jika lebih dari 5MB
-                $quality = 35;
-                $targetWidth = 650;
-            } elseif ($originalSize > 2000) { // Jika lebih dari 2MB
-                $quality = 45;
-                $targetWidth = 700;
-            } elseif ($originalSize > 1000) { // Jika lebih dari 1MB
-                $quality = 55;
-                $targetWidth = 750;
+            // Resize maksimal 800px lebar
+            if ($image->width() > 800) {
+                $image->scale(width: 800);
             }
 
-            // Scale gambar secara proporsional
-            $image->scale(width: $targetWidth);
+            // Hapus metadata
+            $image->removeMetadata;
 
-            // Dapatkan ekstensi file
+            // Tentukan ekstensi output
             $extension = pathinfo($imagePath, PATHINFO_EXTENSION);
+            $allowed = ['jpg', 'jpeg', 'png', 'gif'];
+            $outputExtension = in_array(strtolower($extension), $allowed) ? 'jpg' : 'jpg';
 
-            // Simpan gambar yang telah dikompresi
-            $compressedPath = 'compressed_' . basename($imagePath);
+            $tempDir = storage_path('app/public/temp');
+            if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
 
-            // Konversi ke format jpg jika bukan jpg
-            if (strtolower($extension) !== 'jpg' && strtolower($extension) !== 'jpeg') {
-                $compressedPath = str_replace('.' . $extension, '.jpg', $compressedPath);
-            }
+            $compressedFileName = 'compressed_' . Str::random(10) . '.jpg';
+            $compressedPath = $tempDir . '/' . $compressedFileName;
 
-            // Simpan dengan kualitas yang telah ditentukan
-            $image->toJpeg($quality)->save(storage_path('app/public/' . $compressedPath));
+            // Coba kualitas dari 70 → 50 → 30 → 20
+            $qualities = [70, 60, 50, 40, 30, 20];
 
-            // Periksa ukuran hasil kompresi
-            $compressedSize = filesize(storage_path('app/public/' . $compressedPath)) / 1024; // KB
+            foreach ($qualities as $quality) {
+                $image->toJpeg($quality)->save($compressedPath);
 
-            // Jika masih lebih dari 900KB, coba kompresi lebih agresif
-            if ($compressedSize > 900) {
-                // Hapus file kompresi sebelumnya
-                @unlink(storage_path('app/public/' . $compressedPath));
-
-                // Coba dengan kualitas lebih rendah dan ukuran lebih kecil
-                $image = $manager->read($imagePath);
-                $image->scale(width: 600);
-                $image->toJpeg(25)->save(storage_path('app/public/' . $compressedPath));
-
-                // Update ukuran setelah kompresi kedua
-                $compressedSize = filesize(storage_path('app/public/' . $compressedPath)) / 1024;
-
-                // Jika masih lebih dari 900KB, coba kompresi paling agresif
-                if ($compressedSize > 900) {
-                    @unlink(storage_path('app/public/' . $compressedPath));
-
-                    $image = $manager->read($imagePath);
-                    $image->scale(width: 500);
-                    $image->toJpeg(20)->save(storage_path('app/public/' . $compressedPath));
-
-                    $compressedSize = filesize(storage_path('app/public/' . $compressedPath)) / 1024;
+                if (filesize($compressedPath) < 1_000_000) { // < 1MB
+                    break;
                 }
             }
 
-            // Log ukuran file sebelum dan sesudah kompresi
-            $compressionRatio = $originalSize > 0 ? round(($originalSize - $compressedSize) / $originalSize * 100) : 0;
-            Log::info("Kompresi gambar: {$originalSize}KB → {$compressedSize}KB (Kompresi: {$compressionRatio}%, Width: {$targetWidth}px, Quality: {$quality}%)");
+            // Jika masih besar, paksa 800px + kualitas 15
+            if (filesize($compressedPath) >= 1_000_000) {
+                $image = $manager->read($imagePath);
+                $image->scale(width: 600)->removeMetadata;
+                $image->toJpeg(15)->save($compressedPath);
+            }
 
-            return $compressedPath;
+            $finalSize = filesize($compressedPath);
+            $compressionRatio = round(($originalSize - $finalSize) / $originalSize * 100);
+
+            Log::info("Image compressed: {$originalSize} → {$finalSize} bytes ({$compressionRatio}% saved)", [
+                'file' => basename($imagePath),
+                'quality' => $quality ?? 15,
+                'width' => $image->width(),
+            ]);
+
+            return 'temp/' . $compressedFileName; // Path relatif untuk Storage::disk('public')
         } catch (\Exception $e) {
-            Log::error('Gagal mengkompresi gambar: ' . $e->getMessage());
-            // Jika gagal kompresi, kembalikan file asli
-            return basename($imagePath);
+            Log::error('Failed to compress image: ' . $e->getMessage());
+            // Jika gagal, kembalikan file asli (tapi ini bisa >1MB)
+            $copyName = 'temp/original_' . basename($imagePath);
+            copy($imagePath, storage_path('app/public/' . $copyName));
+            return $copyName;
         }
     }
+    /**
+     * Deteksi apakah browser mendukung format WebP
+     * 
+     * @return bool True jika browser mendukung WebP, false jika tidak
+     */
 }
