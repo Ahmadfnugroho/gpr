@@ -135,27 +135,27 @@ class RegistrationController extends Controller
                 try {
                     $ktpFile = $request->file('ktp_photo');
                     Log::info('Registration: Processing KTP photo', ['user_id' => $user->id, 'file_size' => $ktpFile->getSize()]);
-                    
+
                     // Simpan file sementara
                     $tempPath = storage_path('app/public/temp/' . Str::random(20) . '.' . $ktpFile->getClientOriginalExtension());
                     $ktpFile->move(dirname($tempPath), basename($tempPath));
-                    
+
                     // Kompresi gambar jika ukurannya > 1MB
                     if ($ktpFile->getSize() > 1024 * 1024) {
                         // Gunakan fungsi compressImage untuk kompresi
                         $compressedFileName = $this->compressImage($tempPath);
                         $compressedPath = storage_path('app/public/' . $compressedFileName);
-                        
+
                         // Hapus file temp asli
                         if (file_exists($tempPath)) {
                             @unlink($tempPath);
                         }
-                        
+
                         $tempPath = $compressedPath;
                     }
-                    
+
                     $ktpFileName = 'ktp_' . $user->id . '_' . time() . '.' . pathinfo($tempPath, PATHINFO_EXTENSION);
-                    
+
                     // Buat instance UploadedFile dari file yang sudah dikompres
                     $compressedFile = new UploadedFile(
                         $tempPath,
@@ -208,27 +208,27 @@ class RegistrationController extends Controller
                         'id_type' => $request->id_type,
                         'extension' => $idFile->getClientOriginalExtension()
                     ]);
-                    
+
                     // Simpan file sementara
                     $tempPath = storage_path('app/public/temp/' . Str::random(20) . '.' . $idFile->getClientOriginalExtension());
                     $idFile->move(dirname($tempPath), basename($tempPath));
-                    
+
                     // Kompresi gambar jika ukurannya > 1MB
                     if ($idFile->getSize() > 1024 * 1024) {
                         // Gunakan fungsi compressImage untuk kompresi
                         $compressedFileName = $this->compressImage($tempPath);
                         $compressedPath = storage_path('app/public/' . $compressedFileName);
-                        
+
                         // Hapus file temp asli
                         if (file_exists($tempPath)) {
                             @unlink($tempPath);
                         }
-                        
+
                         $tempPath = $compressedPath;
                     }
-                    
+
                     $idFileName = 'id_1_' . $user->id . '_' . time() . '.' . pathinfo($tempPath, PATHINFO_EXTENSION);
-                    
+
                     // Buat instance UploadedFile dari file yang sudah dikompres
                     $compressedFile = new UploadedFile(
                         $tempPath,
@@ -282,25 +282,25 @@ class RegistrationController extends Controller
                         'id_type' => $request->id_type_2,
                         'extension' => $idFile2->getClientOriginalExtension()
                     ]);
-                    
+
                     // Simpan file sementara
                     $tempPath2 = storage_path('app/public/temp/' . Str::random(20) . '.' . $idFile2->getClientOriginalExtension());
                     $idFile2->move(dirname($tempPath2), basename($tempPath2));
-                    
+
                     // Kompresi gambar jika ukurannya > 1MB
                     if ($idFile2->getSize() > 1024 * 1024) {
                         // Gunakan fungsi compressImage untuk kompresi
                         $compressedFileName = $this->compressImage($tempPath2);
                         $compressedPath = storage_path('app/public/' . $compressedFileName);
-                        
+
                         // Hapus file temp asli
                         if (file_exists($tempPath2)) {
                             @unlink($tempPath2);
                         }
-                        
+
                         $tempPath2 = $compressedPath;
                     }
-                    
+
                     $idFileName2 = 'id_2_' . $user->id . '_' . time() . '.' . pathinfo($tempPath2, PATHINFO_EXTENSION);
 
                     $compressedFile2 = new UploadedFile(
@@ -482,17 +482,18 @@ class RegistrationController extends Controller
             ->with('success', 'Email berhasil diverifikasi!');
     }
 
-    public function compressImage($imagePath) {
+    public function compressImage($imagePath)
+    {
         $manager = new ImageManager(new Driver());
         $image = $manager->read($imagePath);
-        
+
         // Scale gambar secara proporsional
         $image->scale(width: 800); // Atur lebar maksimum 800px
-        
+
         // Simpan gambar yang telah dikompresi
-        $compressedPath = 'compressed_'.basename($imagePath);
-        $image->save(storage_path('app/public/'.$compressedPath));
-        
+        $compressedPath = 'compressed_' . basename($imagePath);
+        $image->save(storage_path('app/public/' . $compressedPath));
+
         return $compressedPath;
     }
 }
