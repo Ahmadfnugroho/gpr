@@ -64,12 +64,12 @@ class ProductResource extends Resource
     {
         // Clean and normalize search term
         $searchTerm = trim(strtolower($search));
-        
+
         // If empty search, do nothing
         if (empty($searchTerm)) {
             return;
         }
-        
+
         // Override default search behavior to search for exact phrase only
         $query->where(function ($query) use ($searchTerm) {
             $query->whereRaw('LOWER(name) LIKE ?', ['%' . $searchTerm . '%']);
@@ -83,7 +83,7 @@ class ProductResource extends Resource
         $latestTransaction = $record->detailTransactions()
             ->with('transaction')
             ->whereHas('transaction', function ($query) {
-                $query->where('booking_status', '!=', 'cancelled');
+                $query->where('booking_status', '!=', 'cancel');
             })
             ->latest('created_at')
             ->first();
@@ -98,7 +98,7 @@ class ProductResource extends Resource
         // Check availability based on current active transactions
         $hasActiveTransaction = $record->detailTransactions()
             ->whereHas('transaction', function ($query) use ($today) {
-                $query->where('booking_status', '!=', 'cancelled')
+                $query->where('booking_status', '!=', 'cancel')
                     ->where('start_date', '<=', $today)
                     ->where('end_date', '>=', $today);
             })
@@ -139,7 +139,7 @@ class ProductResource extends Resource
                     ->required()
                     ->numeric()
                     ->prefix('Rp'),
-                Forms\Components\FileUpload::make('thumbnail')
+                \Filament\Forms\Components\FileUpload::make('thumbnail')
                     ->label('Foto Produk')
                     ->image()
                     ->nullable(),

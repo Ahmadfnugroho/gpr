@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\FrontApiKey;
 use App\Http\Middleware\WhatsAppAuth;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\PerformanceMonitoring;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,6 +20,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'api_key' => FrontApiKey::class,
             'whatsapp.auth' => WhatsAppAuth::class
         ]);
+        
+        // Add security headers globally
+        $middleware->append(SecurityHeaders::class);
+        
+        // Add performance monitoring globally
+        $middleware->append(PerformanceMonitoring::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

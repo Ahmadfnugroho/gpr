@@ -26,7 +26,8 @@ class Transaction extends Model
 
 
     protected $fillable = [
-        'user_id',
+        'user_id', // Legacy field - will be deprecated
+        'customer_id',
         'booking_transaction_id',
         'grand_total',
         'booking_status',
@@ -37,6 +38,14 @@ class Transaction extends Model
         'note',
         'down_payment',
         'remaining_payment',
+        'additional_fee_1_name',
+        'additional_fee_1_amount',
+        'additional_fee_2_name',
+        'additional_fee_2_amount',
+        'additional_fee_3_name',
+        'additional_fee_3_amount',
+        'additional_services',
+        'cancellation_fee',
     ];
 
 
@@ -44,9 +53,14 @@ class Transaction extends Model
         'down_payment' => MoneyCast::class,
         'remaining_payment' => MoneyCast::class,
         'grand_total' => MoneyCast::class,
+        'additional_fee_1_amount' => MoneyCast::class,
+        'additional_fee_2_amount' => MoneyCast::class,
+        'additional_fee_3_amount' => MoneyCast::class,
+        'additional_services' => 'array',
+        'cancellation_fee' => MoneyCast::class,
         'start_date' => 'datetime',
         'end_date' => 'datetime',
-        'duration' => 'integer', // Pastikan duration dicasting ke integer
+        'duration' => 'integer',
     ];
 
 
@@ -54,7 +68,7 @@ class Transaction extends Model
     {
         return LogOptions::defaults()
             ->logOnly([
-                'user.name',
+                'customer.name',
                 'booking_transaction_id',
                 'grand_total',
                 'booking_status',
@@ -102,15 +116,15 @@ class Transaction extends Model
         // Event listeners for notifications
         static::created(function ($transaction) {
             // Send notification after transaction is created
-            if ($transaction->user) {
-                $transaction->user->notify(new TransactionNotification($transaction, 'created'));
+            if ($transaction->customer) {
+                $transaction->customer->notify(new TransactionNotification($transaction, 'created'));
             }
         });
 
         static::updated(function ($transaction) {
             // Send notification only if booking_status changed
-            if ($transaction->wasChanged('booking_status') && $transaction->user) {
-                $transaction->user->notify(new TransactionNotification($transaction, 'updated'));
+            if ($transaction->wasChanged('booking_status') && $transaction->customer) {
+                $transaction->customer->notify(new TransactionNotification($transaction, 'updated'));
             }
         });
     }
@@ -122,6 +136,11 @@ class Transaction extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
     }
 
 
@@ -170,5 +189,36 @@ class Transaction extends Model
     public function promo(): BelongsTo
     {
         return $this->belongsTo(Promo::class);
+    }
+
+    /**
+     * Calculate cancellation fee (50% of grand total)
+     */
+    public function calculateCancellationFee(): int
+    {
+        return (int) floor($this->grand_total * 0.5);
+    }
+
+    /**
+     * Calculate total additional fees
+     */
+    public function getTotalAdditionalFees(): int
+    {
+        $fee1 = $this->additional_fee_1_amount ?? 0;
+        $fee2 = $this->additional_fee_2_amount ?? 0;
+        $fee3 = $this->additional_fee_3_amount ?? 0;
+        
+        return (int) ($fee1 + $fee2 + $fee3);
+    }
+
+    /**
+     * Auto-set cancellation fee when status changes to cancel
+     */
+    public function setCancellationFeeOnCancel(): void
+    {
+        if ($this->booking_status === 'cancel' && $this->cancellation_fee === null) {
+            $this->cancellation_fee = $this->calculateCancellationFee();
+            $this->save();
+        }
     }
 }

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\SubCategoryController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Admin\WhatsAppController;
@@ -13,8 +14,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
+})->middleware('auth:sanctum');
+
+// Region API Routes (for dropdown functionality)
+Route::prefix('regions')->group(function () {
+    Route::get('/provinces', [RegionController::class, 'getProvinces']);
+    Route::get('/regencies/{provinceId}', [RegionController::class, 'getRegencies']);
+    Route::get('/districts/{regencyId}', [RegionController::class, 'getDistricts']);
+    Route::get('/villages/{districtId}', [RegionController::class, 'getVillages']);
 });
-// ->middleware('auth:sanctum');
 
 // WhatsApp API Routes
 Route::prefix('server')->group(function () {
@@ -29,9 +37,9 @@ Route::prefix('sessions')->group(function () {
 
 Route::post('/sendText', [WhatsAppController::class, 'sendTestMessage']);
 
-Route::middleware('api_key')->group(function () {
+Route::middleware(['api_key', 'throttle:60,1'])->group(function () {
     Route::get('/product/{product:slug}', [ProductController::class, 'show']);
-    Route::get('/search-suggestions', [ProductController::class, 'searchSuggestions']);
+    Route::get('/search-suggestions', [ProductController::class, 'searchSuggestions'])->middleware('throttle:30,1');
     Route::get('/category/{category:slug}', [CategoryController::class, 'show']);
     Route::apiResource('/categories', CategoryController::class);
     Route::get('/sub-categories/{subCategory:slug}', [SubCategoryController::class, 'show']);

@@ -24,27 +24,27 @@ class AppServiceProvider extends ServiceProvider
     {
         // Set Carbon locale to Indonesian
         Carbon::setLocale('id');
-        
+
         // Paksa semua URL menggunakan HTTPS di production
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }
-        
+
         // Custom validation rule untuk ukuran file maksimal di server
         \Illuminate\Support\Facades\Validator::extend('max_server_size', function ($attribute, $value, $parameters, $validator) {
             if (!$value instanceof \Illuminate\Http\UploadedFile) {
                 return false;
             }
-            
+
             $maxSize = (int) $parameters[0] * 1024; // Convert to KB
             $fileSize = $value->getSize() / 1024; // Get size in KB
-            
+
             // Jika ukuran file melebihi batas server, cek apakah sudah dikompresi di client-side
             if ($fileSize > $maxSize) {
                 // Jika belum dikompresi, tolak file
                 return false;
             }
-            
+
             return true;
         }, 'Ukuran file :attribute tidak boleh melebihi :max_server_size KB setelah kompresi.');
 
@@ -56,10 +56,10 @@ class AppServiceProvider extends ServiceProvider
                 $newStatus = $detailTransaction->booking_status;
                 $oldStatus = $detailTransaction->getOriginal('booking_status');
 
-                // Jika status berubah dari rented/paid ke finished/cancelled
+                // Jika status berubah dari on_rented/paid ke done/cancel
                 if (
-                    in_array($oldStatus, ['rented', 'paid']) &&
-                    in_array($newStatus, ['finished', 'cancelled'])
+                    in_array($oldStatus, ['on_rented', 'paid']) &&
+                    in_array($newStatus, ['done', 'cancel'])
                 ) {
                     // Kembalikan product items
                     foreach ($detailTransaction->serial_numbers as $serial) {

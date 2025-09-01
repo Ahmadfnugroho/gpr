@@ -66,8 +66,8 @@ class TransactionNotification extends Notification
 
         // Tambahkan link invoice hanya untuk kondisi tertentu
         if (
-            ($this->eventType === 'created' && in_array($status, ['pending', 'paid'])) ||
-            ($this->eventType === 'updated' && $t->getOriginal('booking_status') === 'pending' && $status === 'paid')
+            ($this->eventType === 'created' && in_array($status, ['booking', 'paid'])) ||
+            ($this->eventType === 'updated' && $t->getOriginal('booking_status') === 'booking' && $status === 'paid')
         ) {
             $mail->line('🧾 Klik tombol di bawah untuk melihat invoice transaksi kamu:')
                 ->action('Lihat Invoice', $invoiceUrl);
@@ -112,7 +112,7 @@ class TransactionNotification extends Notification
         $intro = '';
 
         if ($eventType === 'created') {
-            if ($status === 'pending') {
+            if ($status === 'booking') {
                 $subject = "Transaksi {$transactionId} berhasil dibuat";
                 $intro = "Transaksi kamu dengan ID {$transactionId} berhasil dibuat dan sedang menunggu pembayaran.";
             } elseif ($status === 'paid') {
@@ -125,15 +125,15 @@ class TransactionNotification extends Notification
                     $subject = "Transaksi {$transactionId} telah lunas";
                     $intro = "Pembayaran untuk transaksi kamu dengan ID {$transactionId} telah kami terima.";
                     break;
-                case 'rented':
+                case 'on_rented':
                     $subject = "Transaksi {$transactionId} telah diambil";
                     $intro = "Barang untuk transaksi kamu dengan ID {$transactionId} telah diambil. Selamat menggunakan!";
                     break;
-                case 'finished':
+                case 'done':
                     $subject = "Transaksi {$transactionId} selesai";
                     $intro = "Transaksi sewa kamu dengan ID {$transactionId} telah selesai. Terima kasih telah menggunakan layanan kami.";
                     break;
-                case 'cancelled':
+                case 'cancel':
                     $subject = "Transaksi {$transactionId} dibatalkan";
                     $intro = "Transaksi kamu dengan ID {$transactionId} telah dibatalkan. Jika kamu merasa tidak melakukan ini, segera hubungi admin.";
                     break;

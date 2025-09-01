@@ -31,17 +31,17 @@ class WAHAService
         try {
             // Gunakan session name yang diberikan atau default
             $session = $sessionName ?: $this->session;
-            
+
             // Validasi session name
             if (empty($session)) {
                 $errorMessage = 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard';
                 Log::error($errorMessage, ['session' => $session]);
                 return ['success' => false, 'message' => $errorMessage];
             }
-            
+
             // Format nomor telepon (pastikan format internasional)
             $formattedTo = $this->formatPhoneNumber($to);
-            
+
             // Validasi nomor telepon
             if (empty($formattedTo)) {
                 $errorMessage = 'Invalid phone number format';
@@ -74,18 +74,20 @@ class WAHAService
             } else {
                 $errorMessage = 'Failed to send WhatsApp message';
                 $errorData = [];
-                
+
                 // Handle error 422 (session not found atau validasi error lainnya)
                 if ($response->status() === 422) {
                     try {
                         $errorData = $response->json();
                         $errorMessage = $errorData['message'] ?? 'Validation error';
-                        
+
                         // Cek apakah session tidak valid
-                        if (strpos(strtolower($errorMessage), 'session not found') !== false || 
-                            strpos(strtolower($errorMessage), 'invalid session') !== false) {
+                        if (
+                            strpos(strtolower($errorMessage), 'session not found') !== false ||
+                            strpos(strtolower($errorMessage), 'invalid session') !== false
+                        ) {
                             $errorMessage = 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard';
-                            
+
                             // Coba mulai session otomatis
                             Log::info('Attempting to start session automatically', ['session' => $session]);
                             $startResult = $this->startSession($session);
@@ -98,14 +100,14 @@ class WAHAService
                         $errorMessage = 'Validation error: ' . $response->body();
                     }
                 }
-                
+
                 Log::error($errorMessage, [
                     'to' => $formattedTo,
                     'session' => $session,
                     'status' => $response->status(),
                     'error' => $response->body()
                 ]);
-                
+
                 return ['success' => false, 'message' => $errorMessage, 'status' => $response->status()];
             }
         } catch (\Exception $e) {
@@ -146,25 +148,25 @@ class WAHAService
         try {
             // Gunakan session name yang diberikan atau default
             $session = $sessionName ?: $this->session;
-            
+
             // Validasi session name
             if (empty($session)) {
                 Log::error('Invalid session name', ['session' => $session]);
                 return ['success' => false, 'message' => 'Invalid session name, check it at whatsapp.globalphotorental.com/dashboard'];
             }
-            
+
             // Endpoint untuk memulai session baru
             $endpoint = "{$this->baseUrl}/sessions";
             if ($sessionName) {
                 // Endpoint untuk memulai session yang sudah ada
                 $endpoint = "{$this->baseUrl}/sessions/{$session}/start";
             }
-            
+
             Log::info('Starting WAHA session', [
                 'endpoint' => $endpoint,
                 'session' => $session
             ]);
-            
+
             $response = Http::withHeaders([
                 'X-Api-Key' => $this->apiKey,
                 'Content-Type' => 'application/json',
@@ -196,7 +198,7 @@ class WAHAService
             } else {
                 $errorMessage = 'Failed to start session';
                 $errorData = [];
-                
+
                 // Handle error 422 (session already exists or other validation errors)
                 if ($response->status() === 422) {
                     try {
@@ -206,13 +208,13 @@ class WAHAService
                         $errorMessage = 'Session validation error: ' . $response->body();
                     }
                 }
-                
+
                 Log::error($errorMessage, [
                     'session' => $session,
                     'status' => $response->status(),
                     'response' => $response->body()
                 ]);
-                
+
                 return ['success' => false, 'message' => $errorMessage, 'status' => $response->status()];
             }
         } catch (\Exception $e) {
@@ -253,15 +255,15 @@ class WAHAService
      */
     public function sendTransactionNotification($transaction, $eventType)
     {
-        $user = $transaction->user;
-        $phoneNumber = $user->userPhoneNumbers->first()?->phone_number;
+        $customer = $transaction->customer;
+        $phoneNumber = $customer->customerPhoneNumbers->first()?->phone_number;
 
         if (!$phoneNumber) {
-            // Log::warning('No phone number found for user', ['user_id' => $user->id]);
+            // Log::warning('No phone number found for customer', ['customer_id' => $customer->id]);
             return false;
         }
 
-        $message = $this->buildTransactionMessage($transaction, $eventType, $user->name);
+        $message = $this->buildTransactionMessage($transaction, $eventType, $customer->name);
 
         return $this->sendMessage($phoneNumber, $message);
     }
@@ -278,17 +280,17 @@ class WAHAService
         $total = number_format($transaction->grand_total, 0, ',', '.');
 
         $statusEmoji = [
-            'pending' => '⏳',
+            'booking' => '⏳',
             'paid' => '✅',
-            'rented' => '📦',
-            'finished' => '🎉',
-            'cancelled' => '❌'
+            'on_rented' => '📦',
+            'done' => '🎉',
+            'cancel' => '❌'
         ];
 
         $emoji = $statusEmoji[$status] ?? '📋';
 
         if ($eventType === 'created') {
-            if ($status === 'pending') {
+            if ($status === 'booking') {
                 $message = "🔔 *Transaksi Baru Dibuat*\n\n";
                 $message .= "Halo *{$userName}*,\n\n";
                 $message .= "Transaksi Anda berhasil dibuat!\n\n";
@@ -326,7 +328,7 @@ class WAHAService
                     $message .= "Terima kasih! 🙏";
                     break;
 
-                case 'rented':
+                case 'on_rented':
                     $message = "📦 *Barang Sudah Diambil*\n\n";
                     $message .= "Halo *{$userName}*,\n\n";
                     $message .= "Peralatan untuk transaksi *{$transactionId}* telah diambil.\n\n";
@@ -336,7 +338,7 @@ class WAHAService
                     $message .= "Happy shooting! 📷✨";
                     break;
 
-                case 'finished':
+                case 'done':
                     $message = "🎉 *Transaksi Selesai*\n\n";
                     $message .= "Halo *{$userName}*,\n\n";
                     $message .= "Transaksi *{$transactionId}* telah selesai!\n\n";
@@ -347,7 +349,7 @@ class WAHAService
                     $message .= "Sampai jumpa lagi! 👋📸";
                     break;
 
-                case 'cancelled':
+                case 'cancel':
                     $message = "❌ *Transaksi Dibatalkan*\n\n";
                     $message .= "Halo *{$userName}*,\n\n";
                     $message .= "Transaksi *{$transactionId}* telah dibatalkan.\n\n";

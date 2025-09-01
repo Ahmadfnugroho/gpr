@@ -19,11 +19,22 @@ return new class extends Migration
             $table->unsignedInteger('grand_total')->nullable();
             $table->unsignedInteger('down_payment')->nullable();
             $table->unsignedInteger('remaining_payment')->nullable();
-            $table->enum('booking_status', ['pending', 'paid', 'rented', 'finished', 'cancelled'])->default('pending');
+            $table->enum('booking_status', ['booking', 'paid', 'on_rented', 'done', 'cancel'])->default('booking');
             $table->datetime('start_date');
             $table->datetime('end_date');
             $table->unsignedInteger('duration');
             $table->text('note')->nullable();
+            
+            // Additional fee fields
+            $table->string('additional_fee_1_name')->nullable();
+            $table->unsignedInteger('additional_fee_1_amount')->nullable();
+            $table->string('additional_fee_2_name')->nullable();
+            $table->unsignedInteger('additional_fee_2_amount')->nullable();
+            $table->string('additional_fee_3_name')->nullable();
+            $table->unsignedInteger('additional_fee_3_amount')->nullable();
+            
+            // Cancellation fee for 50% payment logic
+            $table->unsignedInteger('cancellation_fee')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });

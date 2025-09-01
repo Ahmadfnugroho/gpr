@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\GoogleSheetSyncController;
 use App\Http\Controllers\PdfController;
+use App\Http\Controllers\ProductSearchController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SessionController;
 use App\Models\User;
@@ -28,6 +29,9 @@ Route::get('/registration/success', [RegistrationController::class, 'success'])-
 Route::get('/email/verify/{id}/{hash}', [RegistrationController::class, 'verifyEmail'])
     ->middleware(['signed'])
     ->name('verification.verify');
+
+// Product Search Route
+Route::get('/search-products', [ProductSearchController::class, 'index'])->name('product.search');
 
 // Region API Routes
 Route::prefix('api/regions')->group(function () {

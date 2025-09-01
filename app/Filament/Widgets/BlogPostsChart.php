@@ -25,7 +25,7 @@ class BlogPostsChart extends ChartWidget
     {
         $monthlyEarnings = Transaction::selectRaw('EXTRACT(MONTH FROM created_at) as month, SUM(round(grand_total/100000,2)) as total')
             ->whereYear('created_at', now()->year)
-            ->whereIn('booking_status', ['pending', 'paid', 'rented', 'finished'])
+            ->whereIn('booking_status', ['booking', 'paid', 'on_rented', 'done'])
             ->groupBy('month')
             ->orderBy('month')
             ->pluck('total', 'month');

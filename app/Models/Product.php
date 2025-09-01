@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
@@ -84,7 +85,7 @@ class Product extends Model
 
     //     $usedSerialsCount = $this->items()
     //         ->whereHas('detailTransactions.transaction', function ($q) use ($now) {
-    //             $q->whereIn('booking_status', ['pending', 'paid', 'rented'])
+    //             $q->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
     //                 ->where('end_date', '>=', $now);
     //         })
     //         ->count();
@@ -93,26 +94,34 @@ class Product extends Model
     // }
     public function getAvailableQuantityForPeriod(Carbon $startDate, Carbon $endDate): int
     {
-        return $this->items()
-            ->whereDoesntHave('detailTransactions.transaction', function ($q) use ($startDate, $endDate) {
-                $q->whereIn('booking_status', ['pending', 'paid', 'rented'])
-                    ->where(function ($q2) use ($startDate, $endDate) {
-                        $q2->whereBetween('start_date', [$startDate, $endDate])
-                            ->orWhereBetween('end_date', [$startDate, $endDate])
-                            ->orWhere(function ($q3) use ($startDate, $endDate) {
-                                $q3->where('start_date', '<', $startDate)
-                                    ->where('end_date', '>', $endDate);
-                            });
-                    });
-            })
-            ->count();
+        $cacheKey = "product_availability_{$this->id}_{$startDate->format('Y-m-d')}_{$endDate->format('Y-m-d')}";
+        
+        return Cache::remember($cacheKey, now()->addMinutes(5), function () use ($startDate, $endDate) {
+            return $this->items()
+                ->whereDoesntHave('detailTransactions.transaction', function ($q) use ($startDate, $endDate) {
+                    $q->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                        ->where(function ($q2) use ($startDate, $endDate) {
+                            $q2->whereBetween('start_date', [$startDate, $endDate])
+                                ->orWhereBetween('end_date', [$startDate, $endDate])
+                                ->orWhere(function ($q3) use ($startDate, $endDate) {
+                                    $q3->where('start_date', '<', $startDate)
+                                        ->where('end_date', '>', $endDate);
+                                });
+                        });
+                })
+                ->count();
+        });
     }
     public function getAvailableSerialNumbersForPeriod($startDate, $endDate)
     {
-        return $this->items()
-            ->actuallyAvailableForPeriod($startDate, $endDate)
-            ->pluck('serial_number')
-            ->toArray();
+        $cacheKey = "product_serials_{$this->id}_{$startDate}_{$endDate}";
+        
+        return Cache::remember($cacheKey, now()->addMinutes(3), function () use ($startDate, $endDate) {
+            return $this->items()
+                ->actuallyAvailableForPeriod($startDate, $endDate)
+                ->pluck('serial_number')
+                ->toArray();
+        });
     }
 
 
@@ -194,7 +203,7 @@ class Product extends Model
         $now = now();
         return $this->items()->where('is_available', true)
             ->whereDoesntHave('detailTransactions.transaction', function ($query) use ($now) {
-                $query->whereIn('booking_status', ['pending', 'paid', 'rented'])
+                $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
                     ->where('end_date', '>=', $now);
             });
     }

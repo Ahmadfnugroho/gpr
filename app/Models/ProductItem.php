@@ -42,7 +42,7 @@ class ProductItem extends Model
             ->where('product_id', $productId)
             ->whereNotNull('product_item_id')
             ->whereHas('transaction', function ($query) use ($startDate, $endDate) {
-                $query->whereIn('booking_status', ['pending', 'paid', 'rented'])
+                $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
                     ->where(function ($q) use ($startDate, $endDate) {
                         $q->whereBetween('start_date', [$startDate, $endDate])
                             ->orWhereBetween('end_date', [$startDate, $endDate])
@@ -66,7 +66,7 @@ class ProductItem extends Model
     public function scopeActuallyAvailableForPeriod($query, $startDate, $endDate)
     {
         return $query->whereDoesntHave('detailTransactions.transaction', function ($q) use ($startDate, $endDate) {
-            $q->whereIn('booking_status', ['pending', 'paid', 'rented'])
+            $q->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
                 ->where(function ($sub) use ($startDate, $endDate) {
                     $sub->whereBetween('start_date', [$startDate, $endDate])
                         ->orWhereBetween('end_date', [$startDate, $endDate])

@@ -34,7 +34,7 @@ class ReturnedProductsToday extends BaseWidget
                 DetailTransaction::with(['product', 'bundling', 'transaction.user'])
                     ->whereHas('transaction', function ($query) {
                         $query->whereDate('end_date', today())
-                            ->whereIn('booking_status', ['pending', 'paid', 'rented']);
+                            ->whereIn('booking_status', ['booking', 'paid', 'on_rented']);
                     })
                     ->select(['id', 'product_id', 'bundling_id', 'transaction_id']) // Tambahkan kolom 'id' dan relasi terkait
 

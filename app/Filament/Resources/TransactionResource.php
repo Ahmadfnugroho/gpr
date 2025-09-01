@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Log;
 use App\Models\Bundling;
 use App\Models\Product;
 use App\Models\Transaction;
-use App\Models\User;
-use App\Models\UserPhoneNumber;
+use App\Models\Customer;
+use App\Models\CustomerPhoneNumber;
 use App\Models\ProductItem;
 use App\Models\DetailTransactionProductItem;
 use Carbon\Carbon;
@@ -47,6 +47,8 @@ use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\DeleteAction;
+use Filament\Actions\Exports\Enums\ExportFormat;
+use App\Filament\Exports\TransactionExporter;
 
 use Filament\Tables\Columns\TextInputColumn;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
@@ -70,6 +72,24 @@ class TransactionResource extends Resource
     protected static ?string $navigationGroup = 'Sales & Transactions';
     protected static ?string $navigationLabel = 'Transactions';
     protected static ?int $navigationSort = 31;
+
+    /**
+     * Highlight search terms in text
+     */
+    protected static function highlightSearchTerm(?string $text, ?string $searchTerm): string
+    {
+        if (!$text || !$searchTerm || strlen($searchTerm) < 2) {
+            return $text ?? '';
+        }
+
+        $highlighted = preg_replace(
+            '/(' . preg_quote($searchTerm, '/') . ')/i',
+            '<mark style="background-color: yellow; padding: 2px;">$1</mark>',
+            $text
+        );
+
+        return $highlighted ?? $text;
+    }
     protected static function resolveAvailableProductSerials(Get $get, $set = null): array
     {
         $productId = $get('product_id');
@@ -92,8 +112,8 @@ class TransactionResource extends Resource
 
         // Ambil product_item_id dari tabel pivot yang sudah digunakan dalam repeater saat ini
         $usedInCurrentRepeater = collect($allDetailTransactions)
-            ->filter(fn($row) => isset($row['uuid']) && $row['uuid'] !== $currentUuid)
-            ->flatMap(fn($row) => $row['productItems'] ?? [])
+            ->filter(fn($row) => is_array($row) && isset($row['uuid']) && $row['uuid'] !== $currentUuid)
+            ->flatMap(fn($row) => is_array($row['productItems'] ?? null) ? $row['productItems'] : [])
             ->unique()
             ->values()
             ->all();
@@ -153,8 +173,8 @@ class TransactionResource extends Resource
 
         // Ambil product_item_id dari tabel pivot yang sudah digunakan dalam repeater saat ini
         $usedInCurrentRepeater = collect($allDetailTransactions)
-            ->filter(fn($row) => isset($row['uuid']) && $row['uuid'] !== $currentUuid)
-            ->flatMap(fn($row) => $row['productItems'] ?? [])
+            ->filter(fn($row) => is_array($row) && isset($row['uuid']) && $row['uuid'] !== $currentUuid)
+            ->flatMap(fn($row) => is_array($row['productItems'] ?? null) ? $row['productItems'] : [])
             ->unique()
             ->values()
             ->all();
@@ -289,6 +309,11 @@ class TransactionResource extends Resource
         $details = collect($get('detailTransactions') ?? []);
 
         return $details->sum(function ($item) {
+            // Skip if not array
+            if (!is_array($item)) {
+                return 0;
+            }
+
             $quantity = (int)($item['quantity'] ?? 1);
 
             // Ensure quantity is at least 1
@@ -376,7 +401,7 @@ class TransactionResource extends Resource
     }
 
     /**
-     * Calculate grand total (total before discount - discount + duration)
+     * Calculate grand total (total before discount * duration - discount + additional fees)
      */
     protected static function calculateGrandTotal(Get $get): int
     {
@@ -390,11 +415,27 @@ class TransactionResource extends Resource
         // Apply duration to base price
         $totalWithDuration = $totalBeforeDiscount * $duration;
 
-        // Calculate discount
+        // Calculate discount based on total with duration
         $discountAmount = static::calculateDiscountAmount($get, $totalBeforeDiscount);
 
-        // Final total
-        return max(0, $totalWithDuration - $discountAmount);
+        // Calculate additional services fees from repeater
+        $additionalFees = 0;
+        $additionalServices = $get('additional_services') ?? [];
+        if (is_array($additionalServices)) {
+            foreach ($additionalServices as $service) {
+                if (is_array($service) && isset($service['amount'])) {
+                    $additionalFees += (int)($service['amount'] ?? 0);
+                }
+            }
+        }
+
+        // Legacy support for old structure
+        $additionalFees += (int)($get('additional_fee_1_amount') ?? 0);
+        $additionalFees += (int)($get('additional_fee_2_amount') ?? 0);
+        $additionalFees += (int)($get('additional_fee_3_amount') ?? 0);
+
+        // Final total: (base price * duration) - discount + additional fees
+        return max(0, $totalWithDuration - $discountAmount + $additionalFees);
     }
 
     protected static function getGrandTotalValue(Get $get): int
@@ -408,25 +449,75 @@ class TransactionResource extends Resource
     protected static function updateBookingStatusBasedOnPayment(Set $set, int $downPayment, int $grandTotal): void
     {
         if ($grandTotal <= 0) {
-            $set('booking_status', 'cancelled');
+            $set('booking_status', 'cancel');
             return;
         }
 
         if ($downPayment <= 0) {
-            $set('booking_status', 'cancelled');
+            $set('booking_status', 'cancel');
         } elseif ($downPayment >= $grandTotal) {
-            // Full payment - keep existing status if it's rented/finished, otherwise set to paid
+            // Full payment - keep existing status if it's on_rented/done, otherwise set to paid
             $currentStatus = request()->input('booking_status');
-            if (!in_array($currentStatus, ['rented', 'finished'])) {
+            if (!in_array($currentStatus, ['on_rented', 'done'])) {
                 $set('booking_status', 'paid');
             }
         } else {
             // Partial payment
             $minPayment = max(0, floor($grandTotal * 0.5));
             if ($downPayment >= $minPayment) {
-                $set('booking_status', 'pending');
+                $set('booking_status', 'booking');
             } else {
-                $set('booking_status', 'cancelled');
+                $set('booking_status', 'cancel');
+            }
+        }
+    }
+
+    /**
+     * Validate product availability for the given date range
+     */
+    protected static function validateProductAvailability(Get $get, Carbon $startDate, Carbon $endDate): void
+    {
+        $detailTransactions = $get('detailTransactions') ?? [];
+
+        foreach ($detailTransactions as $detailTransaction) {
+            // Skip if not array or no product selected
+            if (!is_array($detailTransaction) || empty($detailTransaction['selection_key'])) {
+                continue;
+            }
+
+            $selectionKey = $detailTransaction['selection_key'];
+            $quantity = (int)($detailTransaction['quantity'] ?? 1);
+
+            if (str_starts_with($selectionKey, 'bundling-')) {
+                $bundlingId = (int)substr($selectionKey, 9);
+                $bundling = \App\Models\Bundling::find($bundlingId);
+
+                if ($bundling) {
+                    $available = $bundling->getAvailableQuantityForPeriod($startDate, $endDate, $quantity);
+
+                    if ($available <= 0) {
+                        Notification::make()
+                            ->warning()
+                            ->title('Bundling Availability Issue')
+                            ->body("Bundling '{$bundling->name}' may not be available for the selected date range.")
+                            ->send();
+                    }
+                }
+            } elseif (str_starts_with($selectionKey, 'produk-')) {
+                $productId = (int)substr($selectionKey, 7);
+                $product = \App\Models\Product::find($productId);
+
+                if ($product) {
+                    $available = $product->getAvailableQuantityForPeriod($startDate, $endDate);
+
+                    if ($available < $quantity) {
+                        Notification::make()
+                            ->warning()
+                            ->title('Product Availability Issue')
+                            ->body("Product '{$product->name}' may not have sufficient quantity available for the selected date range.")
+                            ->send();
+                    }
+                }
             }
         }
     }
@@ -446,8 +537,8 @@ class TransactionResource extends Resource
                 ->columnSpanFull(),
             Grid::make('Durasi')
                 ->schema([
-                    Select::make('user_id')
-                        ->relationship('user', 'name', fn(Builder $query) => $query->where('status', 'active'))
+                    Select::make('customer_id')
+                        ->relationship('customer', 'name', fn(Builder $query) => $query->where('status', Customer::STATUS_ACTIVE))
                         ->required()
                         ->searchable()
                         ->preload()
@@ -455,34 +546,34 @@ class TransactionResource extends Resource
                         ->columnSpan(1)
                         ->extraAttributes([
                             'aria-label' => 'Select customer for this transaction',
-                            'aria-describedby' => 'user-selection-help',
-                            'id' => 'user_id_select'
+                            'aria-describedby' => 'customer-selection-help',
+                            'id' => 'customer_id_select'
                         ])
                         ->afterStateUpdated(function ($state, callable $set) {
-                            $set('user_id', $state);
-                            $user = \App\Models\User::find($state);
-                            $set('user_status', $user ? $user->status : '');
-                            $set('user_email', $user ? $user->email : '');
-                            $phoneNumber = \App\Models\UserPhoneNumber::where('user_id', $state)->first();
-                            $set('user_phone_number', $phoneNumber ? $phoneNumber->phone_number : '');
+                            $set('customer_id', $state);
+                            $customer = \App\Models\Customer::find($state);
+                            $set('customer_status', $customer ? $customer->status : '');
+                            $set('customer_email', $customer ? $customer->email : '');
+                            $phoneNumber = \App\Models\CustomerPhoneNumber::where('customer_id', $state)->first();
+                            $set('customer_phone_number', $phoneNumber ? $phoneNumber->phone_number : '');
                         })
                         ->helperText(function (Get $get) {
-                            $user = User::find($get('user_id'));
+                            $customer = Customer::find($get('customer_id'));
 
-                            if (! $user) {
-                                return new HtmlString('Pilih pengguna untuk melihat detail.');
+                            if (! $customer) {
+                                return new HtmlString('Pilih customer untuk melihat detail.');
                             }
 
-                            $statusColor = match ($user->status) {
-                                'active' => 'text-green-600',
-                                'blacklist' => 'text-red-600',
+                            $statusColor = match ($customer->status) {
+                                Customer::STATUS_ACTIVE => 'text-green-600',
+                                Customer::STATUS_BLACKLIST => 'text-red-600',
                                 default => 'text-gray-600',
                             };
 
                             return new HtmlString(
-                                "Status: <strong class=\"{$statusColor}\">{$user->status}</strong><br>" .
-                                    "Email: <strong>{$user->email}</strong><br>" .
-                                    "Phone: <strong>{$user->phone_number}</strong>"
+                                "Status: <strong class=\"{$statusColor}\">{$customer->status}</strong><br>" .
+                                    "Email: <strong>{$customer->email}</strong><br>" .
+                                    "Phone: <strong>{$customer->phone_number}</strong>"
                             );
                         }),
 
@@ -510,8 +601,8 @@ class TransactionResource extends Resource
                             $duration = (int) $get('duration');
 
                             if ($startDate && $duration) {
-                                $endDate = Carbon::parse($startDate)->addDays($duration - 1)->endOfDay()->format('Y-m-d H:i');
-
+                                // Calculate end date as hours (24 hours * duration)
+                                $endDate = Carbon::parse($startDate)->addHours($duration * 24)->format('Y-m-d H:i');
                                 $set('end_date', $endDate);
                             }
                             $allDetailTransactions = $get('../../detailTransactions') ?? [];
@@ -531,87 +622,82 @@ class TransactionResource extends Resource
                             'id' => 'duration_select'
                         ])
                         ->afterStateUpdated(function ($state, callable $set, callable $get) {
-
                             $startDate = $get('start_date');
                             $duration = (int) $state;
                             if ($startDate && $duration) {
-                                $endDate = Carbon::parse($startDate)->addDays($duration - 1)->endOfDay()->format('Y-m-d H:i:s');
-
+                                // Calculate end date as hours (24 hours * duration)
+                                $endDate = Carbon::parse($startDate)->addHours($duration * 24)->format('Y-m-d H:i:s');
                                 $set('end_date', $endDate);
                             }
                             $allDetailTransactions = $get('../../detailTransactions') ?? [];
                             \App\Filament\Resources\TransactionResource::resolveProductOrBundlingSelection($state, $set, $get, $allDetailTransactions);
                         }),
-                    Placeholder::make('end_date')
+                    DateTimePicker::make('end_date')
                         ->label('End Date')
+                        ->seconds(false)
+                        ->native(false)
+                        ->displayFormat('d M Y, H:i')
+                        ->format('d M Y, H:i')
                         ->reactive()
-                        ->content(function ($get, $set) {
-                            // Validasi start_date dan duration
-                            $startDateRaw = $get('start_date');
-                            $duration = (int) $get('duration');
+                        ->default(function (Get $get) {
+                            $startDate = $get('start_date');
+                            $duration = (int)($get('duration') ?? 1);
+                            if ($startDate && $duration) {
+                                return Carbon::parse($startDate)->addHours($duration * 24)->format('Y-m-d H:i');
+                            }
+                            return null;
+                        })
+                        ->extraAttributes([
+                            'aria-label' => 'Rental end date and time (auto-calculated)',
+                            'aria-describedby' => 'end-date-help',
+                            'id' => 'end_date_picker'
+                        ])
+                        ->helperText(function (Get $get) {
+                            $startDate = $get('start_date');
+                            $duration = (int)($get('duration') ?? 1);
 
-                            if (!$startDateRaw || !$duration) {
-                                return 'Tanggal mulai atau durasi belum diisi.';
+                            if (!$startDate) {
+                                return 'Set start date first to see auto-calculated end date.';
                             }
 
                             try {
-                                $startDate = Carbon::parse($startDateRaw);
+                                $autoEndDate = Carbon::parse($startDate)->addHours($duration * 24);
+                                return 'Auto-calculated: ' . $autoEndDate->format('d M Y, H:i') . ' (' . ($duration * 24) . ' hours)';
                             } catch (\Exception $e) {
-                                return 'Format tanggal tidak valid.';
+                                return 'Invalid start date format.';
                             }
+                        })
+                        ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                            if (!$state || !$get('start_date')) return;
 
-                            // Hitung end_date
-                            $endDate = $startDate->copy()->addDays($duration - 1)->endOfDay();
-                            $set('end_date', $endDate->toDateTimeString());
+                            try {
+                                $startDate = Carbon::parse($get('start_date'));
+                                $endDate = Carbon::parse($state);
 
-                            // Validasi ketersediaan produk/bundling
-                            $detailTransactions = $get('detailTransactions') ?? [];
+                                // Calculate new duration based on manual end date
+                                $newDuration = $startDate->diffInDays($endDate) + 1;
 
-                            foreach ($detailTransactions as $detailTransaction) {
-                                $customId = $detailTransaction['product_id'] ?? '';
-
-                                if (!filled($customId)) continue;
-
-                                if (str_starts_with($customId, 'bundling-')) {
-                                    $bundlingId = (int) substr($customId, 9);
-                                    $bundling = \App\Models\Bundling::find($bundlingId);
-
-                                    if ($bundling) {
-                                        $quantity = $detailTransaction['quantity'] ?? 1;
-                                        $available = $bundling->getAvailableQuantityForPeriod($startDate, $endDate, $quantity);
-
-                                        if ($available <= 0) {
-                                            Notification::make()
-                                                ->danger()
-                                                ->title('Bundling Tidak Tersedia')
-                                                ->body("Bundling tidak tersedia dari {$startDate->format('d M')} hingga {$endDate->format('d M')}.")
-                                                ->send();
-
-                                            return "Bundling tidak tersedia dari {$startDate->format('d M')} hingga {$endDate->format('d M')}.";
-                                        }
-                                    }
-                                } elseif (str_starts_with($customId, 'produk-')) {
-                                    $productId = (int) substr($customId, 7);
-                                    $product = \App\Models\Product::find($productId);
-
-                                    if ($product) {
-                                        $available = $product->getAvailableQuantityForPeriod($startDate, $endDate);
-
-                                        if ($available <= 0) {
-                                            Notification::make()
-                                                ->danger()
-                                                ->title('Produk Tidak Tersedia')
-                                                ->body("Produk {$product->name} tidak tersedia dari {$startDate->format('d M')} hingga {$endDate->format('d M')}.")
-                                                ->send();
-
-                                            return "Produk {$product->name} tidak tersedia dari {$startDate->format('d M')} hingga {$endDate->format('d M')}.";
-                                        }
-                                    }
+                                if ($newDuration < 1) {
+                                    Notification::make()
+                                        ->warning()
+                                        ->title('Invalid Date Range')
+                                        ->body('End date must be after start date.')
+                                        ->send();
+                                    return;
                                 }
-                            }
 
-                            // Return format tanggal akhir
-                            return $endDate->format('d M Y, H:i');
+                                // Update duration based on manual end date
+                                $set('duration', $newDuration);
+
+                                // Validate product availability for new date range
+                                static::validateProductAvailability($get, $startDate, $endDate);
+                            } catch (\Exception $e) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Invalid Date')
+                                    ->body('Please enter a valid end date.')
+                                    ->send();
+                            }
                         })
                 ])
                 ->columns([
@@ -639,7 +725,22 @@ class TransactionResource extends Resource
                                     'lg' => 6,
                                 ])->schema([
                                     Select::make('selection_key')
-                                        ->label('Pilih Produk/Bundling')
+                                        ->label(function (Get $get) {
+                                            // Show current selection in label when editing
+                                            $productId = $get('product_id');
+                                            $bundlingId = $get('bundling_id');
+                                            $isBundling = $get('is_bundling');
+                                            
+                                            if ($productId && !$isBundling) {
+                                                $product = Product::find($productId);
+                                                return $product ? "Pilih Produk/Bundling (Current: {$product->name})" : 'Pilih Produk/Bundling';
+                                            } elseif ($bundlingId && $isBundling) {
+                                                $bundling = Bundling::find($bundlingId);
+                                                return $bundling ? "Pilih Produk/Bundling (Current: {$bundling->name} - Bundle)" : 'Pilih Produk/Bundling';
+                                            }
+                                            
+                                            return 'Pilih Produk/Bundling';
+                                        })
                                         ->searchable()
                                         ->options(function () {
                                             $products = Product::pluck('name', 'id')->mapWithKeys(fn($name, $id) => ["produk-{$id}" => $name]);
@@ -651,6 +752,20 @@ class TransactionResource extends Resource
                                             'aria-label' => 'Select product or bundling package for rental',
                                             'aria-describedby' => 'product-selection-help'
                                         ])
+                                        ->default(function (Get $get) {
+                                            // Pre-populate selection_key based on existing data when editing
+                                            $productId = $get('product_id');
+                                            $bundlingId = $get('bundling_id');
+                                            $isBundling = $get('is_bundling');
+                                            
+                                            if ($productId && !$isBundling) {
+                                                return "produk-{$productId}";
+                                            } elseif ($bundlingId && $isBundling) {
+                                                return "bundling-{$bundlingId}";
+                                            }
+                                            
+                                            return null;
+                                        })
 
                                         // Trigger saat awal data dimuat
                                         ->afterStateHydrated(function ($state, Set $set, Get $get) {
@@ -774,8 +889,8 @@ class TransactionResource extends Resource
 
                                                 // Ambil semua product_item_id yang sudah digunakan dalam repeater saat ini
                                                 $usedInCurrentRepeater = collect($detailTransactions)
-                                                    ->filter(fn($row) => isset($row['uuid']) && $row['uuid'] !== $uuid)
-                                                    ->flatMap(fn($row) => $row['productItems'] ?? [])
+                                                    ->filter(fn($row) => is_array($row) && isset($row['uuid']) && $row['uuid'] !== $uuid)
+                                                    ->flatMap(fn($row) => is_array($row['productItems'] ?? null) ? $row['productItems'] : [])
                                                     ->unique()
                                                     ->values()
                                                     ->all();
@@ -814,8 +929,19 @@ class TransactionResource extends Resource
                                                     $query->whereIn('product_items.id', $result['ids']);
                                                 }
 
-                                                // Pastikan untuk tidak menyertakan ID yang sudah dikeluarkan
-                                                $query->whereNotIn('product_items.id', $excludedIds);
+                                                // When editing, we need to include currently selected items even if they're "excluded"
+                                                $currentlySelectedItems = $get('productItems') ?? [];
+                                                if (is_array($currentlySelectedItems) && !empty($currentlySelectedItems)) {
+                                                    // Include currently selected items OR available items, but exclude other used ones
+                                                    $finalExcludedIds = array_diff($excludedIds, $currentlySelectedItems);
+                                                    $query->where(function($q) use ($finalExcludedIds, $currentlySelectedItems) {
+                                                        $q->whereNotIn('product_items.id', $finalExcludedIds)
+                                                          ->orWhereIn('product_items.id', $currentlySelectedItems);
+                                                    });
+                                                } else {
+                                                    // New transaction - just exclude used items
+                                                    $query->whereNotIn('product_items.id', $excludedIds);
+                                                }
                                             }
                                         )->saveRelationshipsUsing(function (CheckboxList $component, ?array $state, callable $get) {
                                             $detailTransaction = $component->getModelInstance();
@@ -826,6 +952,12 @@ class TransactionResource extends Resource
                                             }
                                         })
                                         ->default(function (Get $get) {
+                                            // If we're editing and there are existing productItems, return those IDs
+                                            $existingProductItems = $get('productItems');
+                                            if (is_array($existingProductItems) && !empty($existingProductItems)) {
+                                                return $existingProductItems;
+                                            }
+                                            
                                             $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
                                             $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
                                             $productId = $get('product_id');
@@ -1022,7 +1154,7 @@ class TransactionResource extends Resource
                                         $grandTotal = static::calculateGrandTotal($get);
                                         if ($grandTotal <= 0) return ['required', 'min:0'];
 
-                                        $min = max(0, floor($grandTotal * 0.5)); // 50% minimum
+                                        $min = max(0, floor($grandTotal * 0.5)); // 50% minimum including fees
 
                                         return [
                                             'required',
@@ -1031,7 +1163,7 @@ class TransactionResource extends Resource
                                             function ($attribute, $value, $fail) use ($min, $grandTotal) {
                                                 $value = (int)$value;
                                                 if ($value < $min) {
-                                                    $fail("Nilai harus minimal Rp " . number_format($min, 0, ',', '.') . " (50% dari total)");
+                                                    $fail("Nilai harus minimal Rp " . number_format($min, 0, ',', '.') . " (50% dari total termasuk additional services)");
                                                 }
                                                 if ($value > $grandTotal) {
                                                     $fail("Nilai tidak boleh melebihi total Rp " . number_format($grandTotal, 0, ',', '.'));
@@ -1047,7 +1179,7 @@ class TransactionResource extends Resource
                                 ->helperText(function (Get $get) {
                                     $grandTotal = static::calculateGrandTotal($get);
                                     $minPayment = max(0, floor($grandTotal * 0.5));
-                                    return 'Pembayaran minimal 50%: Rp ' . number_format($minPayment, 0, ',', '.') .
+                                    return 'Pembayaran minimal 50% (termasuk additional services): Rp ' . number_format($minPayment, 0, ',', '.') .
                                         ' - Maksimal: Rp ' . number_format($grandTotal, 0, ',', '.');
                                 })
                                 ->minValue(function (Get $get) {
@@ -1063,7 +1195,7 @@ class TransactionResource extends Resource
                                     if ($grandTotal <= 0) {
                                         $set('down_payment', 0);
                                         $set('remaining_payment', 0);
-                                        $set('booking_status', 'cancelled');
+                                        $set('booking_status', 'cancel');
                                         return;
                                     }
 
@@ -1120,11 +1252,11 @@ class TransactionResource extends Resource
                         ->schema([
                             ToggleButtons::make('booking_status')
                                 ->options([
-                                    'pending' => 'pending',
+                                    'booking' => 'booking',
                                     'paid' => 'paid',
-                                    'cancelled' => 'cancelled',
-                                    'rented' => 'rented',
-                                    'finished' => 'finished',
+                                    'cancel' => 'cancel',
+                                    'on_rented' => 'on_rented',
+                                    'done' => 'done',
                                 ])
                                 ->extraAttributes([
                                     'aria-label' => 'Select booking status',
@@ -1132,36 +1264,36 @@ class TransactionResource extends Resource
                                     'role' => 'radiogroup'
                                 ])
                                 ->icons([
-                                    'pending' => 'heroicon-o-clock',
-                                    'cancelled' => 'heroicon-o-x-circle',
-                                    'rented' => 'heroicon-o-shopping-bag',
-                                    'finished' => 'heroicon-o-check',
+                                    'booking' => 'heroicon-o-clock',
+                                    'cancel' => 'heroicon-o-x-circle',
+                                    'on_rented' => 'heroicon-o-shopping-bag',
+                                    'done' => 'heroicon-o-check',
                                     'paid' => 'heroicon-o-banknotes',
                                 ])
                                 ->colors([
-                                    'pending' => 'warning',
-                                    'cancelled' => 'danger',
-                                    'rented' => 'info',
-                                    'finished' => 'success',
+                                    'booking' => 'warning',
+                                    'cancel' => 'danger',
+                                    'on_rented' => 'info',
+                                    'done' => 'success',
                                     'paid' => 'success',
                                 ])
                                 ->inline()
                                 ->columnSpanFull()
                                 ->grouped()
                                 ->reactive()
-                                ->default('pending')
+                                ->default('booking')
                                 ->helperText(function (Get $get) {
                                     $status = $get('booking_status');
                                     switch ($status) {
-                                        case 'pending':
+                                        case 'booking':
                                             return new HtmlString('Masih <strong style="color:red">DP</strong> atau <strong style="color:red">belum pelunasan</strong>');
                                         case 'paid':
                                             return new HtmlString('<strong style="color:green">Sewa sudah lunas</strong> tapi <strong style="color:red">barang belum diambil</strong>.');
-                                        case 'rented':
+                                        case 'on_rented':
                                             return new HtmlString('Sewa sudah <strong style="color:blue">lunas</strong> dan barang sudah <strong style="color:blue">diambil</strong>');
-                                        case 'cancelled':
+                                        case 'cancel':
                                             return new HtmlString('<strong style="color:red">Sewa dibatalkan.</strong>');
-                                        case 'finished':
+                                        case 'done':
                                             return new HtmlString('<strong style="color:green">Sudah selesai disewa dan barang sudah diterima.</strong>');
                                     }
                                 })
@@ -1175,12 +1307,17 @@ class TransactionResource extends Resource
 
                                     $grandTotal = static::calculateGrandTotal($get);
 
-                                    // Atur down_payment berdasarkan status
-                                    match ($state) {
-                                        'paid', 'rented', 'finished' => $set('down_payment', $grandTotal),
-                                        'cancelled' => $set('down_payment', 0),
-                                        default => $set('down_payment', max(0, (int)($grandTotal / 2))),
-                                    };
+                                    // Atur down_payment berdasarkan status dan handle cancellation fee
+                                    if (in_array($state, ['paid', 'on_rented', 'done'])) {
+                                        $set('down_payment', $grandTotal);
+                                    } elseif ($state === 'cancel') {
+                                        // Apply cancellation fee (50% of grand total)
+                                        $cancellationFee = (int)floor($grandTotal * 0.5);
+                                        $set('cancellation_fee', $cancellationFee);
+                                        $set('down_payment', $cancellationFee);
+                                    } else {
+                                        $set('down_payment', max(0, (int)($grandTotal / 2)));
+                                    }
 
                                     $isUpdating = false;
                                     $set('remaining_payment', max(0, $grandTotal - $get('down_payment')));
@@ -1193,6 +1330,48 @@ class TransactionResource extends Resource
                                     'aria-describedby' => 'note-help',
                                     'id' => 'rental_note_input'
                                 ]),
+
+                            // Additional Services Fields
+                            Section::make('Additional Services')
+                                ->schema([
+                                    Repeater::make('additional_services')
+                                        ->schema([
+                                            TextInput::make('name')
+                                                ->label('Service Name')
+                                                ->placeholder('e.g., Damage repair, Late return, Extra service')
+                                                ->required()
+                                                ->columnSpan(1),
+                                            TextInput::make('amount')
+                                                ->label('Service Amount')
+                                                ->numeric()
+                                                ->default(0)
+                                                ->minValue(0)
+                                                ->live()
+                                                ->prefix('Rp')
+                                                ->inputMode('decimal')
+                                                ->step(1000)
+                                                ->formatStateUsing(fn ($state) => $state ? number_format($state, 0, '', '') : '')
+                                                ->dehydrateStateUsing(fn ($state) => (int) str_replace(',', '', $state))
+                                                ->afterStateUpdated(fn($state, $set, $get) => $set('../../grand_total', static::calculateGrandTotal($get)))
+                                                ->columnSpan(1),
+                                        ])
+                                        ->columns(2)
+                                        ->addActionLabel('Add Additional Service')
+                                        ->defaultItems(1)
+                                        ->collapsible()
+                                        ->columnSpanFull(),
+
+                                    TextInput::make('cancellation_fee')
+                                        ->label('Cancellation Fee')
+                                        ->numeric()
+                                        ->default(0)
+                                        ->minValue(0)
+                                        ->readonly()
+                                        ->helperText('Automatically calculated when status is set to cancel')
+                                        ->columnSpanFull(),
+                                ])
+                                ->collapsible()
+                                ->columnSpanFull(),
 
 
 
@@ -1215,7 +1394,7 @@ class TransactionResource extends Resource
                             ->schema([
                                 TextEntry::make('booking_transaction_id')
                                     ->label('Transaction ID'),
-                                TextEntry::make('user.name')
+                                TextEntry::make('customer.name')
                                     ->label('Customer'),
                                 TextEntry::make('start_date')
                                     ->label('Start Date')
@@ -1230,10 +1409,10 @@ class TransactionResource extends Resource
                                     ->label('Status')
                                     ->badge()
                                     ->color(fn(string $state): string => match ($state) {
-                                        'pending' => 'warning',
-                                        'cancelled' => 'danger',
-                                        'rented' => 'info',
-                                        'finished' => 'success',
+                                        'booking' => 'warning',
+                                        'cancel' => 'danger',
+                                        'on_rented' => 'info',
+                                        'done' => 'success',
                                         'paid' => 'success',
                                     }),
                             ])
@@ -1263,7 +1442,7 @@ class TransactionResource extends Resource
 
                 InfoSection::make('Financial Information')
                     ->schema([
-                        InfoGrid::make(3)
+                        InfoGrid::make(4)
                             ->schema([
                                 TextEntry::make('grand_total')
                                     ->label('Grand Total')
@@ -1283,6 +1462,14 @@ class TransactionResource extends Resource
                                         fn(string $state): string =>
                                         $state == '0' ? 'LUNAS' : 'Rp ' . number_format((int) $state, 0, ',', '.')
                                     ),
+                                TextEntry::make('cancellation_fee')
+                                    ->label('Cancellation Fee')
+                                    ->formatStateUsing(
+                                        fn(?string $state, $record): string =>
+                                        $record->booking_status === 'cancel' && $state && $state != '0' ? 'Rp ' . number_format((int) $state, 0, ',', '.') : '-'
+                                    )
+                                    ->color(fn($record): string => $record->booking_status === 'cancel' ? 'danger' : 'gray')
+                                    ->visible(fn($record): bool => $record->booking_status === 'cancel'),
                             ])
                     ]),
 
@@ -1301,7 +1488,7 @@ class TransactionResource extends Resource
     public static function getEagerLoadRelations(): array
     {
         return [
-            'user.userPhoneNumbers',
+            'customer.customerPhoneNumbers',
             'detailTransactions.product',
             'detailTransactions.bundling.products', // jika bundling membutuhkan eager load produk
             'detailTransactions.productItem',
@@ -1314,16 +1501,52 @@ class TransactionResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->modifyQueryUsing(function (Builder $query) {
-                return $query->with([
-                    'user:id,name,email',
-                    'user.userPhoneNumbers:id,user_id,phone_number',
+                // Check for table search parameter
+                $searchTerm = request('tableSearch');
+                
+                $query->with([
+                    'customer:id,name,email',
+                    'customer.customerPhoneNumbers:id,customer_id,phone_number',
                     'detailTransactions:id,transaction_id,product_id,bundling_id,quantity',
                     'detailTransactions.product:id,name',
                     'detailTransactions.bundling:id,name',
                     'detailTransactions.productItems:id,serial_number,product_id',
                     'promo:id,name'
                 ]);
+                
+                if ($searchTerm && strlen($searchTerm) >= 2) {
+                    $query->where(function ($q) use ($searchTerm) {
+                        // Search in transaction ID
+                        $q->where('booking_transaction_id', 'LIKE', "%{$searchTerm}%")
+                          // Search in customer name
+                          ->orWhereHas('customer', function ($customerQuery) use ($searchTerm) {
+                              $customerQuery->where('name', 'LIKE', "%{$searchTerm}%");
+                          })
+                          // Search in product names
+                          ->orWhereHas('detailTransactions.product', function ($productQuery) use ($searchTerm) {
+                              $productQuery->where('name', 'LIKE', "%{$searchTerm}%");
+                          })
+                          // Search in bundling names
+                          ->orWhereHas('detailTransactions.bundling', function ($bundlingQuery) use ($searchTerm) {
+                              $bundlingQuery->where('name', 'LIKE', "%{$searchTerm}%");
+                          })
+                          // Search in serial numbers
+                          ->orWhereHas('detailTransactions.productItems', function ($serialQuery) use ($searchTerm) {
+                              $serialQuery->where('serial_number', 'LIKE', "%{$searchTerm}%");
+                          });
+                    });
+                }
+                
+                return $query;
             })
+            ->searchable()
+            ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
+            ->searchOnBlur()
+            ->searchDebounce('500ms')
+            ->globalSearch(
+                keyBindings: ['command+k', 'ctrl+k'],
+                placeholder: 'Search by product name, bundle name, or serial number...'
+            )
             ->columns([
                 TextColumn::make('booking_transaction_id')
                     ->label('ID')
@@ -1331,15 +1554,15 @@ class TransactionResource extends Resource
                     ->size(TextColumnSize::ExtraSmall)
 
                     ->sortable(),
-                TextColumn::make('user.name')
+                TextColumn::make('customer.name')
                     ->label('Nama')
                     ->size(TextColumnSize::ExtraSmall)
 
                     ->searchable(),
-                TextColumn::make('user.phone_number')
+                TextColumn::make('customer.phone_number')
                     ->label('WA')
                     ->formatStateUsing(fn($state) => '+62' . ltrim($state, '0'))
-                    ->url(fn($record) => 'https://wa.me/62' . ltrim($record->user->phone_number, '0'))
+                    ->url(fn($record) => 'https://wa.me/62' . ltrim($record->customer->phone_number, '0'))
                     ->openUrlInNewTab()
                     ->color('success')
                     ->size(TextColumnSize::ExtraSmall)
@@ -1351,30 +1574,36 @@ class TransactionResource extends Resource
                     ->size(TextColumnSize::ExtraSmall)
                     ->getStateUsing(function ($record) {
                         $products = [];
+                        $searchTerm = request('tableSearch');
 
                         // Use already eager-loaded relationships to avoid N+1 queries
                         if ($record->relationLoaded('detailTransactions')) {
                             foreach ($record->detailTransactions as $detail) {
                                 if ($detail->bundling_id && $detail->relationLoaded('bundling') && $detail->bundling) {
-                                    $products[] = $detail->bundling->name . ' (Bundle)';
+                                    $bundleName = $detail->bundling->name . ' (Bundle)';
+                                    $products[] = static::highlightSearchTerm($bundleName, $searchTerm);
                                 } elseif ($detail->product_id && $detail->relationLoaded('product') && $detail->product) {
-                                    $products[] = $detail->product->name;
+                                    $productName = $detail->product->name;
+                                    $products[] = static::highlightSearchTerm($productName, $searchTerm);
                                 }
                             }
                         }
 
                         return implode(', ', array_unique($products)) ?: 'N/A';
                     })
+                    ->html()
+                    ->searchable()
                     ->wrap(),
                 TextColumn::make('detailTransactions.productItems.serial_number')
                     ->label('S/N')
                     ->size(TextColumnSize::ExtraSmall)
                     ->formatStateUsing(function ($record) {
                         $serialNumbers = [];
+                        $searchTerm = request('tableSearch');
 
                         foreach ($record->detailTransactions as $detail) {
                             foreach ($detail->productItems as $item) {
-                                $serialNumbers[] = $item->serial_number;
+                                $serialNumbers[] = static::highlightSearchTerm($item->serial_number, $searchTerm);
                             }
                         }
 
@@ -1392,6 +1621,7 @@ class TransactionResource extends Resource
                         return implode(', ', $first5) . " <span style='color: #6b7280; font-style: italic;'>dan {$remaining} lainnya</span>";
                     })
                     ->html()
+                    ->searchable()
                     ->wrap(),
                 TextColumn::make('start_date')
                     ->label('Start')
@@ -1417,7 +1647,48 @@ class TransactionResource extends Resource
                     ->size(TextColumnSize::ExtraSmall),
                 TextInputColumn::make('down_payment')
                     ->label('DP')
+                    ->type('number')
                     ->default(fn(Transaction $record): int => (int)($record->grand_total / 2))
+                    ->rules([
+                        'required',
+                        'numeric',
+                        'min:0',
+                    ])
+                    ->afterStateUpdated(function ($record, $state) {
+                        if ($record && $state !== null) {
+                            $grandTotal = (int)$record->grand_total;
+                            $downPayment = (int)$state;
+                            
+                            // Calculate remaining payment
+                            $remainingPayment = max(0, $grandTotal - $downPayment);
+                            
+                            // Update the record
+                            $record->update([
+                                'down_payment' => $downPayment,
+                                'remaining_payment' => $remainingPayment,
+                            ]);
+                            
+                            // Update booking status based on payment
+                            if ($grandTotal <= 0) {
+                                $record->update(['booking_status' => 'cancel']);
+                            } elseif ($downPayment <= 0) {
+                                $record->update(['booking_status' => 'cancel']);
+                            } elseif ($downPayment >= $grandTotal) {
+                                // Full payment - set to paid if not already on_rented/done
+                                if (!in_array($record->booking_status, ['on_rented', 'done'])) {
+                                    $record->update(['booking_status' => 'paid']);
+                                }
+                            } else {
+                                // Partial payment
+                                $minPayment = max(0, floor($grandTotal * 0.5));
+                                if ($downPayment >= $minPayment) {
+                                    $record->update(['booking_status' => 'booking']);
+                                } else {
+                                    $record->update(['booking_status' => 'cancel']);
+                                }
+                            }
+                        }
+                    })
                     ->sortable(),
 
                 TextColumn::make('remaining_payment')
@@ -1428,76 +1699,135 @@ class TransactionResource extends Resource
                     ))
                     ->sortable(),
 
+                TextColumn::make('cancellation_fee')
+                    ->label('Cancel Fee')
+                    ->size(TextColumnSize::ExtraSmall)
+                    ->formatStateUsing(fn(?string $state): HtmlString => new HtmlString(
+                        $state && $state != '0' ? 'Rp ' . number_format((int) $state, 0, ',', '.') : '-'
+                    ))
+                    ->visible(fn($record) => $record->booking_status === 'cancel')
+                    ->color('danger'),
                 TextColumn::make('booking_status')
                     ->label('')
                     ->wrap()
                     ->size(TextColumnSize::ExtraSmall)
                     ->icon(fn(string $state): string => match ($state) {
-                        'pending' => 'heroicon-o-clock',
-                        'cancelled' => 'heroicon-o-x-circle',
-                        'rented' => 'heroicon-o-shopping-bag',
-                        'finished' => 'heroicon-o-check',
+                        'booking' => 'heroicon-o-clock',
+                        'cancel' => 'heroicon-o-x-circle',
+                        'on_rented' => 'heroicon-o-shopping-bag',
+                        'done' => 'heroicon-o-check',
                         'paid' => 'heroicon-o-banknotes',
+                        // Legacy status mapping for existing data
+                        'booking' => 'heroicon-o-clock',
+                        'cancel' => 'heroicon-o-x-circle',
+                        'on_rented' => 'heroicon-o-shopping-bag',
+                        'done' => 'heroicon-o-check',
                     })
                     ->color(fn(string $state): string => match ($state) {
-                        'pending' => 'warning',
-                        'cancelled' => 'danger',
-                        'rented' => 'info',
-                        'finished' => 'success',
+                        'booking' => 'warning',
+                        'cancel' => 'danger',
+                        'on_rented' => 'info',
+                        'done' => 'success',
                         'paid' => 'success',
+                        // Legacy status mapping for existing data
+                        'booking' => 'warning',
+                        'cancel' => 'danger',
+                        'on_rented' => 'info',
+                        'done' => 'success',
                     }),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('user.name'),
+                Tables\Filters\SelectFilter::make('customer_id')
+                    ->relationship('customer', 'name')
+                    ->searchable()
+                    ->preload(),
                 Tables\Filters\SelectFilter::make('booking_status')
+                    ->multiple()
                     ->options([
-                        'pending' => 'pending',
-                        'cancelled' => 'cancelled',
-                        'rented' => 'rented',
-                        'finished' => 'finished',
-                        'paid' => 'paid',
-                    ]),
+                        'booking' => 'Booking',
+                        'cancel' => 'Cancel',
+                        'on_rented' => 'On Rented',
+                        'done' => 'Done',
+                        'paid' => 'Paid',
+                    ])
+                    ->default(['booking', 'paid', 'on_rented']),
+            ])
+            ->headerActions([
+                \Filament\Actions\Action::make('export_settings')
+                    ->label('Export Settings')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->color('gray')
+                    ->form([
+                        \Filament\Forms\Components\CheckboxList::make('included_columns')
+                            ->label('Select Columns to Export')
+                            ->options(\App\Models\ExportSetting::getAvailableColumns('TransactionResource'))
+                            ->default(function () {
+                                $settings = \App\Models\ExportSetting::getSettings('TransactionResource');
+                                return $settings['included_columns'] ?? [];
+                            })
+                            ->columns(2)
+                            ->required()
+                    ])
+                    ->action(function (array $data) {
+                        $settings = [
+                            'included_columns' => $data['included_columns'],
+                            'excluded_columns' => ['serial_numbers', 'customer_phone'] // Keep these excluded by default
+                        ];
+                        \App\Models\ExportSetting::updateSettings('TransactionResource', $settings);
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->title('Export settings updated successfully')
+                            ->success()
+                            ->send();
+                    })
+                    ->modalHeading('Configure Export Columns')
+                    ->modalSubmitActionLabel('Save Settings'),
+                \Filament\Actions\ExportAction::make()
+                    ->exporter(TransactionExporter::class)
+                    ->label('Export Transactions')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('success')
+                    ->formats([
+                        ExportFormat::Xlsx,
+                        ExportFormat::Csv,
+                    ])
+                    ->fileName(fn (): string => 'transactions-' . now()->format('Y-m-d-H-i-s'))
+                    ->columnMapping(false)
+                    ->modalHeading('Export Transaction Data')
+                    ->modalDescription('Export transaction data to Excel or CSV format. You can choose the export format and date range.')
+                    ->modalSubmitActionLabel('Export')
             ])
             ->actions([
                 BulkActionGroup::make([
-                    Action::make('pending')
-                        ->icon('heroicon-o-clock') // Ikon untuk action
-                        ->color('warning') // Warna action (warning biasanya kuning/orange)
-                        ->label('Pending') // Label yang ditampilkan
-                        ->requiresConfirmation() // Memastikan action memerlukan konfirmasi sebelum dijalankan
-                        ->modalHeading('Ubah Status -> PENDING')
-                        ->modalDescription(fn(): HtmlString => new HtmlString('Apakah Anda yakin ingin mengubah status booking menjadi Pending? <br> <strong style="color:red">Harap sesuaikan kolom DP, Jika sudah lunas maka action akan gagal</strong>')) // Deskripsi modal konfirmasi
-                        ->modalSubmitActionLabel('Ya, Ubah Status') // Label tombol konfirmasi
-                        ->modalCancelActionLabel('Batal') // Label tombol batal
-
+                    Action::make('booking')
+                        ->icon('heroicon-o-clock')
+                        ->color('warning')
+                        ->label('Booking')
+                        ->requiresConfirmation()
+                        ->modalHeading('Ubah Status -> BOOKING')
+                        ->modalDescription(fn(): HtmlString => new HtmlString('Apakah Anda yakin ingin mengubah status booking menjadi Booking? <br> <strong style="color:red">Harap sesuaikan kolom DP, Jika sudah lunas maka action akan gagal</strong>'))
+                        ->modalSubmitActionLabel('Ya, Ubah Status')
+                        ->modalCancelActionLabel('Batal')
                         ->action(function (Transaction $record) {
-                            // Ambil data dari record langsung
                             $downPayment = (int) ($record->down_payment ?? 0);
                             $grandTotal = (int) ($record->grand_total ?? 0);
 
-                            // Validasi: cek apakah DP sama dengan grand total
                             if ($downPayment === $grandTotal) {
                                 Notification::make()
                                     ->danger()
                                     ->title('UBAH STATUS GAGAL')
-                                    ->body('Sesuaikan DP, jika sudah lunas maka statusnya adalah "Paid", "Rented", atau "Finished"')
+                                    ->body('Sesuaikan DP, jika sudah lunas maka statusnya adalah "Paid", "on_rented", atau "Done"')
                                     ->send();
-
-                                return; // Hentikan eksekusi jika kondisi tidak sesuai
+                                return;
                             }
 
                             try {
-                                // Update status booking menjadi 'pending'
-                                $record->update(['booking_status' => 'pending']);
-
-                                // Notifikasi sukses
+                                $record->update(['booking_status' => 'booking']);
                                 Notification::make()
                                     ->success()
                                     ->title('Berhasil Mengubah Status Booking Transaksi')
                                     ->send();
                             } catch (\Exception $e) {
-                                // Tangani error saat update
-
                                 Notification::make()
                                     ->danger()
                                     ->title('Gagal Update Status')
@@ -1524,39 +1854,37 @@ class TransactionResource extends Resource
                                 ->body('Status transaksi berhasil diubah menjadi "Paid" dan down payment disesuaikan dengan grand total.')
                                 ->send();
                         }),
-                    Action::make('cancelled')
+                    Action::make('cancel')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
-                        ->label('cancelled')
+                        ->label('cancel')
                         ->requiresConfirmation()
                         ->action(function (Transaction $record) {
+                            // Apply 50% cancellation fee
+                            $cancellationFee = (int)floor($record->grand_total * 0.5);
                             $record->update([
-                                'booking_status' => 'cancelled',
-                                'down_payment' => $record->grand_total, // Set down_payment sama dengan grand_total
-
+                                'booking_status' => 'cancel',
+                                'cancellation_fee' => $cancellationFee,
+                                'down_payment' => $cancellationFee,
                             ]);
-
-
 
                             Notification::make()
                                 ->success()
                                 ->title('Berhasil Mengubah Status Booking Transaksi')
+                                ->body('Biaya pembatalan 50% telah diterapkan.')
                                 ->send();
                         }),
 
-                    Action::make('rented')
+                    Action::make('on_rented')
                         ->icon('heroicon-o-shopping-bag')
                         ->color('info')
-                        ->label('rented')
+                        ->label('on_rented')
                         ->requiresConfirmation()
                         ->action(function (Transaction $record) {
                             $record->update([
-                                'booking_status' => 'rented',
-                                'down_payment' => $record->grand_total, // Set down_payment sama dengan grand_total
-
+                                'booking_status' => 'on_rented',
+                                'down_payment' => $record->grand_total,
                             ]);
-
-
 
                             Notification::make()
                                 ->success()
@@ -1564,15 +1892,13 @@ class TransactionResource extends Resource
                                 ->send();
                         }),
 
-                    Action::make('finished')
+                    Action::make('done')
                         ->icon('heroicon-o-check')
                         ->color('success')
-                        ->label('finished')
+                        ->label('done')
                         ->requiresConfirmation()
                         ->action(function (Transaction $record) {
-                            $record->update(['booking_status' => 'finished']);
-
-
+                            $record->update(['booking_status' => 'done']);
 
                             Notification::make()
                                 ->success()
@@ -1638,16 +1964,14 @@ class TransactionResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     DeleteBulkAction::make()
                         ->label('hapus'),
-                    BulkAction::make('pending')
+                    BulkAction::make('booking')
                         ->icon('heroicon-o-clock')
                         ->color('warning')
-                        ->label('Pending')
+                        ->label('Booking')
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
-
-
                         ->action(function (Collection $records) {
-                            $records->each->update(['booking_status' => 'pending']);
+                            $records->each->update(['booking_status' => 'booking']);
                             Notification::make()
                                 ->success()
                                 ->title('Berhasil Mengubah Status Booking Transaksi')
@@ -1671,48 +1995,53 @@ class TransactionResource extends Resource
                                 ->send();
                         }),
 
-                    BulkAction::make('cancelled')
+                    BulkAction::make('cancel')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
-                        ->label('cancelled')
+                        ->label('cancel')
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
-
-
                         ->action(function (Collection $records) {
-                            $records->each->update(['booking_status' => 'cancelled']);
+                            $records->each(function ($record) {
+                                $cancellationFee = (int)floor($record->grand_total * 0.5);
+                                $record->update([
+                                    'booking_status' => 'cancel',
+                                    'cancellation_fee' => $cancellationFee,
+                                    'down_payment' => $cancellationFee,
+                                ]);
+                            });
                             Notification::make()
                                 ->success()
                                 ->title('Berhasil Mengubah Status Booking Transaksi')
+                                ->body('Biaya pembatalan 50% telah diterapkan pada semua transaksi.')
                                 ->send();
                         }),
 
-                    BulkAction::make('rented')
+                    BulkAction::make('on_rented')
                         ->icon('heroicon-o-shopping-bag')
                         ->color('info')
-                        ->label('rented')
+                        ->label('on_rented')
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
-
-
                         ->action(function (Collection $records) {
-                            $records->each->update(['booking_status' => 'rented']);
+                            $records->each->update([
+                                'booking_status' => 'on_rented',
+                                'down_payment' => DB::raw('grand_total'),
+                            ]);
                             Notification::make()
                                 ->success()
                                 ->title('Berhasil Mengubah Status Booking Transaksi')
                                 ->send();
                         }),
 
-                    BulkAction::make('finished')
+                    BulkAction::make('done')
                         ->icon('heroicon-o-check')
                         ->color('success')
-                        ->label('finished')
+                        ->label('done')
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
-
-
                         ->action(function (Collection $records) {
-                            $records->each->update(['booking_status' => 'finished']);
+                            $records->each->update(['booking_status' => 'done']);
                             Notification::make()
                                 ->success()
                                 ->title('Berhasil Mengubah Status Booking Transaksi')

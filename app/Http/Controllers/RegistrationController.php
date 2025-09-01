@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Models\UserPhoto;
-use App\Models\UserPhoneNumber;
+use App\Models\Customer;
+use App\Models\CustomerPhoto;
+use App\Models\CustomerPhoneNumber;
 use App\Services\WAHAService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -16,7 +16,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Drivers\Imagick\Driver;
 
 class RegistrationController extends Controller
 {
@@ -32,7 +32,7 @@ class RegistrationController extends Controller
         ini_set('memory_limit', '256M');
 
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email|unique:users,email',
+            'email' => 'required|email|unique:customers,email',
             'source_info' => 'required|in:Instagram,Teman,Google,Lainnya,TikTok',
             'name' => 'required|string|max:255',
             'gender' => 'required|in:male,female',
@@ -100,11 +100,10 @@ class RegistrationController extends Controller
                 $request->province
             ]));
 
-            // Buat user baru
-            $user = User::create([
+            // Buat customer baru
+            $customer = Customer::create([
                 'name' => $request->name,
                 'email' => $request->email,
-                'password' => Hash::make('default123'), // Password default
                 'gender' => $request->gender,
                 'address' => $fullAddress,
                 'job' => $request->job,
@@ -113,18 +112,18 @@ class RegistrationController extends Controller
                 'source_info' => $request->source_info,
                 'emergency_contact_name' => $request->emergency_contact_name,
                 'emergency_contact_number' => $request->emergency_contact_number,
-                'status' => 'blacklist', // Default status
+                'status' => Customer::STATUS_BLACKLIST, // Default status
             ]);
 
             // Simpan nomor HP
-            UserPhoneNumber::create([
-                'user_id' => $user->id,
+            CustomerPhoneNumber::create([
+                'customer_id' => $customer->id,
                 'phone_number' => $request->phone1,
             ]);
 
             if ($request->phone2) {
-                UserPhoneNumber::create([
-                    'user_id' => $user->id,
+                CustomerPhoneNumber::create([
+                    'customer_id' => $customer->id,
                     'phone_number' => $request->phone2,
                 ]);
             }
@@ -133,7 +132,7 @@ class RegistrationController extends Controller
             if ($request->hasFile('ktp_photo')) {
                 try {
                     $ktpFile = $request->file('ktp_photo');
-                    Log::info('Registration: Processing KTP photo', ['user_id' => $user->id, 'file_size' => $ktpFile->getSize()]);
+                    Log::info('Registration: Processing KTP photo', ['customer_id' => $customer->id, 'file_size' => $ktpFile->getSize()]);
 
                     // Simpan file sementara
                     $tempPath = storage_path('app/public/temp/' . Str::random(20) . '.' . $ktpFile->getClientOriginalExtension());
@@ -153,7 +152,7 @@ class RegistrationController extends Controller
                         $tempPath = $compressedPath;
                     }
 
-                    $ktpFileName = 'ktp_' . $user->id . '_' . time() . '.' . pathinfo($tempPath, PATHINFO_EXTENSION);
+                    $ktpFileName = 'ktp_' . $customer->id . '_' . time() . '.' . pathinfo($tempPath, PATHINFO_EXTENSION);
 
                     // Buat instance UploadedFile dari file yang sudah dikompres
                     $compressedFile = new UploadedFile(
@@ -165,7 +164,7 @@ class RegistrationController extends Controller
                     );
 
                     // Simpan ke storage
-                    $ktpPath = $compressedFile->storeAs('user_photos', $ktpFileName, 'public');
+                    $ktpPath = $compressedFile->storeAs('customer_photos', $ktpFileName, 'public');
 
                     // Hapus file temp
                     if (file_exists($tempPath)) {
@@ -176,8 +175,8 @@ class RegistrationController extends Controller
                         throw new \Exception('Gagal menyimpan foto KTP.');
                     }
 
-                    UserPhoto::create([
-                        'user_id' => $user->id,
+                    CustomerPhoto::create([
+                        'customer_id' => $customer->id,
                         'photo_type' => 'ktp',
                         'photo' => $ktpPath,
                     ]);
@@ -186,7 +185,7 @@ class RegistrationController extends Controller
                 } catch (\Exception $e) {
                     Log::error('Registration: Failed to upload KTP photo', [
                         'error' => $e->getMessage(),
-                        'user_id' => $user->id
+                        'customer_id' => $customer->id
                     ]);
                     throw new \Exception('Gagal mengunggah foto KTP: ' . $e->getMessage());
                 }
@@ -202,7 +201,7 @@ class RegistrationController extends Controller
                 try {
                     $idFile = $request->file('id_photo');
                     Log::info('Registration: Processing ID photo 1', [
-                        'user_id' => $user->id,
+                        'customer_id' => $customer->id,
                         'original_size' => $idFile->getSize(),
                         'id_type' => $request->id_type,
                         'extension' => $idFile->getClientOriginalExtension()
@@ -226,7 +225,7 @@ class RegistrationController extends Controller
                         $tempPath = $compressedPath;
                     }
 
-                    $idFileName = 'id_1_' . $user->id . '_' . time() . '.' . pathinfo($tempPath, PATHINFO_EXTENSION);
+                    $idFileName = 'id_1_' . $customer->id . '_' . time() . '.' . pathinfo($tempPath, PATHINFO_EXTENSION);
 
                     // Buat instance UploadedFile dari file yang sudah dikompres
                     $compressedFile = new UploadedFile(
@@ -237,7 +236,7 @@ class RegistrationController extends Controller
                         false
                     );
 
-                    $idPath = $compressedFile->storeAs('user_photos', $idFileName, 'public');
+                    $idPath = $compressedFile->storeAs('customer_photos', $idFileName, 'public');
 
                     // Hapus file sementara
                     if (file_exists($tempPath)) {
@@ -248,8 +247,8 @@ class RegistrationController extends Controller
                         throw new \Exception('Failed to store ID photo 1');
                     }
 
-                    UserPhoto::create([
-                        'user_id' => $user->id,
+                    CustomerPhoto::create([
+                        'customer_id' => $customer->id,
                         'photo_type' => 'additional_id_1',
                         'photo' => $idPath,
                         'id_type' => $request->id_type,
@@ -262,12 +261,12 @@ class RegistrationController extends Controller
                 } catch (\Exception $e) {
                     Log::error('Registration: Failed to upload ID photo 1', [
                         'error' => $e->getMessage(),
-                        'user_id' => $user->id
+                        'customer_id' => $customer->id
                     ]);
                     throw new \Exception('Gagal mengunggah foto ID tambahan 1: ' . $e->getMessage());
                 }
             } else {
-                Log::warning('Registration: No ID photo 1 provided', ['user_id' => $user->id]);
+                Log::warning('Registration: No ID photo 1 provided', ['customer_id' => $customer->id]);
             }
 
             // Upload dan simpan foto ID tambahan 2
@@ -276,7 +275,7 @@ class RegistrationController extends Controller
                 try {
                     $idFile2 = $request->file('id_photo_2');
                     Log::info('Registration: Processing ID photo 2', [
-                        'user_id' => $user->id,
+                        'customer_id' => $customer->id,
                         'original_size' => $idFile2->getSize(),
                         'id_type' => $request->id_type_2,
                         'extension' => $idFile2->getClientOriginalExtension()
@@ -300,7 +299,7 @@ class RegistrationController extends Controller
                         $tempPath2 = $compressedPath;
                     }
 
-                    $idFileName2 = 'id_2_' . $user->id . '_' . time() . '.' . pathinfo($tempPath2, PATHINFO_EXTENSION);
+                    $idFileName2 = 'id_2_' . $customer->id . '_' . time() . '.' . pathinfo($tempPath2, PATHINFO_EXTENSION);
 
                     $compressedFile2 = new UploadedFile(
                         $tempPath2,
@@ -310,7 +309,7 @@ class RegistrationController extends Controller
                         false
                     );
 
-                    $idPath2 = $compressedFile2->storeAs('user_photos', $idFileName2, 'public');
+                    $idPath2 = $compressedFile2->storeAs('customer_photos', $idFileName2, 'public');
 
                     if (file_exists($tempPath2)) {
                         @unlink($tempPath2);
@@ -320,8 +319,8 @@ class RegistrationController extends Controller
                         throw new \Exception('Failed to store ID photo 2');
                     }
 
-                    UserPhoto::create([
-                        'user_id' => $user->id,
+                    CustomerPhoto::create([
+                        'customer_id' => $customer->id,
                         'photo_type' => 'additional_id_2',
                         'photo' => $idPath2,
                         'id_type' => $request->id_type_2,
@@ -334,20 +333,20 @@ class RegistrationController extends Controller
                 } catch (\Exception $e) {
                     Log::error('Registration: Failed to upload ID photo 2', [
                         'error' => $e->getMessage(),
-                        'user_id' => $user->id
+                        'customer_id' => $customer->id
                     ]);
                     throw new \Exception('Gagal mengunggah foto ID tambahan 2: ' . $e->getMessage());
                 }
             } else {
-                Log::warning('Registration: No ID photo 2 provided', ['user_id' => $user->id]);
+                Log::warning('Registration: No ID photo 2 provided', ['customer_id' => $customer->id]);
             }
 
             // Trigger event untuk verifikasi email
-            event(new Registered($user));
+            event(new Registered($customer));
 
             // Kirim notifikasi ke admin (email + WhatsApp)
-            $this->sendAdminNotification($user);
-            $this->sendAdminWhatsAppNotification($user);
+            $this->sendAdminNotification($customer);
+            $this->sendAdminWhatsAppNotification($customer);
 
             return redirect()->route('registration.success')
                 ->with('success', 'Registrasi berhasil! Silakan cek email Anda untuk verifikasi.');
@@ -358,37 +357,37 @@ class RegistrationController extends Controller
         }
     }
 
-    private function sendAdminNotification($user)
+    private function sendAdminNotification($customer)
     {
         $adminEmail = 'global.photorental@gmail.com';
-        $editUrl = url('/admin/users/' . $user->id . '/edit');
+        $editUrl = url('/admin/customers/' . $customer->id . '/edit');
 
-        // Get user phone numbers
-        $phone1 = $user->userPhoneNumbers->first()?->phone_number ?? 'Tidak ada';
-        $phone2 = $user->userPhoneNumbers->skip(1)->first()?->phone_number ?? 'Tidak ada';
+        // Get customer phone numbers
+        $phone1 = $customer->customerPhoneNumbers->first()?->phone_number ?? 'Tidak ada';
+        $phone2 = $customer->customerPhoneNumbers->skip(1)->first()?->phone_number ?? 'Tidak ada';
 
         // Create WhatsApp links
         $waLink1 = $phone1 !== 'Tidak ada' ? 'https://wa.me/' . preg_replace('/\D/', '', $phone1) : null;
         $waLink2 = $phone2 !== 'Tidak ada' ? 'https://wa.me/' . preg_replace('/\D/', '', $phone2) : null;
 
-        $subject = 'Registrasi User Baru - Global Photo Rental';
+        $subject = 'Registrasi Customer Baru - Global Photo Rental';
         $message = "
-            <h2>🆕 Registrasi User Baru</h2>
-            <p>User baru telah mendaftar dengan detail:</p>
+            <h2>🆕 Registrasi Customer Baru</h2>
+            <p>Customer baru telah mendaftar dengan detail:</p>
             <table style='border-collapse: collapse; width: 100%;'>
-                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Nama:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$user->name}</td></tr>
-                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Email:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$user->email}</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Nama:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$customer->name}</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Email:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$customer->email}</td></tr>
                 <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>HP 1:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$phone1}</td></tr>
                 <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>HP 2:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$phone2}</td></tr>
-                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Alamat:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$user->address}</td></tr>
-                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Status:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'><span style='background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px;'>{$user->status}</span></td></tr>
-                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Sumber Info:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$user->source_info}</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Alamat:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$customer->address}</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Status:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'><span style='background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px;'>{$customer->status}</span></td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'><strong>Sumber Info:</strong></td><td style='padding: 8px; border: 1px solid #ddd;'>{$customer->source_info}</td></tr>
             </table>
             
             <div style='margin-top: 20px;'>
                 <h3>🔗 Quick Actions:</h3>
                 <p>
-                    <a href='{$editUrl}' style='background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;'>✏️ Edit User</a>";
+                    <a href='{$editUrl}' style='background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;'>✏️ Edit Customer</a>";
 
         if ($waLink1) {
             $message .= "<a href='{$waLink1}' style='background: #25D366; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;'>📱 Chat HP 1</a>";
@@ -400,7 +399,7 @@ class RegistrationController extends Controller
         $message .= "
                 </p>
                 <p style='margin-top: 15px; padding: 10px; background: #f8f9fa; border-left: 4px solid #007bff; font-style: italic;'>
-                    ✅ Silakan lakukan verifikasi dan ubah status user dari <strong>blacklist</strong> menjadi <strong>active</strong>.
+                    ✅ Silakan lakukan verifikasi dan ubah status customer dari <strong>blacklist</strong> menjadi <strong>active</strong>.
                 </p>
             </div>
         ";
@@ -414,33 +413,33 @@ class RegistrationController extends Controller
         }
     }
 
-    private function sendAdminWhatsAppNotification($user)
+    private function sendAdminWhatsAppNotification($customer)
     {
         try {
             $wahaService = new WAHAService();
             $adminPhone = '6281212349564';
-            $editUrl = url('/admin/users/' . $user->id . '/edit');
+            $editUrl = url('/admin/customers/' . $customer->id . '/edit');
 
-            // Get user phone numbers
-            $phone1 = $user->userPhoneNumbers->first()?->phone_number ?? 'Tidak ada';
-            $phone2 = $user->userPhoneNumbers->skip(1)->first()?->phone_number ?? 'Tidak ada';
+            // Get customer phone numbers
+            $phone1 = $customer->customerPhoneNumbers->first()?->phone_number ?? 'Tidak ada';
+            $phone2 = $customer->customerPhoneNumbers->skip(1)->first()?->phone_number ?? 'Tidak ada';
 
             // Create WhatsApp links
             $waLink1 = $phone1 !== 'Tidak ada' ? 'https://wa.me/' . preg_replace('/\D/', '', $phone1) : 'Tidak ada';
             $waLink2 = $phone2 !== 'Tidak ada' ? 'https://wa.me/' . preg_replace('/\D/', '', $phone2) : 'Tidak ada';
 
-            $message = "🆕 *USER BARU MENDAFTAR*\n\n";
-            $message .= "👤 *Nama:* {$user->name}\n";
-            $message .= "📧 *Email:* {$user->email}\n";
+            $message = "🆕 *CUSTOMER BARU MENDAFTAR*\n\n";
+            $message .= "👤 *Nama:* {$customer->name}\n";
+            $message .= "📧 *Email:* {$customer->email}\n";
             $message .= "📱 *HP 1:* {$phone1}\n";
             $message .= "📱 *HP 2:* {$phone2}\n";
-            $message .= "🏠 *Alamat:* {$user->address}\n";
-            $message .= "💼 *Pekerjaan:* " . ($user->job ?: 'Tidak diisi') . "\n";
-            $message .= "📍 *Sumber Info:* {$user->source_info}\n";
-            $message .= "⚠️ *Status:* " . strtoupper($user->status) . "\n\n";
+            $message .= "🏠 *Alamat:* {$customer->address}\n";
+            $message .= "💼 *Pekerjaan:* " . ($customer->job ?: 'Tidak diisi') . "\n";
+            $message .= "📍 *Sumber Info:* {$customer->source_info}\n";
+            $message .= "⚠️ *Status:* " . strtoupper($customer->status) . "\n\n";
 
             $message .= "🔗 *Quick Actions:*\n";
-            $message .= "• Edit User: {$editUrl}\n";
+            $message .= "• Edit Customer: {$editUrl}\n";
 
             if ($waLink1 !== 'Tidak ada') {
                 $message .= "• Chat HP 1: {$waLink1}\n";
@@ -449,7 +448,7 @@ class RegistrationController extends Controller
                 $message .= "• Chat HP 2: {$waLink2}\n";
             }
 
-            $message .= "\n✅ Silakan lakukan verifikasi dan ubah status user.";
+            $message .= "\n✅ Silakan lakukan verifikasi dan ubah status customer.";
 
             $result = $wahaService->sendMessage($adminPhone, $message);
 
@@ -523,66 +522,132 @@ class RegistrationController extends Controller
 
     private function compressImage($imagePath)
     {
-        $manager = new ImageManager(new Driver());
-
         try {
-            $originalSize = filesize($imagePath);
+            // Check if Imagick is available
+            $useImagick = extension_loaded('imagick');
+            $manager = new ImageManager($useImagick ? new \Intervention\Image\Drivers\Imagick\Driver() : new \Intervention\Image\Drivers\Gd\Driver());
 
-            // Baca gambar
+            $originalSize = filesize($imagePath);
+            Log::info('Starting image compression', ['original_size' => $originalSize, 'use_imagick' => $useImagick]);
+
+            // Read image
             $image = $manager->read($imagePath);
 
-            // Resize maksimal 800px lebar
+            // 1. Resize to max width of 800px to reduce file size significantly
             if ($image->width() > 800) {
                 $image->scale(width: 800);
+                Log::info('Image resized to 800px width');
             }
 
-            // Hapus metadata
-            $image->removeMetadata;
+            // 2. Remove metadata to save space
+            $image = $image->removeMetadata();
 
-            // Tentukan ekstensi output
-            $extension = pathinfo($imagePath, PATHINFO_EXTENSION);
-            $allowed = ['jpg', 'jpeg', 'png', 'gif'];
-            $outputExtension = in_array(strtolower($extension), $allowed) ? 'jpg' : 'jpg';
+            // 3. Determine output format: prefer WebP if supported, otherwise JPG
+            $supportsWebP = $this->browserSupportsWebP();
+            $outputFormat = $supportsWebP ? 'webp' : 'jpg';
+            $outputExtension = $supportsWebP ? '.webp' : '.jpg';
 
             $tempDir = storage_path('app/public/temp');
             if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
 
-            $compressedFileName = 'compressed_' . Str::random(10) . '.jpg';
+            $compressedFileName = 'compressed_' . Str::random(10) . $outputExtension;
             $compressedPath = $tempDir . '/' . $compressedFileName;
 
-            // Coba kualitas dari 70 → 50 → 30 → 20
-            $qualities = [70, 60, 50, 40, 30, 20];
+            // 4. Apply progressive compression with quality reduction until file < 1MB
+            $qualities = [85, 75, 65, 55, 45, 35, 25, 15];
+            $targetSize = 1024 * 1024; // 1MB
+            $finalQuality = 85;
 
             foreach ($qualities as $quality) {
-                $image->toJpeg($quality)->save($compressedPath);
+                if ($outputFormat === 'webp') {
+                    $image->toWebp($quality)->save($compressedPath);
+                } else {
+                    $image->toJpeg($quality)->save($compressedPath);
+                }
 
-                if (filesize($compressedPath) < 1_000_000) { // < 1MB
+                $currentSize = filesize($compressedPath);
+                $finalQuality = $quality;
+
+                if ($currentSize < $targetSize) {
                     break;
                 }
             }
 
-            // Jika masih besar, paksa 800px + kualitas 15
-            if (filesize($compressedPath) >= 1_000_000) {
+            // 5. If still > 1MB, try more aggressive resize
+            if (filesize($compressedPath) >= $targetSize) {
+                Log::info('File still too large, applying aggressive resize');
                 $image = $manager->read($imagePath);
-                $image->scale(width: 600)->removeMetadata;
-                $image->toJpeg(15)->save($compressedPath);
+                $image->scale(width: 600)->removeMetadata();
+                
+                if ($outputFormat === 'webp') {
+                    $image->toWebp(20)->save($compressedPath);
+                } else {
+                    $image->toJpeg(20)->save($compressedPath);
+                }
+                $finalQuality = 20;
+            }
+
+            // 6. Apply Imagick optimization if available
+            if ($useImagick && class_exists('Imagick')) {
+                try {
+                    $imagick = new \Imagick($compressedPath);
+                    
+                    // Strip all metadata and profiles
+                    $imagick->stripImage();
+                    
+                    // Optimize for web
+                    $imagick->setImageFormat($outputFormat === 'webp' ? 'WEBP' : 'JPEG');
+                    
+                    // Apply additional optimization
+                    if (method_exists($imagick, 'optimizeImageLayers')) {
+                        $imagick->optimizeImageLayers();
+                    }
+                    
+                    // Set compression quality
+                    $imagick->setImageCompressionQuality($finalQuality);
+                    
+                    // Write optimized image
+                    $imagick->writeImage($compressedPath);
+                    $imagick->destroy();
+                    
+                    Log::info('Applied Imagick optimization');
+                } catch (\Exception $e) {
+                    Log::warning('Imagick optimization failed: ' . $e->getMessage());
+                }
             }
 
             $finalSize = filesize($compressedPath);
             $compressionRatio = round(($originalSize - $finalSize) / $originalSize * 100);
+            $compressionInfo = [
+                'original_size' => $originalSize,
+                'final_size' => $finalSize,
+                'compression_ratio' => $compressionRatio,
+                'format' => $outputFormat,
+                'quality' => $finalQuality,
+                'final_width' => 'N/A'
+            ];
 
-            Log::info("Image compressed: {$originalSize} → {$finalSize} bytes ({$compressionRatio}% saved)", [
-                'file' => basename($imagePath),
-                'quality' => $quality ?? 15,
-                'width' => $image->width(),
-            ]);
+            // Get final width for logging
+            try {
+                $finalImage = $manager->read($compressedPath);
+                $compressionInfo['final_width'] = $finalImage->width();
+            } catch (\Exception $e) {
+                // Ignore if we can't read final dimensions
+            }
 
-            return 'temp/' . $compressedFileName; // Path relatif untuk Storage::disk('public')
+            Log::info("Image compression completed", $compressionInfo);
+
+            return 'temp/' . $compressedFileName;
         } catch (\Exception $e) {
-            Log::error('Failed to compress image: ' . $e->getMessage());
-            // Jika gagal, kembalikan file asli (tapi ini bisa >1MB)
-            $copyName = 'temp/original_' . basename($imagePath);
-            copy($imagePath, storage_path('app/public/' . $copyName));
+            Log::error('Image compression failed: ' . $e->getMessage(), [
+                'original_path' => $imagePath,
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // Fallback: copy original file
+            $copyName = 'temp/original_' . Str::random(10) . '.' . pathinfo($imagePath, PATHINFO_EXTENSION);
+            $fallbackPath = storage_path('app/public/' . $copyName);
+            copy($imagePath, $fallbackPath);
             return $copyName;
         }
     }

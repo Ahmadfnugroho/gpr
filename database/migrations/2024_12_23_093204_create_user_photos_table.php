@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->string('photo_type')->nullable();
+            $table->string('id_type')->nullable()->comment('Type of ID document (KK, SIM, NPWP, etc.)');
             $table->string('photo');
             $table->softDeletes();
 

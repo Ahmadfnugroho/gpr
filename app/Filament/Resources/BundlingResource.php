@@ -63,12 +63,12 @@ class BundlingResource extends Resource
     {
         // Clean and normalize search term
         $searchTerm = trim(strtolower($search));
-        
+
         // If empty search, do nothing
         if (empty($searchTerm)) {
             return;
         }
-        
+
         // Override default search behavior to search for exact phrase only
         $query->where(function ($query) use ($searchTerm) {
             $query->whereRaw('LOWER(bundlings.name) LIKE ?', ['%' . $searchTerm . '%'])
@@ -83,12 +83,12 @@ class BundlingResource extends Resource
     public static function getGlobalSearchResultDetails(\Illuminate\Database\Eloquent\Model $record): array
     {
         $today = Carbon::now();
-        
+
         // Get latest transaction dates
         $latestTransaction = $record->detailTransactions()
             ->with('transaction')
             ->whereHas('transaction', function ($query) {
-                $query->where('booking_status', '!=', 'cancelled');
+                $query->where('booking_status', '!=', 'cancel');
             })
             ->latest('created_at')
             ->first();
@@ -103,7 +103,7 @@ class BundlingResource extends Resource
         // Check availability based on current active transactions
         $hasActiveTransaction = $record->detailTransactions()
             ->whereHas('transaction', function ($query) use ($today) {
-                $query->where('booking_status', '!=', 'cancelled')
+                $query->where('booking_status', '!=', 'cancel')
                     ->where('start_date', '<=', $today)
                     ->where('end_date', '>=', $today);
             })
@@ -141,7 +141,7 @@ class BundlingResource extends Resource
                     ->numeric()
                     ->prefix('Rp'),
 
-Repeater::make('bundlingProducts')
+                Repeater::make('bundlingProducts')
                     ->relationship('bundlingProducts') // relasi hasMany ke model pivot
                     ->label('Produk dalam Bundling')
                     ->schema([

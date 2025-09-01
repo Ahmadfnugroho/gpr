@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('user_photos', function (Blueprint $table) {
-            $table->string('id_type')->nullable()->after('photo_type')->comment('Type of ID document (KK, SIM, NPWP, etc.)');
+        Schema::table('transactions', function (Blueprint $table) {
+            $table->foreignId('customer_id')->nullable()->after('user_id')->constrained()->onDelete('cascade');
         });
     }
 
@@ -21,8 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('user_photos', function (Blueprint $table) {
-            $table->dropColumn('id_type');
+        Schema::table('transactions', function (Blueprint $table) {
+            $table->dropForeign(['customer_id']);
+            $table->dropColumn('customer_id');
         });
     }
 };

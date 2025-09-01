@@ -16,7 +16,7 @@ class TransactionFactory extends Factory
             'user_id' => 1, // Pastikan ada user dengan id 1 atau sesuaikan
             'booking_transaction_id' => 'TRX-' . strtoupper(Str::random(8)),
             'grand_total' => $this->faker->numberBetween(10000, 100000),
-            'booking_status' => 'pending',
+            'booking_status' => 'booking',
             'start_date' => now(),
             'end_date' => now()->addDay(),
             'duration' => 1,

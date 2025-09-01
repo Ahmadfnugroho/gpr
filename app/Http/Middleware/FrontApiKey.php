@@ -21,7 +21,7 @@ class FrontApiKey
             ->where('active', 1)
             ->where('expires_at', '>', now())
             ->exists()) {
-            return response()->json(['message' => 'Mau Ngapain???'], 401);
+            return response()->json(['message' => 'Unauthorized'], 401);
         }
         return $next($request);
     }

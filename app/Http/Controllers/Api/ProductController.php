@@ -149,86 +149,43 @@ class ProductController extends Controller
             return response()->json(['suggestions' => []]);
         }
 
-        $lowerQuery = strtolower($query);
+        // Use single optimized query with UNION for better performance
+        $suggestions = \DB::select("
+            (SELECT 'product' as type, name, slug, thumbnail, 
+                    CONCAT('/product/', slug) as url, 
+                    name as display
+             FROM products 
+             WHERE MATCH(name) AGAINST(? IN NATURAL LANGUAGE MODE)
+             ORDER BY MATCH(name) AGAINST(? IN NATURAL LANGUAGE MODE) DESC
+             LIMIT 5)
+            UNION ALL
+            (SELECT 'category' as type, name, slug, NULL as thumbnail,
+                    CONCAT('/browse-product?category=', slug) as url,
+                    CONCAT('Kategori: ', name) as display
+             FROM categories
+             WHERE name LIKE ?
+             LIMIT 3)
+            UNION ALL
+            (SELECT 'brand' as type, name, slug, logo as thumbnail,
+                    CONCAT('/browse-product?brand=', slug) as url,
+                    CONCAT('Brand: ', name) as display
+             FROM brands
+             WHERE name LIKE ?
+             LIMIT 3)
+            UNION ALL
+            (SELECT 'subcategory' as type, name, slug, NULL as thumbnail,
+                    CONCAT('/browse-product?subcategory=', slug) as url,
+                    CONCAT('Subkategori: ', name) as display
+             FROM sub_categories
+             WHERE name LIKE ?
+             LIMIT 2)
+        ", [$query, $query, "%{$query}%", "%{$query}%", "%{$query}%"]);
 
-        // Ambil saran dari produk, kategori, brand, subkategori
-        $suggestions = [];
-
-        // 🔹 Produk
-        $products = Product::whereRaw('LOWER(name) LIKE ?', ["%{$lowerQuery}%"])
-            ->limit(5)
-            ->get(['id', 'name', 'slug', 'thumbnail']);
-
-        foreach ($products as $product) {
-            $suggestions[] = [
-                'type' => 'product',
-                'name' => $product->name,
-                'slug' => $product->slug,
-                'thumbnail' => $product->thumbnail,
-                'url' => "/product/{$product->slug}",
-                'display' => $product->name,
-            ];
-        }
-
-        // 🔹 Kategori
-        $categories = Product::whereHas('category', fn($q) => $q->whereRaw('LOWER(name) LIKE ?', ["%{$lowerQuery}%"]))
-            ->with('category:id,name,slug')
-            ->limit(3)
-            ->get()
-            ->pluck('category')
-            ->unique('id');
-
-        foreach ($categories as $cat) {
-            $suggestions[] = [
-                'type' => 'category',
-                'name' => $cat->name,
-                'slug' => $cat->slug,
-                'url' => "/browse-product?category={$cat->slug}",
-                'display' => "Kategori: {$cat->name}",
-            ];
-        }
-
-        // 🔹 Brand
-        $brands = Product::whereHas('brand', fn($q) => $q->whereRaw('LOWER(name) LIKE ?', ["%{$lowerQuery}%"]))
-            ->with('brand:id,name,slug')
-            ->limit(3)
-            ->get()
-            ->pluck('brand')
-            ->unique('id');
-
-        foreach ($brands as $brand) {
-            $suggestions[] = [
-                'type' => 'brand',
-                'name' => $brand->name,
-                'slug' => $brand->slug,
-                'url' => "/browse-product?brand={$brand->slug}",
-                'display' => "Brand: {$brand->name}",
-            ];
-        }
-
-        // 🔹 Subkategori
-        $subcategories = Product::whereHas('subCategory', fn($q) => $q->whereRaw('LOWER(name) LIKE ?', ["%{$lowerQuery}%"]))
-            ->with('subCategory:id,name,slug')
-            ->limit(3)
-            ->get()
-            ->pluck('subCategory')
-            ->unique('id');
-
-        foreach ($subcategories as $sub) {
-            $suggestions[] = [
-                'type' => 'subcategory',
-                'name' => $sub->name,
-                'slug' => $sub->slug,
-                'url' => "/browse-product?subcategory={$sub->slug}",
-                'display' => "Subkategori: {$sub->name}",
-            ];
-        }
-
-        // Hilangkan duplikat berdasarkan `url`
-        $unique = collect($suggestions)->unique('url')->values()->toArray();
+        // Convert to array and limit total results
+        $results = array_slice($suggestions, 0, 10);
 
         return response()->json([
-            'suggestions' => array_slice($unique, 0, 10) // maks 10 saran
+            'suggestions' => $results
         ]);
     }
 }

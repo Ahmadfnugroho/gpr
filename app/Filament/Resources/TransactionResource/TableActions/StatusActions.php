@@ -19,13 +19,13 @@ class StatusActions
     {
         return [
             BulkActionGroup::make([
-                Action::make('pending')
+                Action::make('booking')
                     ->icon('heroicon-o-clock') // Ikon untuk action
                     ->color('warning') // Warna action (warning biasanya kuning/orange)
-                    ->label('Pending') // Label yang ditampilkan
+                    ->label('booking') // Label yang ditampilkan
                     ->requiresConfirmation() // Memastikan action memerlukan konfirmasi sebelum dijalankan
-                    ->modalHeading('Ubah Status -> PENDING')
-                    ->modalDescription(fn(): HtmlString => new HtmlString('Apakah Anda yakin ingin mengubah status booking menjadi Pending? <br> <strong style="color:red">Harap sesuaikan kolom DP, Jika sudah lunas maka action akan gagal</strong>')) // Deskripsi modal konfirmasi
+                    ->modalHeading('Ubah Status -> booking')
+                    ->modalDescription(fn(): HtmlString => new HtmlString('Apakah Anda yakin ingin mengubah status booking menjadi booking? <br> <strong style="color:red">Harap sesuaikan kolom DP, Jika sudah lunas maka action akan gagal</strong>')) // Deskripsi modal konfirmasi
                     ->modalSubmitActionLabel('Ya, Ubah Status') // Label tombol konfirmasi
                     ->modalCancelActionLabel('Batal') // Label tombol batal
 
@@ -39,15 +39,15 @@ class StatusActions
                             Notification::make()
                                 ->danger()
                                 ->title('UBAH STATUS GAGAL')
-                                ->body('Sesuaikan DP, jika sudah lunas maka statusnya adalah "Paid atau Rented atau Finished"')
+                                ->body('Sesuaikan DP, jika sudah lunas maka statusnya adalah "Paid atau on_rented atau done"')
                                 ->send();
 
                             // Gagalkan proses action
                             return;
                         }
 
-                        // Update status booking menjadi 'pending' jika kondisi di atas tidak terpenuhi
-                        $record->update(['booking_status' => 'pending']);
+                        // Update status booking menjadi 'booking' jika kondisi di atas tidak terpenuhi
+                        $record->update(['booking_status' => 'booking']);
 
                         // Notifikasi sukses
                         Notification::make()
@@ -74,14 +74,14 @@ class StatusActions
                             ->body('Status transaksi berhasil diubah menjadi "Paid" dan down payment disesuaikan dengan grand total.')
                             ->send();
                     }),
-                Action::make('cancelled')
+                Action::make('cancel')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
-                    ->label('cancelled')
+                    ->label('cancel')
                     ->requiresConfirmation()
                     ->action(function (Transaction $record) {
                         $record->update([
-                            'booking_status' => 'cancelled',
+                            'booking_status' => 'cancel',
                             'down_payment' => $record->grand_total, // Set down_payment sama dengan grand_total
 
                         ]);
@@ -94,14 +94,14 @@ class StatusActions
                             ->send();
                     }),
 
-                Action::make('rented')
+                Action::make('on_rented')
                     ->icon('heroicon-o-shopping-bag')
                     ->color('info')
-                    ->label('rented')
+                    ->label('on_rented')
                     ->requiresConfirmation()
                     ->action(function (Transaction $record) {
                         $record->update([
-                            'booking_status' => 'rented',
+                            'booking_status' => 'on_rented',
                             'down_payment' => $record->grand_total, // Set down_payment sama dengan grand_total
 
                         ]);
@@ -114,13 +114,13 @@ class StatusActions
                             ->send();
                     }),
 
-                Action::make('finished')
+                Action::make('done')
                     ->icon('heroicon-o-check')
                     ->color('success')
-                    ->label('finished')
+                    ->label('done')
                     ->requiresConfirmation()
                     ->action(function (Transaction $record) {
-                        $record->update(['booking_status' => 'finished']);
+                        $record->update(['booking_status' => 'done']);
 
 
 

@@ -14,16 +14,16 @@ class TransactionBulkActions
         return [
             DeleteBulkAction::make()
                 ->label('hapus'),
-            BulkAction::make('pending')
+            BulkAction::make('booking')
                 ->icon('heroicon-o-clock')
                 ->color('warning')
-                ->label('Pending')
+                ->label('booking')
                 ->requiresConfirmation()
                 ->deselectRecordsAfterCompletion()
 
 
                 ->action(function (Collection $records) {
-                    $records->each->update(['booking_status' => 'pending']);
+                    $records->each->update(['booking_status' => 'booking']);
                     Notification::make()
                         ->success()
                         ->title('Berhasil Mengubah Status Booking Transaksi')
@@ -47,48 +47,48 @@ class TransactionBulkActions
                         ->send();
                 }),
 
-            BulkAction::make('cancelled')
+            BulkAction::make('cancel')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
-                ->label('cancelled')
+                ->label('cancel')
                 ->requiresConfirmation()
                 ->deselectRecordsAfterCompletion()
 
 
                 ->action(function (Collection $records) {
-                    $records->each->update(['booking_status' => 'cancelled']);
+                    $records->each->update(['booking_status' => 'cancel']);
                     Notification::make()
                         ->success()
                         ->title('Berhasil Mengubah Status Booking Transaksi')
                         ->send();
                 }),
 
-            BulkAction::make('rented')
+            BulkAction::make('on_rented')
                 ->icon('heroicon-o-shopping-bag')
                 ->color('info')
-                ->label('rented')
+                ->label('on_rented')
                 ->requiresConfirmation()
                 ->deselectRecordsAfterCompletion()
 
 
                 ->action(function (Collection $records) {
-                    $records->each->update(['booking_status' => 'rented']);
+                    $records->each->update(['booking_status' => 'on_rented']);
                     Notification::make()
                         ->success()
                         ->title('Berhasil Mengubah Status Booking Transaksi')
                         ->send();
                 }),
 
-            BulkAction::make('finished')
+            BulkAction::make('done')
                 ->icon('heroicon-o-check')
                 ->color('success')
-                ->label('finished')
+                ->label('done')
                 ->requiresConfirmation()
                 ->deselectRecordsAfterCompletion()
 
 
                 ->action(function (Collection $records) {
-                    $records->each->update(['booking_status' => 'finished']);
+                    $records->each->update(['booking_status' => 'done']);
                     Notification::make()
                         ->success()
                         ->title('Berhasil Mengubah Status Booking Transaksi')

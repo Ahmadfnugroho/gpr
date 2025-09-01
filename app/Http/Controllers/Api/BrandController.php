@@ -65,7 +65,6 @@ class BrandController extends Controller
 
         $brand->load([
             'products.category',
-            'products.brand',
             'products.subCategory',
             'products.rentalIncludes',
             'products.productSpecifications',

@@ -58,7 +58,7 @@ class StatsOverview extends BaseWidget
     protected function getDailyRevenue()
     {
         $result = Transaction::whereBetween('created_at', [today()->startOfDay(), today()->endOfDay()])
-            ->whereIn('booking_status', ['pending', 'paid', 'rented', 'finished'])
+            ->whereIn('booking_status', ['booking', 'paid', 'on_rented', 'done'])
             ->sum('grand_total');
 
         return round($result / 100, 2);
@@ -72,7 +72,7 @@ class StatsOverview extends BaseWidget
             today()->subDay()->startOfDay(),
             today()->subDay()->endOfDay(),
         ])
-            ->whereIn('booking_status', ['pending', 'paid', 'rented', 'finished'])
+            ->whereIn('booking_status', ['booking', 'paid', 'on_rented', 'done'])
             ->sum('grand_total') / 100, 2);
 
         return $this->calculateChange($today, $yesterday);
@@ -86,7 +86,7 @@ class StatsOverview extends BaseWidget
     protected function getWeeklyRevenue()
     {
         return round(Transaction::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])
-            ->whereIn('booking_status', ['pending', 'paid', 'rented', 'finished'])
+            ->whereIn('booking_status', ['booking', 'paid', 'on_rented', 'done'])
             ->sum('grand_total') / 100, 2);
     }
 
@@ -98,7 +98,7 @@ class StatsOverview extends BaseWidget
             now()->startOfWeek()->subWeek(),
             now()->endOfWeek()->subWeek(),
         ])
-            ->whereIn('booking_status', ['pending', 'paid', 'rented', 'finished'])
+            ->whereIn('booking_status', ['booking', 'paid', 'on_rented', 'done'])
             ->sum('grand_total') / 100, 2);
 
         return $this->calculateChange($thisWeek, $lastWeek);
@@ -112,7 +112,7 @@ class StatsOverview extends BaseWidget
     protected function getMonthlyRevenue()
     {
         return round(Transaction::whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
-            ->whereIn('booking_status', ['pending', 'paid', 'rented', 'finished'])
+            ->whereIn('booking_status', ['booking', 'paid', 'on_rented', 'done'])
             ->sum('grand_total') / 100, 2);
     }
 
@@ -124,7 +124,7 @@ class StatsOverview extends BaseWidget
             now()->subMonth()->startOfMonth(),
             now()->subMonth()->endOfMonth(),
         ])
-            ->whereIn('booking_status', ['pending', 'paid', 'rented', 'finished'])
+            ->whereIn('booking_status', ['booking', 'paid', 'on_rented', 'done'])
             ->sum('grand_total') / 100, 2);
 
         return $this->calculateChange($thisMonth, $lastMonth);
@@ -138,7 +138,7 @@ class StatsOverview extends BaseWidget
     protected function getYearlyRevenue()
     {
         return round(Transaction::whereBetween('created_at', [now()->startOfYear(), now()->endOfYear()])
-            ->whereIn('booking_status', ['pending', 'paid', 'rented', 'finished'])
+            ->whereIn('booking_status', ['booking', 'paid', 'on_rented', 'done'])
             ->sum('grand_total') / 100, 2);
     }
 
@@ -150,7 +150,7 @@ class StatsOverview extends BaseWidget
             now()->subYear()->startOfYear(),
             now()->subYear()->endOfYear(),
         ])
-            ->whereIn('booking_status', ['pending', 'paid', 'rented', 'finished'])
+            ->whereIn('booking_status', ['booking', 'paid', 'on_rented', 'done'])
             ->sum('grand_total') / 100, 2);
 
         return $this->calculateChange($thisYear, $lastYear);

@@ -31,7 +31,7 @@ class UserResource extends Resource
     {
         return $record->name;
     }
-    
+
     public static function getGloballySearchableAttributes(): array
     {
         return [
@@ -40,7 +40,7 @@ class UserResource extends Resource
             'userPhoneNumbers.phone_number',
         ];
     }
-    
+
     public static function getGlobalSearchEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
         return parent::getGlobalSearchEloquentQuery()
@@ -50,30 +50,30 @@ class UserResource extends Resource
             ])
             ->where('status', '!=', 'deleted')
             ->whereHas('transactions', function ($query) {
-                $query->where('booking_status', '!=', 'cancelled');
+                $query->where('booking_status', '!=', 'cancel');
             });
     }
-    
+
     public static function getGlobalSearchResultDetails($record): array
     {
         $phone = $record->userPhoneNumbers->first();
-        
+
         // Get latest transaction dates
         $latestTransaction = $record->transactions()
-            ->where('booking_status', '!=', 'cancelled')
+            ->where('booking_status', '!=', 'cancel')
             ->latest('created_at')
             ->first();
-            
+
         $transactionInfo = '-';
         if ($latestTransaction) {
             $startDate = $latestTransaction->start_date ? $latestTransaction->start_date->format('d M Y') : '-';
             $endDate = $latestTransaction->end_date ? $latestTransaction->end_date->format('d M Y') : '-';
             $transactionInfo = "{$startDate} - {$endDate}";
         }
-        
+
         // Email verification status
         $emailVerified = $record->email_verified_at ? '✅ Verified' : '❌ Not Verified';
-        
+
         return [
             'Email' => $record->email,
             'Email Status' => $emailVerified,
@@ -208,7 +208,7 @@ class UserResource extends Resource
                     ->falseIcon('heroicon-o-exclamation-triangle')
                     ->trueColor('success')
                     ->falseColor('warning')
-                    ->tooltip(fn($record) => $record->email_verified_at 
+                    ->tooltip(fn($record) => $record->email_verified_at
                         ? 'Verified on: ' . $record->email_verified_at->format('d M Y H:i')
                         : 'Email not verified'),
                 Tables\Columns\TextColumn::make('userPhoneNumbers.phone_number')
@@ -226,8 +226,8 @@ class UserResource extends Resource
                     ->counts('userPhotos')
                     ->badge()
                     ->color(fn($state) => $state >= 3 ? 'success' : ($state >= 1 ? 'warning' : 'danger'))
-                    ->tooltip(function($record) {
-                        $photos = $record->userPhotos->map(function($photo) {
+                    ->tooltip(function ($record) {
+                        $photos = $record->userPhotos->map(function ($photo) {
                             if ($photo->photo_type === 'ktp') {
                                 return '📄 KTP';
                             } elseif ($photo->photo_type === 'additional_id_1') {
@@ -239,7 +239,7 @@ class UserResource extends Resource
                             }
                             return '📋 ' . $photo->photo_type;
                         })->implode(', ');
-                        
+
                         $count = $record->userPhotos->count();
                         return "Foto ({$count}/3): " . ($photos ?: 'Tidak ada foto');
                     })

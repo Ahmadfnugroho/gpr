@@ -1,0 +1,550 @@
+openapi: 3.0.0
+info:
+  title: Global Photo Rental API
+  version: 1.0.0
+  description: RESTful API for photo equipment rental management system
+  contact:
+    name: Global Photo Rental
+    url: https://admin.globalphotorental.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://admin.globalphotorental.com/api
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /products:
+    get:
+      summary: Get products list
+      description: Fast, filterable, sortable, searchable product list
+      tags:
+        - Products
+      parameters:
+        - name: q
+          in: query
+          description: Search query (minimum 2 characters)
+          schema:
+            type: string
+            minLength: 2
+            example: "camera"
+        - name: limit
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: sort
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [name, price, recommended, latest, availability]
+            default: name
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        - name: category
+          in: query
+          description: Filter by category slug(s)
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+        - name: brand
+          in: query
+          description: Filter by brand slug(s)
+          schema:
+            oneOf:
+              - type: string
+              - type: array
+                items:
+                  type: string
+        - name: premiere
+          in: query
+          description: Filter premiere products
+          schema:
+            type: boolean
+        - name: exclude_rental_includes
+          in: query
+          description: Exclude products used as rental includes
+          schema:
+            type: boolean
+            default: false
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  links:
+                    $ref: '#/components/schemas/PaginationLinks'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+  /product/{slug}:
+    get:
+      summary: Get product details
+      description: Get detailed information about a specific product
+      tags:
+        - Products
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Product slug
+          schema:
+            type: string
+            example: "canon-eos-r5"
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProductDetail'
+        404:
+          $ref: '#/components/responses/NotFound'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+  /search-suggestions:
+    get:
+      summary: Get search suggestions
+      description: Get search suggestions for products, categories, brands
+      tags:
+        - Search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query (minimum 2 characters)
+          schema:
+            type: string
+            minLength: 2
+            example: "canon"
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SearchSuggestion'
+        429:
+          $ref: '#/components/responses/TooManyRequests'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+  /brands:
+    get:
+      summary: Get brands list
+      description: Get list of all brands with optional filtering
+      tags:
+        - Brands
+      parameters:
+        - name: q
+          in: query
+          description: Search query
+          schema:
+            type: string
+        - name: premiere
+          in: query
+          description: Filter premiere brands
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          description: Items limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 12
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Brand'
+
+  /brand/{slug}:
+    get:
+      summary: Get brand details
+      description: Get detailed brand information with products
+      tags:
+        - Brands
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Brand slug
+          schema:
+            type: string
+      responses:
+        200:
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BrandDetail'
+
+  /transaction:
+    post:
+      summary: Create new transaction
+      description: Create a new rental transaction
+      tags:
+        - Transactions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransactionRequest'
+      responses:
+        201:
+          description: Transaction created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Transaction'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Canon EOS R5"
+        slug:
+          type: string
+          example: "canon-eos-r5"
+        price:
+          type: integer
+          example: 500000
+        thumbnail:
+          type: string
+          nullable: true
+          example: "products/thumbnails/canon-eos-r5.jpg"
+        status:
+          type: string
+          enum: [available, unavailable]
+          example: "available"
+        premiere:
+          type: boolean
+          example: true
+        category:
+          $ref: '#/components/schemas/Category'
+        brand:
+          $ref: '#/components/schemas/Brand'
+
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          properties:
+            product_specifications:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProductSpecification'
+            product_photos:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProductPhoto'
+            rental_includes:
+              type: array
+              items:
+                $ref: '#/components/schemas/RentalInclude'
+
+    Brand:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Canon"
+        slug:
+          type: string
+          example: "canon"
+        logo:
+          type: string
+          nullable: true
+          example: "brands/logos/canon.png"
+        premiere:
+          type: boolean
+          example: true
+        products_count:
+          type: integer
+          example: 25
+
+    BrandDetail:
+      allOf:
+        - $ref: '#/components/schemas/Brand'
+        - type: object
+          properties:
+            products:
+              type: array
+              items:
+                $ref: '#/components/schemas/Product'
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Cameras"
+        slug:
+          type: string
+          example: "cameras"
+
+    SearchSuggestion:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [product, category, brand, subcategory]
+          example: "product"
+        name:
+          type: string
+          example: "Canon EOS R5"
+        slug:
+          type: string
+          example: "canon-eos-r5"
+        thumbnail:
+          type: string
+          nullable: true
+          example: "products/thumbnails/canon-eos-r5.jpg"
+        url:
+          type: string
+          example: "/product/canon-eos-r5"
+        display:
+          type: string
+          example: "Canon EOS R5"
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        booking_transaction_id:
+          type: string
+          example: "GPR12345"
+        product_id:
+          type: integer
+          example: 1
+        duration:
+          type: integer
+          example: 3
+        started_at:
+          type: string
+          format: date-time
+          example: "2025-09-01T10:00:00Z"
+        end_date:
+          type: string
+          format: date-time
+          example: "2025-09-04T10:00:00Z"
+        status:
+          type: string
+          enum: [booking, paid, on_rented, done, cancel]
+          example: "booking"
+
+    CreateTransactionRequest:
+      type: object
+      required:
+        - product_id
+        - duration
+        - started_at
+      properties:
+        product_id:
+          type: integer
+          example: 1
+        duration:
+          type: integer
+          minimum: 1
+          maximum: 30
+          example: 3
+        started_at:
+          type: string
+          format: date-time
+          example: "2025-09-01T10:00:00Z"
+
+    ProductSpecification:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: "Resolution"
+        value:
+          type: string
+          example: "45 Megapixels"
+
+    ProductPhoto:
+      type: object
+      properties:
+        id:
+          type: integer
+        photo:
+          type: string
+          example: "products/photos/canon-eos-r5-1.jpg"
+
+    RentalInclude:
+      type: object
+      properties:
+        id:
+          type: integer
+        included_product:
+          $ref: '#/components/schemas/Product'
+
+    PaginationLinks:
+      type: object
+      properties:
+        first:
+          type: string
+          example: "https://admin.globalphotorental.com/api/products?page=1"
+        last:
+          type: string
+          example: "https://admin.globalphotorental.com/api/products?page=10"
+        prev:
+          type: string
+          nullable: true
+        next:
+          type: string
+          nullable: true
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        last_page:
+          type: integer
+          example: 10
+        per_page:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 100
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Unauthorized"
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+  responses:
+    Unauthorized:
+      description: Unauthorized access
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Unauthorized"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Resource not found"
+
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    TooManyRequests:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Too Many Attempts"

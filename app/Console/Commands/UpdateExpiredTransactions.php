@@ -19,7 +19,7 @@ class UpdateExpiredTransactions extends Command
      *
      * @var string
      */
-    protected $description = 'Update transactions that are expired (past end_date) and still pending to finished status';
+    protected $description = 'Update transactions that are expired (past end_date) and still pending to done status';
 
     /**
      * Execute the console command.

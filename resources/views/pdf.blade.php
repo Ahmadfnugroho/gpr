@@ -362,8 +362,8 @@
         <div class="col col-3">
           <img src="{{ public_path('storage/LOGO-GPR.png') }}" alt="Logo" class="company-logo" />
         </div>
-        <div class="col col-6 company-info">
-          <div class="h1">Global Photo Rental</div>
+        <div class="col col-6 company-info" style="padding-left: 5px;">
+          <div class="h1" style="margin-top: -8px;">Global Photo Rental</div>
           <div class="text-small font-normal mb-5">WA: 0812-1234-9564</div>
           <div class="text-small font-normal mb-5">IG: global.photorental</div>
           <div class="text-small font-normal mb-5">Alamat: Jln Kepu Selatan No. 11A RT 03</div>
@@ -578,6 +578,12 @@
               Rp{{ number_format($diskon, 0, ',', '.') }}
             </td>
           </tr>
+          @if($record->booking_status === 'cancel' && $record->cancellation_fee && $record->cancellation_fee > 0)
+          <tr style="background-color: #ffe6e6; color: #d63031;">
+            <td class="summary-label font-semibold">Biaya Pembatalan (50%):</td>
+            <td class="summary-value font-semibold">Rp{{ number_format($record->cancellation_fee, 0, ',', '.') }}</td>
+          </tr>
+          @endif
           <tr class="grand-total">
             <td class="summary-label">Grand Total:</td>
             <td class="summary-value">Rp{{ number_format($record->grand_total ?? 0, 0, ',', '.') }}</td>

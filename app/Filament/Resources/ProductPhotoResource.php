@@ -37,7 +37,7 @@ class ProductPhotoResource extends Resource
     {
         return $form
             ->schema([
-                Components\FileUpload::make('photo')
+                \Filament\Forms\Components\FileUpload::make('photo')
                     ->label('Foto Produk')
                     ->image()
                     ->required(),

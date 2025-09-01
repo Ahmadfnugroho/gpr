@@ -180,17 +180,17 @@ class TransactionProductColumn
                 ->size(TextColumnSize::ExtraSmall)
 
                 ->icon(fn(string $state): string => match ($state) {
-                    'pending' => 'heroicon-o-clock',
-                    'cancelled' => 'heroicon-o-x-circle',
-                    'rented' => 'heroicon-o-shopping-bag',
-                    'finished' => 'heroicon-o-check',
+                    'booking' => 'heroicon-o-clock',
+                    'cancel' => 'heroicon-o-x-circle',
+                    'on_rented' => 'heroicon-o-shopping-bag',
+                    'done' => 'heroicon-o-check',
                     'paid' => 'heroicon-o-banknotes',
                 })
                 ->color(fn(string $state): string => match ($state) {
-                    'pending' => 'warning',
-                    'cancelled' => 'danger',
-                    'rented' => 'info',
-                    'finished' => 'success',
+                    'booking' => 'warning',
+                    'cancel' => 'danger',
+                    'on_rented' => 'info',
+                    'done' => 'success',
                     'paid' => 'success',
                 }),
 
