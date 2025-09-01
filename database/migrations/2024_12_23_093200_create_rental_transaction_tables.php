@@ -63,6 +63,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('transaction_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('bundling_id')->nullable()->constrained('bundlings')->cascadeOnDelete();
             $table->unsignedInteger('quantity');
             $table->unsignedInteger('unit_price');
             $table->unsignedInteger('total_price');
@@ -70,6 +71,7 @@ return new class extends Migration
             $table->timestamps();
             
             $table->index(['transaction_id', 'product_id']);
+            $table->index('bundling_id');
         });
     }
 
