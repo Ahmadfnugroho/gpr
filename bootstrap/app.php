@@ -24,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Add security headers globally
         $middleware->append(SecurityHeaders::class);
         
-        // Add performance monitoring globally
+        // Add performance monitoring globally (fixed version)
         $middleware->append(PerformanceMonitoring::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {

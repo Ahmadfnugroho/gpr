@@ -24,9 +24,15 @@ class PerformanceMonitoring
         $startTime = microtime(true);
         $startMemory = memory_get_usage(true);
         
-        // Enable query log for this request
-        DB::enableQueryLog();
-        $initialQueryCount = count(DB::getQueryLog());
+        // Skip if query logging might cause issues
+        $initialQueryCount = 0;
+        try {
+            DB::enableQueryLog();
+            $initialQueryCount = count(DB::getQueryLog());
+        } catch (\Exception $e) {
+            // Continue without query logging if it fails
+            Log::warning('Query logging failed in performance monitoring', ['error' => $e->getMessage()]);
+        }
 
         $response = $next($request);
 
