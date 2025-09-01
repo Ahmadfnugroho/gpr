@@ -20,8 +20,8 @@ return new class extends Migration
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('customer_id')->nullable()->constrained()->cascadeOnDelete(); // From add_customer_id migration
-            $table->foreignId('promo_id')->nullable()->constrained('promos')->cascadeOnDelete()->nullable();
+            $table->unsignedBigInteger('customer_id')->nullable(); // From add_customer_id migration - FK added later
+            $table->unsignedBigInteger('promo_id')->nullable(); // FK to promos - constraint added later
             $table->string('booking_transaction_id')->unique();
             
             // Financial fields

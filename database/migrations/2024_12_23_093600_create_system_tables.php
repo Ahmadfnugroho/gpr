@@ -24,7 +24,7 @@ return new class extends Migration
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();
             
-            $table->index(['tokenable_type', 'tokenable_id']);
+            // Index already created by morphs('tokenable')
         });
 
         // Filament imports/exports
@@ -34,9 +34,9 @@ return new class extends Migration
             $table->string('file_name');
             $table->string('file_path');
             $table->string('importer');
-            $table->json('processed_rows')->default(0);
+            $table->json('processed_rows')->nullable();
             $table->json('total_rows');
-            $table->json('successful_rows')->default(0);
+            $table->json('successful_rows')->nullable();
             $table->string('user_id');
             $table->timestamps();
         });
@@ -47,9 +47,9 @@ return new class extends Migration
             $table->string('file_disk');
             $table->string('file_name')->nullable();
             $table->string('exporter');
-            $table->json('processed_rows')->default(0);
+            $table->json('processed_rows')->nullable();
             $table->json('total_rows');
-            $table->json('successful_rows')->default(0);
+            $table->json('successful_rows')->nullable();
             $table->string('user_id');
             $table->timestamps();
         });

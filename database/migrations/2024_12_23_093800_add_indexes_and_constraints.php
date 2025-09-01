@@ -42,6 +42,12 @@ return new class extends Migration
         Schema::table('product_items', function (Blueprint $table) {
             $table->index(['product_id', 'is_available'], 'idx_product_available');
         });
+        
+        // Add foreign key constraints that depend on tables created later
+        Schema::table('transactions', function (Blueprint $table) {
+            $table->foreign('customer_id')->references('id')->on('customers')->onDelete('cascade');
+            $table->foreign('promo_id')->references('id')->on('promos')->onDelete('cascade');
+        });
     }
 
     /**

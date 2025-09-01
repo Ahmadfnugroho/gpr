@@ -21,7 +21,7 @@ return new class extends Migration
             $table->timestamps();
             
             $table->index(['detail_transaction_id', 'product_item_id'], 'idx_detail_product');
-            $table->unique(['detail_transaction_id', 'product_item_id']);
+            $table->unique(['detail_transaction_id', 'product_item_id'], 'idx_detail_product_unique');
         });
     }
 
