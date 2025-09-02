@@ -539,37 +539,37 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
         $('#refresh-logs').click(loadLogs);
 
         // Stop server button
-        $('#stop-server').click(function() {
-            if (!confirm('Are you sure you want to stop the WhatsApp server? This will disconnect all sessions and require server restart.')) return;
+        // $('#stop-server').click(function() {
+        //     if (!confirm('Are you sure you want to stop the WhatsApp server? This will disconnect all sessions and require server restart.')) return;
 
-            let $btn = $(this);
-            $btn.prop('disabled', true).text('Stopping Server...');
+        //     let $btn = $(this);
+        //     $btn.prop('disabled', true).text('Stopping Server...');
 
-            $.post('{{ route("whatsapp.stop.server") }}')
-                .done(function(data) {
-                    if (data.success) {
-                        alert('✅ ' + data.message);
+        //     $.post('{{ route("whatsapp.stop.server") }}')
+        //         .done(function(data) {
+        //             if (data.success) {
+        //                 alert('✅ ' + data.message);
 
-                        // Reset UI elements
-                        $('#qr-code-display').html('<div class="text-gray-500">Server stopped. Please restart the server to continue.</div>');
-                        $('#phone-info').html('Server offline');
+        //                 // Reset UI elements
+        //                 $('#qr-code-display').html('<div class="text-gray-500">Server stopped. Please restart the server to continue.</div>');
+        //                 $('#phone-info').html('Server offline');
 
-                        // Update connection status
-                        $('#connection-status').html(
-                            '<span class="status-indicator status-disconnected"></span>' +
-                            '<span>Server Stopped</span>'
-                        );
-                    } else {
-                        alert('❌ Failed to stop server: ' + data.message);
-                    }
-                })
-                .fail(function() {
-                    alert('❌ Error stopping server. Please try again or contact administrator.');
-                })
-                .always(function() {
-                    $btn.prop('disabled', false).text('Stop Server');
-                });
-        });
+        //                 // Update connection status
+        //                 $('#connection-status').html(
+        //                     '<span class="status-indicator status-disconnected"></span>' +
+        //                     '<span>Server Stopped</span>'
+        //                 );
+        //             } else {
+        //                 alert('❌ Failed to stop server: ' + data.message);
+        //             }
+        //         })
+        //         .fail(function() {
+        //             alert('❌ Error stopping server. Please try again or contact administrator.');
+        //         })
+        //         .always(function() {
+        //             $btn.prop('disabled', false).text('Stop Server');
+        //         });
+        // });
     </script>
 </body>
 
