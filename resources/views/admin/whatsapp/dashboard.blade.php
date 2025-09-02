@@ -185,9 +185,6 @@
                     <button id="refresh-status" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm">
                         Refresh Status
                     </button>
-                    <!-- <button id="stop-server" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm ml-2">
-                            Stop Server
-                        </button> -->
                 </div>
             </div>
 
@@ -537,39 +534,6 @@ Time: {{ date('d M Y H:i:s') }}</textarea>
 
         // Refresh logs button
         $('#refresh-logs').click(loadLogs);
-
-        // Stop server button
-        // $('#stop-server').click(function() {
-        //     if (!confirm('Are you sure you want to stop the WhatsApp server? This will disconnect all sessions and require server restart.')) return;
-
-        //     let $btn = $(this);
-        //     $btn.prop('disabled', true).text('Stopping Server...');
-
-        //     $.post('{{ route("whatsapp.stop.server") }}')
-        //         .done(function(data) {
-        //             if (data.success) {
-        //                 alert('✅ ' + data.message);
-
-        //                 // Reset UI elements
-        //                 $('#qr-code-display').html('<div class="text-gray-500">Server stopped. Please restart the server to continue.</div>');
-        //                 $('#phone-info').html('Server offline');
-
-        //                 // Update connection status
-        //                 $('#connection-status').html(
-        //                     '<span class="status-indicator status-disconnected"></span>' +
-        //                     '<span>Server Stopped</span>'
-        //                 );
-        //             } else {
-        //                 alert('❌ Failed to stop server: ' + data.message);
-        //             }
-        //         })
-        //         .fail(function() {
-        //             alert('❌ Error stopping server. Please try again or contact administrator.');
-        //         })
-        //         .always(function() {
-        //             $btn.prop('disabled', false).text('Stop Server');
-        //         });
-        // });
     </script>
 </body>
 
