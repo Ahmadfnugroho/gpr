@@ -5,11 +5,7 @@ use App\Http\Controllers\PdfController;
 use App\Http\Controllers\ProductSearchController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SessionController;
-use App\Models\User;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use Laravel\Socialite\Facades\Socialite;
 
 Route::get('/', [SessionController::class, 'index']);
 Route::post('/', [SessionController::class, 'login']);
@@ -49,16 +45,16 @@ Route::get('/admin-login', function () {
 // WhatsApp Management Routes (protected by auth)
 Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
     // Root whatsapp route - redirect to dashboard (will be protected by middleware)
-    Route::get('/', function() {
+    Route::get('/', function () {
         return redirect()->route('whatsapp.dashboard');
     })->middleware('whatsapp.auth')->name('index');
-    
+
     // Login routes (no middleware)
-    Route::get('/login', function() {
+    Route::get('/login', function () {
         return view('admin.whatsapp.login');
     })->name('login.form');
-    
-    Route::post('/login', function(\Illuminate\Http\Request $request) {
+
+    Route::post('/login', function (\Illuminate\Http\Request $request) {
         $username = $request->input('username');
         $password = $request->input('password');
 
@@ -69,12 +65,12 @@ Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
             return redirect()->back()->withErrors(['Invalid credentials']);
         }
     })->name('login');
-    
-    Route::post('/auth-logout', function(\Illuminate\Http\Request $request) {
+
+    Route::post('/auth-logout', function (\Illuminate\Http\Request $request) {
         $request->session()->forget('whatsapp_authenticated');
         return redirect()->route('whatsapp.dashboard');
     })->name('auth.logout');
-    
+
     // Protected routes (with middleware)
     Route::middleware('whatsapp.auth')->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\Admin\WhatsAppController::class, 'dashboard'])->name('dashboard');
