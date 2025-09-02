@@ -40,7 +40,7 @@ class CustomerPhoneNumbersRelationManager extends RelationManager
                     ->formatStateUsing(function ($state) {
                         // Format untuk display
                         if (empty($state)) return $state;
-                        
+
                         $phone = preg_replace('/\D/', '', $state);
                         if (str_starts_with($phone, '62')) {
                             return '+' . $phone;
@@ -52,7 +52,7 @@ class CustomerPhoneNumbersRelationManager extends RelationManager
                     ->dehydrateStateUsing(function ($state) {
                         // Format untuk database
                         if (empty($state)) return $state;
-                        
+
                         $phone = preg_replace('/\D/', '', $state);
                         if (str_starts_with($phone, '62')) {
                             return '+' . $phone;
@@ -78,7 +78,7 @@ class CustomerPhoneNumbersRelationManager extends RelationManager
                     ->formatStateUsing(function ($state) {
                         // Format display yang bagus
                         if (empty($state)) return $state;
-                        
+
                         $phone = preg_replace('/\D/', '', $state);
                         if (str_starts_with($phone, '62')) {
                             $formatted = '+62 ' . substr($phone, 2);
@@ -87,13 +87,13 @@ class CustomerPhoneNumbersRelationManager extends RelationManager
                         }
                         return $state;
                     }),
-                    
+
                 TextColumn::make('created_at')
                     ->label('Ditambahkan')
                     ->dateTime('d M Y, H:i')
                     ->sortable()
                     ->since(),
-                    
+
                 TextColumn::make('updated_at')
                     ->label('Diperbarui')
                     ->dateTime('d M Y, H:i')
@@ -107,8 +107,8 @@ class CustomerPhoneNumbersRelationManager extends RelationManager
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah Nomor')
-                    ->icon('heroicon-o-phone-plus')
-                    ->successRedirectUrl(fn () => $this->getOwnerRecord()->resource::getUrl('view', ['record' => $this->getOwnerRecord()])),
+                    ->icon('heroicon-o-phone')
+                    ->successRedirectUrl(fn() => $this->getOwnerRecord()->resource::getUrl('view', ['record' => $this->getOwnerRecord()])),
             ])
             ->actions([
                 Action::make('whatsapp')
@@ -125,18 +125,18 @@ class CustomerPhoneNumbersRelationManager extends RelationManager
                         return "https://wa.me/{$phone}";
                     })
                     ->openUrlInNewTab(),
-                    
+
                 Action::make('call')
                     ->label('Telepon')
                     ->icon('heroicon-o-phone')
                     ->color('primary')
-                    ->url(fn ($record) => "tel:{$record->phone_number}"),
-                    
+                    ->url(fn($record) => "tel:{$record->phone_number}"),
+
                 Tables\Actions\EditAction::make()
-                    ->successRedirectUrl(fn () => $this->getOwnerRecord()->resource::getUrl('view', ['record' => $this->getOwnerRecord()])),
-                    
+                    ->successRedirectUrl(fn() => $this->getOwnerRecord()->resource::getUrl('view', ['record' => $this->getOwnerRecord()])),
+
                 Tables\Actions\DeleteAction::make()
-                    ->successRedirectUrl(fn () => $this->getOwnerRecord()->resource::getUrl('view', ['record' => $this->getOwnerRecord()])),
+                    ->successRedirectUrl(fn() => $this->getOwnerRecord()->resource::getUrl('view', ['record' => $this->getOwnerRecord()])),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
