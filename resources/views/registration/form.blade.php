@@ -508,7 +508,7 @@
                             @enderror
                             <input type="file" class="form-control @error('id_photo_2') is-invalid @enderror"
                                 id="id_photo_2" name="id_photo_2" accept="image/*" required>
-                            <div class="form-text">Boleh diwatermark. Format: JPG, JPEG, PNG. Maksimal 10MB</div>
+                            <div class="form-text">Boleh diwatermark. Format: JPG, JPEG, PNG, WebP. Maksimal 10MB</div>
                             <div id="id_photo_2-notification" class="alert alert-info mt-2" style="display: none;"></div>
                             @error('id_photo_2')
                             <div class="invalid-feedback">{{ $message }}</div>
