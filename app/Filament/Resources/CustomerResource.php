@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\CustomerResource\Pages;
 use App\Filament\Resources\CustomerResource\RelationManagers;
+use App\Filament\Resources\CustomerResource\RelationManagers\CustomerPhotosRelationManager;
+use App\Filament\Resources\CustomerResource\RelationManagers\CustomerPhoneNumbersRelationManager;
 use App\Models\Customer;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -203,7 +205,8 @@ class CustomerResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            CustomerPhotosRelationManager::class,
+            CustomerPhoneNumbersRelationManager::class,
         ];
     }
 
@@ -212,6 +215,7 @@ class CustomerResource extends Resource
         return [
             'index' => Pages\ListCustomers::route('/'),
             'create' => Pages\CreateCustomer::route('/create'),
+            'view' => Pages\ViewCustomer::route('/{record}'),
             'edit' => Pages\EditCustomer::route('/{record}/edit'),
         ];
     }
