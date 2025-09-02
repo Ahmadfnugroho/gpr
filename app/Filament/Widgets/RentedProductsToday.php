@@ -25,7 +25,7 @@ class RentedProductsToday extends BaseWidget
     {
         return $table
             ->query(
-                DetailTransaction::with(['product', 'bundling', 'transaction.user'])
+                DetailTransaction::with(['product', 'bundling', 'transaction.customer'])
                     ->whereHas('transaction', function ($query) {
                         $query->whereDate('start_date', today())
                             ->whereIn('booking_status', ['booking', 'paid', 'on_']);
@@ -89,8 +89,8 @@ class RentedProductsToday extends BaseWidget
                         return new HtmlString($productName ?? '-');
                     }),
 
-                Tables\Columns\TextColumn::make('transaction.user.name')
-                    ->label('Nama User')
+                Tables\Columns\TextColumn::make('transaction.customer.name')
+                    ->label('Nama Customer')
                     ->sortable()
                     ->searchable(),
 

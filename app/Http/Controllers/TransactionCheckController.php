@@ -12,7 +12,7 @@ class TransactionCheckController extends Controller
     public function index()
     {
         $transaction = Transaction::with([
-            'user',
+            'customer',
             'detailTransactions',
             'rentalIncludes'
 

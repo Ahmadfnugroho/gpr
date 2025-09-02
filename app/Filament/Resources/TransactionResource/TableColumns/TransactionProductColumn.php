@@ -31,17 +31,17 @@ class TransactionProductColumn
 
                 ->searchable()
                 ->sortable(),
-            TextColumn::make('user.name')
-                ->label('User')
+            TextColumn::make('customer.name')
+                ->label('Customer')
                 ->wrap()
                 ->size(TextColumnSize::ExtraSmall)
 
 
                 ->searchable()
                 ->sortable(),
-            TextColumn::make('user.userPhoneNumbers')
+            TextColumn::make('customer.customerPhoneNumbers')
                 ->label('Phone')
-                ->formatStateUsing(fn($record) => optional($record->user->userPhoneNumbers->first())->phone_number ?? '-')
+                ->formatStateUsing(fn($record) => optional($record->customer->customerPhoneNumbers->first())->phone_number ?? '-')
 
                 ->wrap()
                 ->size(TextColumnSize::ExtraSmall)
