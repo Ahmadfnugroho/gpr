@@ -637,10 +637,6 @@
             }
         }
 
-        return true;
-
-
-
         // Image compression function with WebP support and adaptive compression
         async function compressImage(file) {
             return new Promise((resolve, reject) => {
@@ -850,14 +846,30 @@
             });
 
             function loadProvinces() {
+                console.log('Loading provinces...');
                 fetch('/api/regions/provinces')
-                    .then(response => response.json())
+                    .then(response => {
+                        console.log('Province response status:', response.status);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log('Province data received:', data);
                         provinceSelect.empty().append('<option value="">Pilih Provinsi</option>');
-                        data.forEach(province => {
-                            provinceSelect.append(`<option value="${province.id}|${province.name}">${province.name}</option>`);
-                        });
+                        
+                        if (Array.isArray(data) && data.length > 0) {
+                            data.forEach(province => {
+                                provinceSelect.append(`<option value="${province.id}|${province.name}">${province.name}</option>`);
+                            });
+                        } else {
+                            console.warn('No province data or invalid format:', data);
+                            provinceSelect.append('<option value="">Tidak ada data provinsi</option>');
+                        }
+                        
                         provinceSelect.select2();
+                        console.log('Provinces loaded successfully');
                     })
                     .catch(error => {
                         console.error('Error loading provinces:', error);
@@ -866,16 +878,32 @@
             }
 
             function loadRegencies(provinceId) {
+                console.log('Loading regencies for province:', provinceId);
                 citySelect.prop('disabled', true).empty().append('<option value="">Loading...</option>').select2();
 
                 fetch(`/api/regions/regencies/${provinceId}`)
-                    .then(response => response.json())
+                    .then(response => {
+                        console.log('Regency response status:', response.status);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log('Regency data received:', data);
                         citySelect.empty().append('<option value="">Pilih Kab/Kota</option>');
-                        data.forEach(regency => {
-                            citySelect.append(`<option value="${regency.id}|${regency.name}">${regency.name}</option>`);
-                        });
+                        
+                        if (Array.isArray(data) && data.length > 0) {
+                            data.forEach(regency => {
+                                citySelect.append(`<option value="${regency.id}|${regency.name}">${regency.name}</option>`);
+                            });
+                        } else {
+                            console.warn('No regency data or invalid format:', data);
+                            citySelect.append('<option value="">Tidak ada data kab/kota</option>');
+                        }
+                        
                         citySelect.prop('disabled', false).select2();
+                        console.log('Regencies loaded successfully');
                     })
                     .catch(error => {
                         console.error('Error loading regencies:', error);
