@@ -382,9 +382,25 @@ class WAHAService
                 'X-Api-Key' => $this->apiKey,
             ])->get("{$this->baseUrl}/sessions");
 
-            return $response->successful() ? $response->json() : [];
+            if ($response->successful()) {
+                $sessions = $response->json();
+                
+                // Ensure each session has a 'name' field, fallback to 'default' if not present
+                $normalizedSessions = [];
+                foreach ($sessions as $session) {
+                    // If session doesn't have 'name' field, use 'id' or default to 'default'
+                    if (!isset($session['name'])) {
+                        $session['name'] = $session['id'] ?? 'default';
+                    }
+                    $normalizedSessions[] = $session;
+                }
+                
+                return $normalizedSessions;
+            }
+            
+            return [];
         } catch (\Exception $e) {
-            // Log::error('Failed to get WAHA sessions', ['error' => $e->getMessage()]);
+            Log::error('Failed to get WAHA sessions', ['error' => $e->getMessage()]);
             return [];
         }
     }
@@ -533,20 +549,29 @@ class WAHAService
 
             if ($response->successful()) {
                 Log::info('Session restarted successfully');
-                return true;
+                return ['success' => true, 'message' => 'Session restarted successfully'];
             } else {
-                Log::error('Failed to restart session', [
+                $errorMessage = 'Failed to restart session';
+                try {
+                    $errorData = $response->json();
+                    $errorMessage = $errorData['message'] ?? $errorMessage;
+                } catch (\Exception $jsonEx) {
+                    $errorMessage = 'Failed to restart session: ' . $response->body();
+                }
+                
+                Log::error($errorMessage, [
                     'status' => $response->status(),
                     'body' => $response->body()
                 ]);
-                return false;
+                return ['success' => false, 'message' => $errorMessage];
             }
         } catch (\Exception $e) {
-            Log::error('WAHA restart session failed', [
+            $errorMessage = 'Exception restarting WAHA session: ' . $e->getMessage();
+            Log::error($errorMessage, [
                 'session' => $sessionName,
                 'error' => $e->getMessage()
             ]);
-            throw $e;
+            return ['success' => false, 'message' => $errorMessage];
         }
     }
 
@@ -577,9 +602,17 @@ class WAHAService
 
             if ($response->successful()) {
                 Log::info('Session logged out successfully');
-                return true;
+                return ['success' => true, 'message' => 'Session logged out successfully'];
             } else {
-                Log::error('Failed to logout session', [
+                $errorMessage = 'Failed to logout session';
+                try {
+                    $errorData = $response->json();
+                    $errorMessage = $errorData['message'] ?? $errorMessage;
+                } catch (\Exception $jsonEx) {
+                    $errorMessage = 'Failed to logout session: ' . $response->body();
+                }
+                
+                Log::error($errorMessage, [
                     'status' => $response->status(),
                     'body' => $response->body()
                 ]);
@@ -593,17 +626,18 @@ class WAHAService
 
                 if ($stopResponse->successful()) {
                     Log::info('Session stopped successfully as fallback');
-                    return true;
+                    return ['success' => true, 'message' => 'Session stopped successfully (fallback)'];
                 }
 
-                return false;
+                return ['success' => false, 'message' => $errorMessage];
             }
         } catch (\Exception $e) {
-            Log::error('WAHA logout session failed', [
+            $errorMessage = 'Exception logging out WAHA session: ' . $e->getMessage();
+            Log::error($errorMessage, [
                 'session' => $sessionName,
                 'error' => $e->getMessage()
             ]);
-            throw $e;
+            return ['success' => false, 'message' => $errorMessage];
         }
     }
 }

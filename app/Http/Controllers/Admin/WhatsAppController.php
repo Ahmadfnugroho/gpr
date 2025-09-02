@@ -88,17 +88,33 @@ class WhatsAppController extends Controller
             // Find the requested session
             $sessionData = null;
             foreach ($sessions as $s) {
-                if ($s['id'] === $session) {
+                // Use 'name' field instead of 'id', with fallback to 'id' for backward compatibility
+                $sessionIdentifier = $s['name'] ?? $s['id'] ?? 'default';
+                if ($sessionIdentifier === $session) {
                     $sessionData = $s;
                     break;
                 }
             }
 
+            // If session not found, return default session or create one
             if (!$sessionData) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Session '{$session}' tidak ditemukan"
-                ]);
+                // Try to find default session
+                foreach ($sessions as $s) {
+                    $sessionIdentifier = $s['name'] ?? $s['id'] ?? 'default';
+                    if ($sessionIdentifier === 'default') {
+                        $sessionData = $s;
+                        break;
+                    }
+                }
+                
+                // If still no session found, return default data
+                if (!$sessionData) {
+                    $sessionData = [
+                        'name' => $session,
+                        'status' => 'SCAN_QR_CODE',
+                        'me' => null
+                    ];
+                }
             }
 
             $status = $sessionData['status'] ?? 'UNKNOWN';
