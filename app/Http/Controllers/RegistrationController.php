@@ -136,30 +136,62 @@ class RegistrationController extends Controller
             if ($request->hasFile('ktp_photo')) {
                 try {
                     $ktpFile = $request->file('ktp_photo');
-                    Log::info('Registration: Processing KTP photo', ['customer_id' => $customer->id, 'file_size' => $ktpFile->getSize()]);
+                    
+                    // Validasi file upload
+                    if (!$ktpFile->isValid()) {
+                        throw new \Exception('File KTP tidak valid atau rusak');
+                    }
+                    
+                    $originalFileSize = $ktpFile->getSize(); // Simpan size sebelum move
+                    $originalFileName = $ktpFile->getClientOriginalName();
+                    $fileExtension = $ktpFile->getClientOriginalExtension();
+                    
+                    Log::info('Registration: Processing KTP photo', [
+                        'customer_id' => $customer->id, 
+                        'file_size' => $originalFileSize,
+                        'original_name' => $originalFileName,
+                        'extension' => $fileExtension
+                    ]);
 
                     // Buat direktori temp jika belum ada
                     $tempDir = storage_path('app/public/temp');
                     if (!is_dir($tempDir)) {
                         mkdir($tempDir, 0755, true);
+                        Log::info('Created temp directory: ' . $tempDir);
                     }
 
                     // Simpan file sementara dengan handling Windows path
-                    $tempFileName = 'ktp_temp_' . Str::random(20) . '.' . $ktpFile->getClientOriginalExtension();
+                    $tempFileName = 'ktp_temp_' . $customer->id . '_' . Str::random(10) . '.' . $fileExtension;
                     $tempPath = $tempDir . DIRECTORY_SEPARATOR . $tempFileName;
+                    
+                    Log::info('Attempting to move file', ['from' => $ktpFile->getPathname(), 'to' => $tempPath]);
                     
                     // Gunakan move() method yang lebih reliable
                     if (!$ktpFile->move($tempDir, $tempFileName)) {
-                        throw new \Exception('Gagal menyimpan file sementara KTP');
+                        throw new \Exception('Gagal memindahkan file KTP ke direktori sementara');
                     }
                     
                     // Verifikasi file tersimpan dengan benar
-                    if (!file_exists($tempPath) || !is_readable($tempPath)) {
-                        throw new \Exception('File KTP tidak dapat diakses setelah upload');
+                    if (!file_exists($tempPath)) {
+                        throw new \Exception('File KTP tidak ditemukan setelah upload: ' . $tempPath);
                     }
+                    
+                    if (!is_readable($tempPath)) {
+                        throw new \Exception('File KTP tidak dapat dibaca setelah upload: ' . $tempPath);
+                    }
+                    
+                    $actualFileSize = filesize($tempPath);
+                    if ($actualFileSize !== $originalFileSize) {
+                        Log::warning('File size mismatch after move', [
+                            'original' => $originalFileSize,
+                            'actual' => $actualFileSize
+                        ]);
+                    }
+                    
+                    Log::info('File moved successfully', ['temp_path' => $tempPath, 'size' => $actualFileSize]);
 
                     // Kompresi gambar jika ukurannya > 1MB
-                    if ($ktpFile->getSize() > 1024 * 1024) {
+                    if ($originalFileSize > 1024 * 1024) {
                         // Gunakan fungsi compressImage untuk kompresi
                         $compressedFileName = $this->compressImage($tempPath);
                         $compressedPath = storage_path('app/public/' . $compressedFileName);
@@ -220,9 +252,10 @@ class RegistrationController extends Controller
             if ($request->hasFile('id_photo')) {
                 try {
                     $idFile = $request->file('id_photo');
+                    $originalIdFileSize = $idFile->getSize(); // Simpan size sebelum move
                     Log::info('Registration: Processing ID photo 1', [
                         'customer_id' => $customer->id,
-                        'original_size' => $idFile->getSize(),
+                        'original_size' => $originalIdFileSize,
                         'id_type' => $request->id_type,
                         'extension' => $idFile->getClientOriginalExtension()
                     ]);
@@ -240,7 +273,7 @@ class RegistrationController extends Controller
                     }
 
                     // Kompresi gambar jika ukurannya > 1MB
-                    if ($idFile->getSize() > 1024 * 1024) {
+                    if ($originalIdFileSize > 1024 * 1024) {
                         // Gunakan fungsi compressImage untuk kompresi
                         $compressedFileName = $this->compressImage($tempPath);
                         $compressedPath = storage_path('app/public/' . $compressedFileName);
@@ -302,9 +335,10 @@ class RegistrationController extends Controller
             if ($request->hasFile('id_photo_2')) {
                 try {
                     $idFile2 = $request->file('id_photo_2');
+                    $originalIdFile2Size = $idFile2->getSize(); // Simpan size sebelum move
                     Log::info('Registration: Processing ID photo 2', [
                         'customer_id' => $customer->id,
-                        'original_size' => $idFile2->getSize(),
+                        'original_size' => $originalIdFile2Size,
                         'id_type' => $request->id_type_2,
                         'extension' => $idFile2->getClientOriginalExtension()
                     ]);
@@ -322,7 +356,7 @@ class RegistrationController extends Controller
                     }
 
                     // Kompresi gambar jika ukurannya > 1MB
-                    if ($idFile2->getSize() > 1024 * 1024) {
+                    if ($originalIdFile2Size > 1024 * 1024) {
                         // Gunakan fungsi compressImage untuk kompresi
                         $compressedFileName = $this->compressImage($tempPath2);
                         $compressedPath = storage_path('app/public/' . $compressedFileName);
