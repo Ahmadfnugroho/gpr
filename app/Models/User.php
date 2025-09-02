@@ -30,7 +30,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         'email_verified_at',
         'password',
     ];
-    protected $with = ['userPhotos', 'userPhoneNumbers'];
+    // Remove userPhotos and userPhoneNumbers - now using Customer model for these
 
 
     public function getActivitylogOptions(): LogOptions
@@ -39,11 +39,8 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             ->logOnly([
                 'name',
                 'email',
-                'address',
-                'job',
-                'status',
             ])
-            ->dontLogIfAttributesChangedOnly(['updated_at']); // Optimisasi logging
+            ->dontLogIfAttributesChangedOnly(['updated_at']);
     }
 
 
@@ -80,28 +77,8 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
 
 
-    public function userPhotos(): HasMany
-    {
-        return $this->hasMany(UserPhoto::class, 'user_id', 'id');
-    }
-
-
-    public function userPhoneNumbers(): HasMany
-    {
-        return $this->hasMany(UserPhoneNumber::class, 'user_id', 'id');
-    }
-
-
-    public function transactions(): HasMany
-    {
-        return $this->hasMany(Transaction::class, 'user_id', 'id');
-    }
-
-    // Accessor untuk phone_number dari relasi userPhoneNumbers
-    public function getPhoneNumberAttribute(): ?string
-    {
-        return $this->userPhoneNumbers->first()?->phone_number;
-    }
+    // User model now only for admin/staff authentication
+    // Customer model handles transactions, phones, and photos
 
     /**
      * Send the email verification notification.

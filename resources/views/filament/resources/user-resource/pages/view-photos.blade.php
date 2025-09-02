@@ -1,90 +1,44 @@
-<div class="space-y-4">
-    @if($user->userPhotos->count() > 0)
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            @foreach($user->userPhotos as $photo)
-                <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                    <div class="p-4 bg-gray-50">
-                        <h3 class="font-semibold text-gray-900 text-sm uppercase">
-                            @if($photo->photo_type === 'ktp')
-                                📄 KTP
-                            @elseif($photo->photo_type === 'additional_id_1')
-                                🆔 ID Tambahan 1: {{ $photo->id_type ?: 'Tidak Diisi' }}
-                            @elseif($photo->photo_type === 'additional_id_2')
-                                🆔 ID Tambahan 2: {{ $photo->id_type ?: 'Tidak Diisi' }}
-                            @elseif($photo->photo_type === 'additional_id')
-                                🆔 ID Tambahan: {{ $photo->id_type ?: 'Tidak Diisi' }}
-                            @else
-                                📋 {{ $photo->photo_type ?: 'Dokumen ID' }}
-                            @endif
-                        </h3>
-                        <p class="text-gray-600 text-xs">
-                            Diupload: {{ $photo->created_at->format('d M Y H:i') }}
-                        </p>
-                        @if($photo->id_type)
-                            <p class="text-blue-600 text-xs font-medium">
-                                Jenis: {{ $photo->id_type }}
-                            </p>
-                        @endif
+{{-- ⚠️ ARCHITECTURE CHANGE NOTICE --}}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-6 rounded-lg">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <svg class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-lg font-medium text-blue-900">Architecture Change Notice</h3>
+                <div class="mt-2 text-sm text-blue-700">
+                    <p class="mb-3">User model no longer handles photos and phone numbers. These have been moved to the Customer model for better separation of concerns.</p>
+                    
+                    <div class="bg-white p-4 rounded-md border border-blue-200 mb-4">
+                        <h4 class="font-semibold text-blue-900 mb-2">New Model Structure:</h4>
+                        <ul class="space-y-1 text-sm">
+                            <li><strong>👤 User Model:</strong> Admin/Staff authentication only (name, email, roles)</li>
+                            <li><strong>👥 Customer Model:</strong> Rental customers with photos, phone numbers, addresses</li>
+                        </ul>
                     </div>
                     
-                    <div class="relative">
-                        @if(Storage::disk('public')->exists($photo->photo))
-                            <img 
-                                src="{{ Storage::url($photo->photo) }}" 
-                                alt="{{ $photo->photo_type }}"
-                                class="w-full h-auto object-cover min-h-80 max-h-96 cursor-pointer hover:opacity-90 transition-opacity"
-                                onclick="openImageModal('{{ Storage::url($photo->photo) }}', '{{ $photo->photo_type ?: 'Dokumen ID' }}')"
-                                style="aspect-ratio: 4/3;"
-                            >
-                        @else
-                            <div class="w-full h-48 bg-gray-200 flex items-center justify-center">
-                                <div class="text-center text-gray-500">
-                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                    <p class="mt-2 text-sm">Foto tidak ditemukan</p>
-                                    <p class="text-xs text-gray-400">{{ $photo->photo }}</p>
-                                </div>
-                            </div>
-                        @endif
-                        
-                        <!-- Safe view overlay - tidak ada opsi delete -->
-                        <div class="absolute top-2 right-2">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                <svg class="mr-1.5 h-2 w-2 text-green-400" fill="currentColor" viewBox="0 0 8 8">
-                                    <circle cx="4" cy="4" r="3"/>
-                                </svg>
-                                View Only
-                            </span>
+                    <div class="bg-white p-4 rounded-md border border-blue-200">
+                        <h4 class="font-semibold text-blue-900 mb-2">Current User Information:</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <div><strong>Name:</strong> {{ $user->name }}</div>
+                            <div><strong>Email:</strong> {{ $user->email }}</div>
+                            <div><strong>Email Verified:</strong> {{ $user->email_verified_at ? '✅ Yes' : '❌ No' }}</div>
+                            <div><strong>Roles:</strong> {{ $user->roles->pluck('name')->join(', ') ?: 'No roles assigned' }}</div>
                         </div>
                     </div>
                 </div>
-            @endforeach
-        </div>
-        
-        <!-- Informasi User -->
-        <div class="mt-6 p-4 bg-blue-50 rounded-lg">
-            <h4 class="font-semibold text-blue-900 mb-2">Informasi User</h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                <div><strong>Nama:</strong> {{ $user->name }}</div>
-                <div><strong>Email:</strong> {{ $user->email }}</div>
-                <div><strong>Status:</strong> 
-                    <span class="px-2 py-1 text-xs rounded {{ $user->status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                        {{ ucfirst($user->status) }}
-                    </span>
+                
+                <div class="mt-4">
+                    <a href="{{ route('filament.admin.resources.customers.index') }}" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-500 focus:outline-none focus:border-blue-700 focus:ring focus:ring-blue-200 active:bg-blue-600 disabled:opacity-25 transition">
+                        📷 View Customer Photos & Documents
+                    </a>
                 </div>
-                <div><strong>Total Foto:</strong> {{ $user->userPhotos->count() }}</div>
             </div>
         </div>
-    @else
-        <div class="text-center py-8 text-gray-500">
-            <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <h3 class="mt-2 text-lg font-medium">Tidak ada foto</h3>
-            <p class="mt-1">User ini belum mengupload foto dokumen.</p>
-        </div>
-    @endif
+    </div>
 </div>
 
 <!-- Modal untuk melihat gambar dalam ukuran penuh -->

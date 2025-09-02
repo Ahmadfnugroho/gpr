@@ -14,6 +14,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
 use Filament\Tables\Actions\ExportAction;
 use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Tables\Actions\ImportAction;
@@ -37,48 +38,24 @@ class UserResource extends Resource
         return [
             'name',
             'email',
-            'userPhoneNumbers.phone_number',
         ];
     }
 
     public static function getGlobalSearchEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
-        return parent::getGlobalSearchEloquentQuery()
-            ->with([
-                'userPhoneNumbers:id,user_id,phone_number',
-                'transactions:id,user_id,start_date,end_date,booking_status'
-            ])
-            ->where('status', '!=', 'deleted')
-            ->whereHas('transactions', function ($query) {
-                $query->where('booking_status', '!=', 'cancel');
-            });
+        return parent::getGlobalSearchEloquentQuery();
     }
 
     public static function getGlobalSearchResultDetails($record): array
     {
-        $phone = $record->userPhoneNumbers->first();
-
-        // Get latest transaction dates
-        $latestTransaction = $record->transactions()
-            ->where('booking_status', '!=', 'cancel')
-            ->latest('created_at')
-            ->first();
-
-        $transactionInfo = '-';
-        if ($latestTransaction) {
-            $startDate = $latestTransaction->start_date ? $latestTransaction->start_date->format('d M Y') : '-';
-            $endDate = $latestTransaction->end_date ? $latestTransaction->end_date->format('d M Y') : '-';
-            $transactionInfo = "{$startDate} - {$endDate}";
-        }
-
         // Email verification status
         $emailVerified = $record->email_verified_at ? '✅ Verified' : '❌ Not Verified';
-
+        
         return [
             'Email' => $record->email,
             'Email Status' => $emailVerified,
-            'Phone' => $phone ? $phone->phone_number : '-',
-            'Latest Rental' => $transactionInfo,
+            'Roles' => $record->roles->pluck('name')->join(', ') ?: 'No roles assigned',
+            'Created' => $record->created_at?->format('d M Y'),
         ];
     }
 
@@ -97,53 +74,35 @@ class UserResource extends Resource
             ->schema([
 
 
-                Forms\Components\Section::make([
-                    Forms\Components\TextInput::make('name')
-                        ->required()
-                        ->maxLength(255),
-                    Forms\Components\CheckboxList::make('roles')
-                        ->relationship('roles', 'name')
-                        ->searchable(),
-                    Forms\Components\TextInput::make('email')
-                        ->required()
-                        ->email()
-                        ->maxLength(255),
-                    Forms\Components\DateTimePicker::make('email_verified_at')
-                        ->label('Email Verified At')
-                        ->helperText('Leave blank if email is not verified. Set date/time when email was verified.')
-                        ->nullable(),
-                    Forms\Components\TextInput::make('password')
-                        ->default(function () {
-                            return Str::random(8);
-                        },)
-                        ->password()
-                        ->hidden(),
-                    Forms\Components\TextInput::make('address'),
-                    Forms\Components\TextInput::make('job')
-                        ->maxLength(255),
-                    Forms\Components\TextInput::make('office_address'),
-                    Forms\Components\TextInput::make('instagram_username')
-                        ->maxLength(255),
-                    Forms\Components\TextInput::make('facebook_username')
-                        ->maxLength(255),
-                    Forms\Components\TextInput::make('emergency_contact_name')
-                        ->maxLength(255),
-                    Forms\Components\TextInput::make('emergency_contact_number')
-                        ->maxLength(255),
-                    Forms\Components\Select::make('gender')
-                        ->options([
-                            'male' => 'Male',
-                            'female' => 'Female'
-                        ]),
-                    Forms\Components\Select::make('status')
-                        ->options([
-                            'active' => 'Active',
-                            'blacklist' => 'Blacklist'
-                        ])
-                        ->default('blacklist'),
-                    Forms\Components\TextInput::make('source_info')
-                        ->maxLength(255),
-                ])
+                Forms\Components\Section::make('User Information')
+                    ->schema([
+                        Forms\Components\TextInput::make('name')
+                            ->label('Full Name')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('email')
+                            ->label('Email Address')
+                            ->required()
+                            ->email()
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(255),
+                        Forms\Components\DateTimePicker::make('email_verified_at')
+                            ->label('Email Verified At')
+                            ->helperText('Leave blank if email is not verified. Set date/time when email was verified.')
+                            ->nullable(),
+                        Forms\Components\TextInput::make('password')
+                            ->label('Password')
+                            ->password()
+                            ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
+                            ->dehydrated(fn ($state) => filled($state))
+                            ->required(fn (string $context): bool => $context === 'create')
+                            ->helperText('Leave blank to keep current password when editing'),
+                        Forms\Components\CheckboxList::make('roles')
+                            ->label('User Roles')
+                            ->relationship('roles', 'name')
+                            ->searchable()
+                            ->helperText('Select roles for this admin/staff user'),
+                    ])
             ]);
     }
 
@@ -211,39 +170,17 @@ class UserResource extends Resource
                     ->tooltip(fn($record) => $record->email_verified_at
                         ? 'Verified on: ' . $record->email_verified_at->format('d M Y H:i')
                         : 'Email not verified'),
-                Tables\Columns\TextColumn::make('userPhoneNumbers.phone_number')
-                    ->label('Phone Number')
-                    ->sortable(),
-                Tables\Columns\IconColumn::make('status')
-                    ->label('Status Keanggotaan')
-                    ->getStateUsing(fn($record) => $record->status === 'active')
-                    ->trueIcon('heroicon-o-check-circle')
-                    ->falseIcon('heroicon-o-x-circle')
-                    ->trueColor('success')
-                    ->falseColor('danger'),
-                Tables\Columns\TextColumn::make('userPhotos_count')
-                    ->label('Foto')
-                    ->counts('userPhotos')
+                Tables\Columns\TextColumn::make('roles.name')
+                    ->label('Roles')
                     ->badge()
-                    ->color(fn($state) => $state >= 3 ? 'success' : ($state >= 1 ? 'warning' : 'danger'))
-                    ->tooltip(function ($record) {
-                        $photos = $record->userPhotos->map(function ($photo) {
-                            if ($photo->photo_type === 'ktp') {
-                                return '📄 KTP';
-                            } elseif ($photo->photo_type === 'additional_id_1') {
-                                return '🆔 ID 1: ' . ($photo->id_type ?: 'Tidak diisi');
-                            } elseif ($photo->photo_type === 'additional_id_2') {
-                                return '🆔 ID 2: ' . ($photo->id_type ?: 'Tidak diisi');
-                            } elseif ($photo->photo_type === 'additional_id') {
-                                return '🆔 ID Tambahan: ' . ($photo->id_type ?: 'Tidak diisi');
-                            }
-                            return '📋 ' . $photo->photo_type;
-                        })->implode(', ');
-
-                        $count = $record->userPhotos->count();
-                        return "Foto ({$count}/3): " . ($photos ?: 'Tidak ada foto');
-                    })
+                    ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Created')
+                    ->dateTime('d M Y H:i')
+                    ->sortable()
+                    ->toggleable(),
+                // Note: Phone numbers and photos now handled by Customer model
 
 
             ])
@@ -331,15 +268,7 @@ class UserResource extends Resource
                         ->label('Ubah Status User'),
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
-                    Tables\Actions\Action::make('view_photos')
-                        ->label('Lihat Foto')
-                        ->icon('heroicon-o-photo')
-                        ->color('info')
-                        ->modalHeading(fn($record) => 'Foto Dokumen - ' . $record->name)
-                        ->modalContent(fn($record) => view('filament.resources.user-resource.pages.view-photos', ['user' => $record]))
-                        ->modalSubmitAction(false)
-                        ->modalCancelActionLabel('Tutup')
-                        ->visible(fn($record) => $record->userPhotos()->count() > 0),
+                    // Photo viewing removed - now handled by Customer model
                     Tables\Actions\DeleteAction::make(),
 
 
@@ -397,9 +326,7 @@ class UserResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\UserPhoneNumberRelationManager::class,
-            RelationManagers\UserPhotoRelationManager::class
-
+            // Note: Phone numbers and photos are now handled by Customer model
         ];
     }
 

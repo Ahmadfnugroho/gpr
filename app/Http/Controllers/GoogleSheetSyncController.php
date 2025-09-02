@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Services\GoogleSheetsServices;
 use App\Models\SyncLog;
 use App\Models\User;
-use App\Models\UserPhoneNumber;
+use App\Models\Customer;
+use App\Models\CustomerPhoneNumber;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -117,21 +118,20 @@ class GoogleSheetSyncController
                     }
                     $incomingUpdatedAt = Carbon::parse($rowData['updated_at'] ?? now());
 
-                    $user = User::where('email', $rowData['Email Address'])->first();
+                    // Check if this should be a Customer (rental data) instead of User (admin)
+                    $customer = Customer::where('email', $rowData['Email Address'])->first();
 
-                    if ($user && $user->updated_at->gte($incomingUpdatedAt)) {
+                    if ($customer && $customer->updated_at->gte($incomingUpdatedAt)) {
                         continue; // Data lokal lebih baru, lewati
                     }
-
 
                     // Use flexible column mapping for better compatibility
                     $gender = $this->convertGenderToDb($this->getColumnValue($rowData, ['Jenis Kelamin']));
                     $statusRaw = $this->getColumnValue($rowData, ['Status', 'STATUS', 'status']) ?? 'blacklist';
                     $status = $this->convertStatusToDb($statusRaw);
 
-                    // ✅ DEBUG: Log all possible Status values
-
-                    $user = User::updateOrCreate(
+                    // Create/Update Customer (not User) since this contains rental customer data
+                    $customer = Customer::updateOrCreate(
                         ['email' => $rowData['Email Address']],
                         [
                             'name' => $rowData['Nama Lengkap (Sesuai KTP)'] ?? null,
@@ -144,16 +144,16 @@ class GoogleSheetSyncController
                             'gender' => $gender,
                             'source_info' => $rowData['Mengetahui Global Photo Rental dari'] ?? null,
                             'status' => $status,
-                            // Password dihapus dari sync - biarkan user pakai password existing atau reset manual
+                            // Note: Customer has password for authentication, but sync doesn't update it
                         ]
                     );
 
-                    // Simpan nomor telepon
+                    // Simpan nomor telepon ke Customer
                     $phoneNumbers = array_filter([$rowData['No. Hp1'] ?? null, $rowData['No. Hp2'] ?? null]);
                     foreach ($phoneNumbers as $phone) {
-                        UserPhoneNumber::updateOrCreate(
-                            ['user_id' => $user->id, 'phone_number' => $phone],
-                            ['user_id' => $user->id, 'phone_number' => $phone]
+                        CustomerPhoneNumber::updateOrCreate(
+                            ['customer_id' => $customer->id, 'phone_number' => $phone],
+                            ['customer_id' => $customer->id, 'phone_number' => $phone]
                         );
                     }
                 }
@@ -168,10 +168,10 @@ class GoogleSheetSyncController
     public function export(Request $request)
     {
         $lastSyncAt = $request->query('since');
-        $users = User::with('userPhoneNumbers')
+        // Export Customer data (not User data) since this is for rental customers
+        $customers = Customer::with('customerPhoneNumbers')
             ->when($lastSyncAt, fn($q) => $q->where('updated_at', '>', $lastSyncAt))
             ->get();
-
 
         $headers = [
             'Email Address',
@@ -193,24 +193,24 @@ class GoogleSheetSyncController
         $values = [];
         $values[] = $headers;
 
-        foreach ($users as $user) {
-            $phones = $user->userPhoneNumbers->pluck('phone_number')->values();
+        foreach ($customers as $customer) {
+            $phones = $customer->customerPhoneNumbers->pluck('phone_number')->values();
 
             $values[] = [
-                $user->email,
-                $user->name,
-                $user->address,
-                $user->job,
-                $user->office_address,
-                $user->instagram_username,
-                $user->emergency_contact_name,
-                $user->emergency_contact_number,
-                $this->convertGenderToSheet($user->gender),
-                $user->source_info,
-                $this->convertStatusToSheet($user->status),
+                $customer->email,
+                $customer->name,
+                $customer->address,
+                $customer->job,
+                $customer->office_address,
+                $customer->instagram_username,
+                $customer->emergency_contact_name,
+                $customer->emergency_contact_number,
+                $this->convertGenderToSheet($customer->gender),
+                $customer->source_info,
+                $this->convertStatusToSheet($customer->status),
                 $phones[0] ?? '',
                 $phones[1] ?? '',
-                $user->updated_at->toISOString()
+                $customer->updated_at->toISOString()
             ];
         }
 
