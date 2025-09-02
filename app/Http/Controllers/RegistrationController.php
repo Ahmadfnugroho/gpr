@@ -16,7 +16,11 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Imagick\Driver;
+use Intervention\Image\Drivers\Imagick\Driver as ImagickDriver;
+use Intervention\Image\Drivers\Gd\Driver as GdDriver;
+use Intervention\Image\Format;
+use Intervention\Image\MediaType;
+use Intervention\Image\FileExtension;
 
 class RegistrationController extends Controller
 {
@@ -134,8 +138,14 @@ class RegistrationController extends Controller
                     $ktpFile = $request->file('ktp_photo');
                     Log::info('Registration: Processing KTP photo', ['customer_id' => $customer->id, 'file_size' => $ktpFile->getSize()]);
 
+                    // Buat direktori temp jika belum ada
+                    $tempDir = storage_path('app/public/temp');
+                    if (!is_dir($tempDir)) {
+                        mkdir($tempDir, 0755, true);
+                    }
+
                     // Simpan file sementara
-                    $tempPath = storage_path('app/public/temp/' . Str::random(20) . '.' . $ktpFile->getClientOriginalExtension());
+                    $tempPath = $tempDir . '/' . Str::random(20) . '.' . $ktpFile->getClientOriginalExtension();
                     $ktpFile->move(dirname($tempPath), basename($tempPath));
 
                     // Kompresi gambar jika ukurannya > 1MB
@@ -351,8 +361,14 @@ class RegistrationController extends Controller
             return redirect()->route('registration.success')
                 ->with('success', 'Registrasi berhasil! Silakan cek email Anda untuk verifikasi.');
         } catch (\Exception $e) {
+            Log::error('Registration failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->except(['ktp_photo', 'id_photo', 'id_photo_2']) // Exclude file data from logs
+            ]);
+            
             return redirect()->back()
-                ->with('error', 'Terjadi kesalahan saat registrasi. Silakan coba lagi.')
+                ->with('error', 'Terjadi kesalahan saat registrasi: ' . $e->getMessage())
                 ->withInput();
         }
     }
@@ -465,15 +481,15 @@ class RegistrationController extends Controller
 
     public function verifyEmail(Request $request)
     {
-        $user = User::findOrFail($request->route('id'));
+        $customer = Customer::findOrFail($request->route('id'));
 
-        if ($user->hasVerifiedEmail()) {
+        if ($customer->hasVerifiedEmail()) {
             return redirect()->route('registration.success')
                 ->with('message', 'Email sudah terverifikasi sebelumnya.');
         }
 
-        if ($user->markEmailAsVerified()) {
-            event(new \Illuminate\Auth\Events\Verified($user));
+        if ($customer->markEmailAsVerified()) {
+            event(new \Illuminate\Auth\Events\Verified($customer));
         }
 
         return redirect()->route('registration.success')
@@ -523,9 +539,11 @@ class RegistrationController extends Controller
     private function compressImage($imagePath)
     {
         try {
-            // Check if Imagick is available
+            // Check if Imagick is available and create manager with new syntax
             $useImagick = extension_loaded('imagick');
-            $manager = new ImageManager($useImagick ? new \Intervention\Image\Drivers\Imagick\Driver() : new \Intervention\Image\Drivers\Gd\Driver());
+            $manager = $useImagick ? 
+                ImageManager::withDriver(ImagickDriver::class) : 
+                ImageManager::withDriver(GdDriver::class);
 
             $originalSize = filesize($imagePath);
             Log::info('Starting image compression', ['original_size' => $originalSize, 'use_imagick' => $useImagick]);
@@ -539,10 +557,7 @@ class RegistrationController extends Controller
                 Log::info('Image resized to 800px width');
             }
 
-            // 2. Remove metadata to save space
-            $image = $image->removeMetadata();
-
-            // 3. Determine output format: prefer WebP if supported, otherwise JPG
+            // 2. Determine output format: prefer WebP if supported, otherwise JPG
             $supportsWebP = $this->browserSupportsWebP();
             $outputFormat = $supportsWebP ? 'webp' : 'jpg';
             $outputExtension = $supportsWebP ? '.webp' : '.jpg';
@@ -553,7 +568,7 @@ class RegistrationController extends Controller
             $compressedFileName = 'compressed_' . Str::random(10) . $outputExtension;
             $compressedPath = $tempDir . '/' . $compressedFileName;
 
-            // 4. Apply progressive compression with quality reduction until file < 1MB
+            // 3. Apply progressive compression with quality reduction until file < 1MB
             $qualities = [85, 75, 65, 55, 45, 35, 25, 15];
             $targetSize = 1024 * 1024; // 1MB
             $finalQuality = 85;
@@ -573,12 +588,12 @@ class RegistrationController extends Controller
                 }
             }
 
-            // 5. If still > 1MB, try more aggressive resize
+            // 4. If still > 1MB, try more aggressive resize
             if (filesize($compressedPath) >= $targetSize) {
                 Log::info('File still too large, applying aggressive resize');
                 $image = $manager->read($imagePath);
-                $image->scale(width: 600)->removeMetadata();
-                
+                $image->scale(width: 600);
+
                 if ($outputFormat === 'webp') {
                     $image->toWebp(20)->save($compressedPath);
                 } else {
@@ -587,34 +602,8 @@ class RegistrationController extends Controller
                 $finalQuality = 20;
             }
 
-            // 6. Apply Imagick optimization if available
-            if ($useImagick && class_exists('Imagick')) {
-                try {
-                    $imagick = new \Imagick($compressedPath);
-                    
-                    // Strip all metadata and profiles
-                    $imagick->stripImage();
-                    
-                    // Optimize for web
-                    $imagick->setImageFormat($outputFormat === 'webp' ? 'WEBP' : 'JPEG');
-                    
-                    // Apply additional optimization
-                    if (method_exists($imagick, 'optimizeImageLayers')) {
-                        $imagick->optimizeImageLayers();
-                    }
-                    
-                    // Set compression quality
-                    $imagick->setImageCompressionQuality($finalQuality);
-                    
-                    // Write optimized image
-                    $imagick->writeImage($compressedPath);
-                    $imagick->destroy();
-                    
-                    Log::info('Applied Imagick optimization');
-                } catch (\Exception $e) {
-                    Log::warning('Imagick optimization failed: ' . $e->getMessage());
-                }
-            }
+            // 5. Apply native Imagick optimization if available (skip custom Imagick code)
+            // The new Intervention Image v3 handles optimization internally
 
             $finalSize = filesize($compressedPath);
             $compressionRatio = round(($originalSize - $finalSize) / $originalSize * 100);
@@ -643,10 +632,13 @@ class RegistrationController extends Controller
                 'original_path' => $imagePath,
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             // Fallback: copy original file
             $copyName = 'temp/original_' . Str::random(10) . '.' . pathinfo($imagePath, PATHINFO_EXTENSION);
             $fallbackPath = storage_path('app/public/' . $copyName);
+            if (!is_dir(dirname($fallbackPath))) {
+                mkdir(dirname($fallbackPath), 0755, true);
+            }
             copy($imagePath, $fallbackPath);
             return $copyName;
         }
