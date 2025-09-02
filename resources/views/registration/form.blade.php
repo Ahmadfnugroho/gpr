@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Registrasi - Global Photo Rental</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -256,8 +257,35 @@
                             <input type="email" class="form-control @error('email') is-invalid @enderror"
                                 id="email" name="email" value="{{ old('email') }}" required>
                         </div>
+                        <div id="email-availability" class="mt-2" style="display: none;"></div>
                         @error('email')
-                        <div class="invalid-feedback">{{ $message }}</div>
+                        <div class="invalid-feedback d-block">
+                            {{ $message }}
+                            @if(str_contains($message, 'sudah terdaftar'))
+                                <div class="mt-2 p-3 bg-info bg-opacity-10 border border-info border-opacity-25 rounded">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="fas fa-info-circle text-info me-2"></i>
+                                        <strong class="text-info">Bantuan Customer Service</strong>
+                                    </div>
+                                    <div class="small">
+                                        <div class="mb-1">
+                                            <i class="fab fa-whatsapp text-success me-2"></i>
+                                            <strong>WhatsApp:</strong> 
+                                            <a href="https://wa.me/6281212349564" target="_blank" class="text-decoration-none">
+                                                +62 812-1234-9564
+                                            </a>
+                                        </div>
+                                        <div>
+                                            <i class="fas fa-envelope text-primary me-2"></i>
+                                            <strong>Email:</strong> 
+                                            <a href="mailto:global.photorental@gmail.com" class="text-decoration-none">
+                                                global.photorental@gmail.com
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
                         @enderror
                     </div>
                     <!-- Sumber Info -->
@@ -452,8 +480,14 @@
                                 id="ktp_photo" name="ktp_photo" accept="image/*" required>
                             <div class="form-text">Format: JPG, JPEG, PNG, WebP. Maksimal 10MB. File akan dioptimalkan secara otomatis.</div>
                             <div id="ktp_photo-notification" class="alert alert-info mt-2" style="display: none;"></div>
-                            <div class="progress mt-2" style="display: none;">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                            <div id="ktp_photo-progress" class="mt-2" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted">Mengupload foto KTP...</small>
+                                    <small id="ktp_photo-progress-text" class="text-muted">0%</small>
+                                </div>
+                                <div class="progress">
+                                    <div id="ktp_photo-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%"></div>
+                                </div>
                             </div>
                             @error('ktp_photo')
                             <div class="invalid-feedback">{{ $message }}</div>
@@ -481,8 +515,14 @@
                                 id="id_photo" name="id_photo" accept="image/*" required>
                             <div class="form-text">Format: JPG, JPEG, PNG, WebP. Maksimal 10MB. File akan dioptimalkan secara otomatis.</div>
                             <div id="id_photo-notification" class="alert alert-info mt-2" style="display: none;"></div>
-                            <div class="progress mt-2" style="display: none;">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                            <div id="id_photo-progress" class="mt-2" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted">Mengupload foto ID tambahan 1...</small>
+                                    <small id="id_photo-progress-text" class="text-muted">0%</small>
+                                </div>
+                                <div class="progress">
+                                    <div id="id_photo-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%"></div>
+                                </div>
                             </div>
                             @error('id_photo')
                             <div class="invalid-feedback">{{ $message }}</div>
@@ -510,6 +550,15 @@
                                 id="id_photo_2" name="id_photo_2" accept="image/*" required>
                             <div class="form-text">Boleh diwatermark. Format: JPG, JPEG, PNG, WebP. Maksimal 10MB</div>
                             <div id="id_photo_2-notification" class="alert alert-info mt-2" style="display: none;"></div>
+                            <div id="id_photo_2-progress" class="mt-2" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted">Mengupload foto ID tambahan 2...</small>
+                                    <small id="id_photo_2-progress-text" class="text-muted">0%</small>
+                                </div>
+                                <div class="progress">
+                                    <div id="id_photo_2-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-warning" role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </div>
                             @error('id_photo_2')
                             <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -748,8 +797,102 @@
         document.getElementById('emergency_contact_number').addEventListener('blur', function() {
             formatPhoneNumber(this);
         });
+        
+        // Email availability checking
+        let emailCheckTimeout;
+        document.getElementById('email').addEventListener('input', function() {
+            clearTimeout(emailCheckTimeout);
+            const email = this.value.trim();
+            
+            if (email && email.includes('@') && email.includes('.')) {
+                emailCheckTimeout = setTimeout(() => {
+                    checkEmailAvailability(email);
+                }, 1000); // Check after 1 second of no typing
+            } else {
+                hideEmailAvailability();
+            }
+        });
+        
+        function checkEmailAvailability(email) {
+            const availabilityDiv = document.getElementById('email-availability');
+            availabilityDiv.innerHTML = '<div class="small text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Mengecek ketersediaan email...</div>';
+            availabilityDiv.style.display = 'block';
+            
+            // Create a simple check by making a request to see if email exists
+            fetch('/api/check-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || document.querySelector('[name="_token"]').value
+                },
+                body: JSON.stringify({ email: email })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.exists) {
+                    availabilityDiv.innerHTML = `
+                        <div class="alert alert-warning small py-2 mb-0">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            <strong>Email sudah terdaftar!</strong> 
+                            Hubungi customer service untuk bantuan:
+                            <div class="mt-1">
+                                <a href="https://wa.me/6281212349564" target="_blank" class="btn btn-success btn-sm me-2">
+                                    <i class="fab fa-whatsapp"></i> WhatsApp
+                                </a>
+                                <a href="mailto:global.photorental@gmail.com" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-envelope"></i> Email
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    availabilityDiv.innerHTML = '<div class="small text-success"><i class="fas fa-check me-1"></i>Email tersedia</div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking email:', error);
+                hideEmailAvailability();
+            });
+        }
+        
+        function hideEmailAvailability() {
+            document.getElementById('email-availability').style.display = 'none';
+        }
 
-        // Form validation with image optimization
+        // Enhanced upload progress tracking
+        function showUploadProgress(inputId, show = true) {
+            const progressContainer = document.getElementById(`${inputId}-progress`);
+            const progressBar = document.getElementById(`${inputId}-progress-bar`);
+            const progressText = document.getElementById(`${inputId}-progress-text`);
+            
+            if (progressContainer) {
+                if (show) {
+                    progressContainer.style.display = 'block';
+                    updateUploadProgress(inputId, 0);
+                } else {
+                    progressContainer.style.display = 'none';
+                }
+            }
+        }
+        
+        function updateUploadProgress(inputId, percentage) {
+            const progressBar = document.getElementById(`${inputId}-progress-bar`);
+            const progressText = document.getElementById(`${inputId}-progress-text`);
+            
+            if (progressBar && progressText) {
+                progressBar.style.width = percentage + '%';
+                progressText.textContent = percentage + '%';
+                
+                if (percentage >= 100) {
+                    progressBar.classList.remove('progress-bar-animated');
+                    setTimeout(() => {
+                        showUploadProgress(inputId, false);
+                    }, 1500);
+                }
+            }
+        }
+
+        // Form validation with enhanced image optimization and progress
         (function() {
             'use strict';
             window.addEventListener('load', function() {
@@ -758,20 +901,26 @@
                 imageInputs.forEach(input => {
                     input.addEventListener('change', async function(event) {
                         if (this.files && this.files[0]) {
+                            const inputId = this.id;
+                            
                             // Show progress bar
-                            const progressContainer = this.nextElementSibling.nextElementSibling.nextElementSibling;
-                            const progressBar = progressContainer.querySelector('.progress-bar');
-                            progressContainer.style.display = 'block';
-                            progressBar.style.width = '50%';
-
+                            showUploadProgress(inputId, true);
+                            updateUploadProgress(inputId, 20);
+                            
+                            // Simulate upload progress
+                            setTimeout(() => updateUploadProgress(inputId, 40), 200);
+                            setTimeout(() => updateUploadProgress(inputId, 60), 400);
+                            
                             // Validate and compress the file
-                            await validateFile(this.files[0], this);
-
-                            // Hide progress bar after completion
-                            progressBar.style.width = '100%';
-                            setTimeout(() => {
-                                progressContainer.style.display = 'none';
-                            }, 1000);
+                            const isValid = await validateFile(this.files[0], this);
+                            
+                            if (isValid) {
+                                updateUploadProgress(inputId, 80);
+                                setTimeout(() => updateUploadProgress(inputId, 100), 300);
+                            } else {
+                                // Hide progress if validation failed
+                                showUploadProgress(inputId, false);
+                            }
                         }
                     });
                 });

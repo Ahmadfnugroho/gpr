@@ -60,7 +60,7 @@ class RegistrationController extends Controller
         ], [
             'email.required' => 'Email wajib diisi',
             'email.email' => 'Format email tidak valid',
-            'email.unique' => 'Email sudah terdaftar',
+            'email.unique' => 'Email ini sudah terdaftar dalam sistem kami. Jika Anda sudah memiliki akun, silakan hubungi customer service di WhatsApp +62 812-1234-9564 atau email global.photorental@gmail.com untuk bantuan.',
             'source_info.required' => 'Silakan pilih dari mana Anda mengetahui Global Photo Rental',
             'name.required' => 'Nama lengkap wajib diisi',
             'gender.required' => 'Jenis kelamin wajib dipilih',
@@ -144,9 +144,19 @@ class RegistrationController extends Controller
                         mkdir($tempDir, 0755, true);
                     }
 
-                    // Simpan file sementara
-                    $tempPath = $tempDir . '/' . Str::random(20) . '.' . $ktpFile->getClientOriginalExtension();
-                    $ktpFile->move(dirname($tempPath), basename($tempPath));
+                    // Simpan file sementara dengan handling Windows path
+                    $tempFileName = 'ktp_temp_' . Str::random(20) . '.' . $ktpFile->getClientOriginalExtension();
+                    $tempPath = $tempDir . DIRECTORY_SEPARATOR . $tempFileName;
+                    
+                    // Gunakan move() method yang lebih reliable
+                    if (!$ktpFile->move($tempDir, $tempFileName)) {
+                        throw new \Exception('Gagal menyimpan file sementara KTP');
+                    }
+                    
+                    // Verifikasi file tersimpan dengan benar
+                    if (!file_exists($tempPath) || !is_readable($tempPath)) {
+                        throw new \Exception('File KTP tidak dapat diakses setelah upload');
+                    }
 
                     // Kompresi gambar jika ukurannya > 1MB
                     if ($ktpFile->getSize() > 1024 * 1024) {
@@ -217,9 +227,17 @@ class RegistrationController extends Controller
                         'extension' => $idFile->getClientOriginalExtension()
                     ]);
 
-                    // Simpan file sementara
-                    $tempPath = storage_path('app/public/temp/' . Str::random(20) . '.' . $idFile->getClientOriginalExtension());
-                    $idFile->move(dirname($tempPath), basename($tempPath));
+                    // Simpan file sementara dengan handling Windows path
+                    $tempFileName = 'id1_temp_' . Str::random(20) . '.' . $idFile->getClientOriginalExtension();
+                    $tempPath = storage_path('app/public/temp') . DIRECTORY_SEPARATOR . $tempFileName;
+                    
+                    if (!$idFile->move(storage_path('app/public/temp'), $tempFileName)) {
+                        throw new \Exception('Gagal menyimpan file sementara ID 1');
+                    }
+                    
+                    if (!file_exists($tempPath) || !is_readable($tempPath)) {
+                        throw new \Exception('File ID 1 tidak dapat diakses setelah upload');
+                    }
 
                     // Kompresi gambar jika ukurannya > 1MB
                     if ($idFile->getSize() > 1024 * 1024) {
@@ -291,9 +309,17 @@ class RegistrationController extends Controller
                         'extension' => $idFile2->getClientOriginalExtension()
                     ]);
 
-                    // Simpan file sementara
-                    $tempPath2 = storage_path('app/public/temp/' . Str::random(20) . '.' . $idFile2->getClientOriginalExtension());
-                    $idFile2->move(dirname($tempPath2), basename($tempPath2));
+                    // Simpan file sementara dengan handling Windows path
+                    $tempFileName2 = 'id2_temp_' . Str::random(20) . '.' . $idFile2->getClientOriginalExtension();
+                    $tempPath2 = storage_path('app/public/temp') . DIRECTORY_SEPARATOR . $tempFileName2;
+                    
+                    if (!$idFile2->move(storage_path('app/public/temp'), $tempFileName2)) {
+                        throw new \Exception('Gagal menyimpan file sementara ID 2');
+                    }
+                    
+                    if (!file_exists($tempPath2) || !is_readable($tempPath2)) {
+                        throw new \Exception('File ID 2 tidak dapat diakses setelah upload');
+                    }
 
                     // Kompresi gambar jika ukurannya > 1MB
                     if ($idFile2->getSize() > 1024 * 1024) {
@@ -566,7 +592,7 @@ class RegistrationController extends Controller
             if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
 
             $compressedFileName = 'compressed_' . Str::random(10) . $outputExtension;
-            $compressedPath = $tempDir . '/' . $compressedFileName;
+            $compressedPath = $tempDir . DIRECTORY_SEPARATOR . $compressedFileName;
 
             // 3. Apply progressive compression with quality reduction until file < 1MB
             $qualities = [85, 75, 65, 55, 45, 35, 25, 15];

@@ -29,6 +29,9 @@ Route::get('/email/verify/{id}/{hash}', [RegistrationController::class, 'verifyE
 // Product Search Route
 Route::get('/search-products', [ProductSearchController::class, 'index'])->name('product.search');
 
+// Email Check API Route
+Route::post('/api/check-email', [App\Http\Controllers\Api\EmailCheckController::class, 'checkEmail'])->name('api.check-email');
+
 // Region API Routes
 Route::prefix('api/regions')->group(function () {
     Route::get('/provinces', [App\Http\Controllers\Api\RegionController::class, 'getProvinces'])->name('api.provinces');
