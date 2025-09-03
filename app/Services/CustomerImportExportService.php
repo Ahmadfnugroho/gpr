@@ -6,20 +6,30 @@ use App\Imports\CustomerImporter;
 use App\Models\Customer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Maatwebsite\Excel\Facades\Excel;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+// use Maatwebsite\Excel\Facades\Excel;
+// use Maatwebsite\Excel\Concerns\FromCollection;
+// use Maatwebsite\Excel\Concerns\WithHeadings;
+// use Maatwebsite\Excel\Concerns\WithMapping;
+// use Maatwebsite\Excel\Concerns\WithStyles;
+// use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class CustomerImportExportService
 {
     /**
      * Import customers from Excel file
+     * TEMPORARILY DISABLED - Excel package not properly installed
      */
     public function importCustomers(UploadedFile $file, bool $updateExisting = false): array
     {
+        return [
+            'total' => 0,
+            'success' => 0,
+            'failed' => 0,
+            'updated' => 0,
+            'errors' => ['Excel import temporarily disabled - package not properly installed']
+        ];
+        
+        /* ORIGINAL CODE - COMMENTED OUT UNTIL EXCEL PACKAGE IS FIXED
         try {
             // Validate file type
             $allowedMimeTypes = [
@@ -50,39 +60,57 @@ class CustomerImportExportService
                 'errors' => ['Error: ' . $e->getMessage()]
             ];
         }
+        */
     }
 
     /**
      * Export customers to Excel
+     * TEMPORARILY DISABLED - Excel package not properly installed
      */
     public function exportCustomers(array $customerIds = null): string
     {
+        throw new \Exception('Excel export temporarily disabled - package not properly installed');
+        
+        /* ORIGINAL CODE - COMMENTED OUT UNTIL EXCEL PACKAGE IS FIXED
         $export = new CustomerExport($customerIds);
         $filename = 'customers_export_' . date('Y-m-d_H-i-s') . '.xlsx';
         
         Excel::store($export, $filename, 'public');
         
         return Storage::disk('public')->path($filename);
+        */
     }
 
     /**
      * Generate Excel template for import
+     * TEMPORARILY DISABLED - Excel package not properly installed
      */
     public function generateTemplate(): string
     {
+        throw new \Exception('Excel template generation temporarily disabled - package not properly installed');
+        
+        /* ORIGINAL CODE - COMMENTED OUT UNTIL EXCEL PACKAGE IS FIXED
         $template = new CustomerImportTemplate();
         $filename = 'customer_import_template.xlsx';
         
         Excel::store($template, $filename, 'public');
         
         return Storage::disk('public')->path($filename);
+        */
     }
 
     /**
      * Validate Excel file structure
+     * TEMPORARILY DISABLED - Excel package not properly installed
      */
     public function validateFileStructure(UploadedFile $file): array
     {
+        return [
+            'valid' => false,
+            'errors' => ['Excel validation temporarily disabled - package not properly installed']
+        ];
+        
+        /* ORIGINAL CODE - COMMENTED OUT UNTIL EXCEL PACKAGE IS FIXED
         try {
             $data = Excel::toArray(new CustomerImporter(), $file);
             
@@ -119,13 +147,15 @@ class CustomerImportExportService
                 'errors' => ['File validation error: ' . $e->getMessage()]
             ];
         }
+        */
     }
 }
 
 /**
  * Customer Export Class
  */
-class CustomerExport implements FromCollection, WithHeadings, WithMapping, WithStyles
+// class CustomerExport implements FromCollection, WithHeadings, WithMapping, WithStyles
+class CustomerExport
 {
     protected $customerIds;
 
@@ -193,22 +223,23 @@ class CustomerExport implements FromCollection, WithHeadings, WithMapping, WithS
         ];
     }
 
-    public function styles(Worksheet $sheet)
-    {
-        return [
-            // Style the first row as bold text
-            1 => ['font' => ['bold' => true]],
-            
-            // Set auto width for all columns
-            'A:Q' => ['alignment' => ['wrapText' => true]]
-        ];
-    }
+    // public function styles(Worksheet $sheet)
+    // {
+    //     return [
+    //         // Style the first row as bold text
+    //         1 => ['font' => ['bold' => true]],
+    //         
+    //         // Set auto width for all columns
+    //         'A:Q' => ['alignment' => ['wrapText' => true]]
+    //     ];
+    // }
 }
 
 /**
  * Customer Import Template Class
  */
-class CustomerImportTemplate implements FromCollection, WithHeadings, WithStyles
+// class CustomerImportTemplate implements FromCollection, WithHeadings, WithStyles
+class CustomerImportTemplate
 {
     public function collection()
     {
@@ -233,66 +264,66 @@ class CustomerImportTemplate implements FromCollection, WithHeadings, WithStyles
         ]);
     }
 
-    public function headings(): array
-    {
-        return CustomerImporter::getExpectedHeaders();
-    }
+    // public function headings(): array
+    // {
+    //     return CustomerImporter::getExpectedHeaders();
+    // }
 
-    public function styles(Worksheet $sheet)
-    {
-        // Set header row style
-        $sheet->getStyle('A1:N1')->applyFromArray([
-            'font' => [
-                'bold' => true,
-                'color' => ['rgb' => 'FFFFFF']
-            ],
-            'fill' => [
-                'fillType' => 'solid',
-                'startColor' => ['rgb' => '4CAF50']
-            ]
-        ]);
-
-        // Set sample data row style
-        $sheet->getStyle('A2:N2')->applyFromArray([
-            'fill' => [
-                'fillType' => 'solid',
-                'startColor' => ['rgb' => 'E8F5E8']
-            ]
-        ]);
-
-        // Auto-size columns
-        foreach (range('A', 'N') as $column) {
-            $sheet->getColumnDimension($column)->setAutoSize(true);
-        }
-
-        // Add data validation for gender column (E)
-        $validation = $sheet->getCell('E2')->getDataValidation();
-        $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
-        $validation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
-        $validation->setAllowBlank(true);
-        $validation->setShowInputMessage(true);
-        $validation->setShowErrorMessage(true);
-        $validation->setShowDropDown(true);
-        $validation->setErrorTitle('Input error');
-        $validation->setError('Value is not in list.');
-        $validation->setPromptTitle('Pick from list');
-        $validation->setPrompt('Please pick a value from the drop-down list.');
-        $validation->setFormula1('"male,female"');
-
-        // Add data validation for status column (F)
-        $statusValidation = $sheet->getCell('F2')->getDataValidation();
-        $statusValidation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
-        $statusValidation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
-        $statusValidation->setAllowBlank(true);
-        $statusValidation->setShowInputMessage(true);
-        $statusValidation->setShowErrorMessage(true);
-        $statusValidation->setShowDropDown(true);
-        $statusValidation->setErrorTitle('Input error');
-        $statusValidation->setError('Value is not in list.');
-        $statusValidation->setPromptTitle('Pick from list');
-        $statusValidation->setPrompt('Please pick a value from the drop-down list.');
-        $statusValidation->setFormula1('"active,inactive,blacklist"');
-
-        return [];
-    }
+    // public function styles(Worksheet $sheet)
+    // {
+    //     // Set header row style
+    //     $sheet->getStyle('A1:N1')->applyFromArray([
+    //         'font' => [
+    //             'bold' => true,
+    //             'color' => ['rgb' => 'FFFFFF']
+    //         ],
+    //         'fill' => [
+    //             'fillType' => 'solid',
+    //             'startColor' => ['rgb' => '4CAF50']
+    //         ]
+    //     ]);
+    // 
+    //     // Set sample data row style
+    //     $sheet->getStyle('A2:N2')->applyFromArray([
+    //         'fill' => [
+    //             'fillType' => 'solid',
+    //             'startColor' => ['rgb' => 'E8F5E8']
+    //         ]
+    //     ]);
+    // 
+    //     // Auto-size columns
+    //     foreach (range('A', 'N') as $column) {
+    //         $sheet->getColumnDimension($column)->setAutoSize(true);
+    //     }
+    // 
+    //     // Add data validation for gender column (E)
+    //     $validation = $sheet->getCell('E2')->getDataValidation();
+    //     $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
+    //     $validation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
+    //     $validation->setAllowBlank(true);
+    //     $validation->setShowInputMessage(true);
+    //     $validation->setShowErrorMessage(true);
+    //     $validation->setShowDropDown(true);
+    //     $validation->setErrorTitle('Input error');
+    //     $validation->setError('Value is not in list.');
+    //     $validation->setPromptTitle('Pick from list');
+    //     $validation->setPrompt('Please pick a value from the drop-down list.');
+    //     $validation->setFormula1('"male,female"');
+    // 
+    //     // Add data validation for status column (F)
+    //     $statusValidation = $sheet->getCell('F2')->getDataValidation();
+    //     $statusValidation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
+    //     $statusValidation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
+    //     $statusValidation->setAllowBlank(true);
+    //     $statusValidation->setShowInputMessage(true);
+    //     $statusValidation->setShowErrorMessage(true);
+    //     $statusValidation->setShowDropDown(true);
+    //     $statusValidation->setErrorTitle('Input error');
+    //     $statusValidation->setError('Value is not in list.');
+    //     $statusValidation->setPromptTitle('Pick from list');
+    //     $statusValidation->setPrompt('Please pick a value from the drop-down list.');
+    //     $statusValidation->setFormula1('"active,inactive,blacklist"');
+    // 
+    //     return [];
+    // }
 }
