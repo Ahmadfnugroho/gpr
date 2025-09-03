@@ -730,7 +730,7 @@ class TransactionResource extends Resource
                                             $productId = $get('product_id');
                                             $bundlingId = $get('bundling_id');
                                             $isBundling = $get('is_bundling');
-                                            
+
                                             if ($productId && !$isBundling) {
                                                 $product = Product::find($productId);
                                                 return $product ? "Pilih Produk/Bundling (Current: {$product->name})" : 'Pilih Produk/Bundling';
@@ -738,7 +738,7 @@ class TransactionResource extends Resource
                                                 $bundling = Bundling::find($bundlingId);
                                                 return $bundling ? "Pilih Produk/Bundling (Current: {$bundling->name} - Bundle)" : 'Pilih Produk/Bundling';
                                             }
-                                            
+
                                             return 'Pilih Produk/Bundling';
                                         })
                                         ->searchable()
@@ -757,13 +757,13 @@ class TransactionResource extends Resource
                                             $productId = $get('product_id');
                                             $bundlingId = $get('bundling_id');
                                             $isBundling = $get('is_bundling');
-                                            
+
                                             if ($productId && !$isBundling) {
                                                 return "produk-{$productId}";
                                             } elseif ($bundlingId && $isBundling) {
                                                 return "bundling-{$bundlingId}";
                                             }
-                                            
+
                                             return null;
                                         })
 
@@ -934,9 +934,9 @@ class TransactionResource extends Resource
                                                 if (is_array($currentlySelectedItems) && !empty($currentlySelectedItems)) {
                                                     // Include currently selected items OR available items, but exclude other used ones
                                                     $finalExcludedIds = array_diff($excludedIds, $currentlySelectedItems);
-                                                    $query->where(function($q) use ($finalExcludedIds, $currentlySelectedItems) {
+                                                    $query->where(function ($q) use ($finalExcludedIds, $currentlySelectedItems) {
                                                         $q->whereNotIn('product_items.id', $finalExcludedIds)
-                                                          ->orWhereIn('product_items.id', $currentlySelectedItems);
+                                                            ->orWhereIn('product_items.id', $currentlySelectedItems);
                                                     });
                                                 } else {
                                                     // New transaction - just exclude used items
@@ -957,7 +957,7 @@ class TransactionResource extends Resource
                                             if (is_array($existingProductItems) && !empty($existingProductItems)) {
                                                 return $existingProductItems;
                                             }
-                                            
+
                                             $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
                                             $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
                                             $productId = $get('product_id');
@@ -1350,8 +1350,8 @@ class TransactionResource extends Resource
                                                 ->prefix('Rp')
                                                 ->inputMode('decimal')
                                                 ->step(1000)
-                                                ->formatStateUsing(fn ($state) => $state ? number_format($state, 0, '', '') : '')
-                                                ->dehydrateStateUsing(fn ($state) => (int) str_replace(',', '', $state))
+                                                ->formatStateUsing(fn($state) => $state ? number_format($state, 0, '', '') : '')
+                                                ->dehydrateStateUsing(fn($state) => (int) str_replace(',', '', $state))
                                                 ->afterStateUpdated(fn($state, $set, $get) => $set('../../grand_total', static::calculateGrandTotal($get)))
                                                 ->columnSpan(1),
                                         ])
@@ -1503,7 +1503,7 @@ class TransactionResource extends Resource
             ->modifyQueryUsing(function (Builder $query) {
                 // Check for table search parameter
                 $searchTerm = request('tableSearch');
-                
+
                 $query->with([
                     'customer:id,name,email',
                     'customer.customerPhoneNumbers:id,customer_id,phone_number',
@@ -1513,34 +1513,33 @@ class TransactionResource extends Resource
                     'detailTransactions.productItems:id,serial_number,product_id',
                     'promo:id,name'
                 ]);
-                
+
                 if ($searchTerm && strlen($searchTerm) >= 2) {
                     $query->where(function ($q) use ($searchTerm) {
                         // Search in transaction ID
                         $q->where('booking_transaction_id', 'LIKE', "%{$searchTerm}%")
-                          // Search in customer name
-                          ->orWhereHas('customer', function ($customerQuery) use ($searchTerm) {
-                              $customerQuery->where('name', 'LIKE', "%{$searchTerm}%");
-                          })
-                          // Search in product names
-                          ->orWhereHas('detailTransactions.product', function ($productQuery) use ($searchTerm) {
-                              $productQuery->where('name', 'LIKE', "%{$searchTerm}%");
-                          })
-                          // Search in bundling names
-                          ->orWhereHas('detailTransactions.bundling', function ($bundlingQuery) use ($searchTerm) {
-                              $bundlingQuery->where('name', 'LIKE', "%{$searchTerm}%");
-                          })
-                          // Search in serial numbers
-                          ->orWhereHas('detailTransactions.productItems', function ($serialQuery) use ($searchTerm) {
-                              $serialQuery->where('serial_number', 'LIKE', "%{$searchTerm}%");
-                          });
+                            // Search in customer name
+                            ->orWhereHas('customer', function ($customerQuery) use ($searchTerm) {
+                                $customerQuery->where('name', 'LIKE', "%{$searchTerm}%");
+                            })
+                            // Search in product names
+                            ->orWhereHas('detailTransactions.product', function ($productQuery) use ($searchTerm) {
+                                $productQuery->where('name', 'LIKE', "%{$searchTerm}%");
+                            })
+                            // Search in bundling names
+                            ->orWhereHas('detailTransactions.bundling', function ($bundlingQuery) use ($searchTerm) {
+                                $bundlingQuery->where('name', 'LIKE', "%{$searchTerm}%");
+                            })
+                            // Search in serial numbers
+                            ->orWhereHas('detailTransactions.productItems', function ($serialQuery) use ($searchTerm) {
+                                $serialQuery->where('serial_number', 'LIKE', "%{$searchTerm}%");
+                            });
                     });
                 }
-                
+
                 return $query;
             })
             ->searchable()
-            ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->searchOnBlur()
             ->searchDebounce('500ms')
             ->globalSearch(
@@ -1658,16 +1657,16 @@ class TransactionResource extends Resource
                         if ($record && $state !== null) {
                             $grandTotal = (int)$record->grand_total;
                             $downPayment = (int)$state;
-                            
+
                             // Calculate remaining payment
                             $remainingPayment = max(0, $grandTotal - $downPayment);
-                            
+
                             // Update the record
                             $record->update([
                                 'down_payment' => $downPayment,
                                 'remaining_payment' => $remainingPayment,
                             ]);
-                            
+
                             // Update booking status based on payment
                             if ($grandTotal <= 0) {
                                 $record->update(['booking_status' => 'cancel']);
@@ -1774,7 +1773,7 @@ class TransactionResource extends Resource
                             'excluded_columns' => ['serial_numbers', 'customer_phone'] // Keep these excluded by default
                         ];
                         \App\Models\ExportSetting::updateSettings('TransactionResource', $settings);
-                        
+
                         \Filament\Notifications\Notification::make()
                             ->title('Export settings updated successfully')
                             ->success()
@@ -1791,7 +1790,7 @@ class TransactionResource extends Resource
                         ExportFormat::Xlsx,
                         ExportFormat::Csv,
                     ])
-                    ->fileName(fn (): string => 'transactions-' . now()->format('Y-m-d-H-i-s'))
+                    ->fileName(fn(): string => 'transactions-' . now()->format('Y-m-d-H-i-s'))
                     ->columnMapping(false)
                     ->modalHeading('Export Transaction Data')
                     ->modalDescription('Export transaction data to Excel or CSV format. You can choose the export format and date range.')
