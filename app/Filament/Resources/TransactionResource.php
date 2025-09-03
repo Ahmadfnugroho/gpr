@@ -1542,10 +1542,6 @@ class TransactionResource extends Resource
             ->searchable()
             ->searchOnBlur()
             ->searchDebounce('500ms')
-            ->globalSearch(
-                keyBindings: ['command+k', 'ctrl+k'],
-                placeholder: 'Search by product name, bundle name, or serial number...'
-            )
             ->columns([
                 TextColumn::make('booking_transaction_id')
                     ->label('ID')
