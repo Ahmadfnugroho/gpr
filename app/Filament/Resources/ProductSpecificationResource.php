@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ProductSpecificationResource\Pages;
 use App\Filament\Resources\ProductSpecificationResource\RelationManagers;
 use App\Filament\Imports\ProductSpecificationImporter;
+use App\Filament\Exports\ProductSpecificationExporter;
 use App\Models\ProductSpecification;
 use App\Models\Product;
 
@@ -16,6 +17,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\ExportAction;
 use Filament\Notifications\Notification;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 use Illuminate\Support\Str;
@@ -64,6 +66,9 @@ class ProductSpecificationResource extends Resource
                 ImportAction::make()
                     ->importer(ProductSpecificationImporter::class)
                     ->label('Import Product Specification'),
+                ExportAction::make()
+                    ->exporter(ProductSpecificationExporter::class)
+                    ->label('Export Product Specification'),
             ])
             ->columns([
                 tables\Columns\TextColumn::make('product.name')

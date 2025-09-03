@@ -7,6 +7,7 @@ use App\Filament\Resources\ProductPhotoResource\RelationManagers;
 use App\Models\ProductPhoto;
 use App\Models\Product;
 use App\Filament\Imports\ProductPhotoImporter;
+use App\Filament\Exports\ProductPhotoExporter;
 use Filament\Forms\Components;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -14,6 +15,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\ExportAction;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -58,6 +60,9 @@ class ProductPhotoResource extends Resource
                 ImportAction::make()
                     ->importer(ProductPhotoImporter::class)
                     ->label('Import Product Photo'),
+                ExportAction::make()
+                    ->exporter(ProductPhotoExporter::class)
+                    ->label('Export Product Photo'),
             ])
 
             ->columns([
@@ -81,6 +86,14 @@ class ProductPhotoResource extends Resource
 
             ])
             ->actions([
+                Tables\Actions\Action::make('view_full_photo')
+                    ->label('Lihat Besar')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
+                    ->modalHeading(fn($record) => 'Foto Produk - ' . $record->product->name)
+                    ->modalContent(fn($record) => view('filament.resources.product-photo-resource.pages.view-full-photo', ['productPhoto' => $record]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup'),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\DeleteAction::make(),

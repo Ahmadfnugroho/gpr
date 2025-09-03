@@ -22,6 +22,10 @@ class RentalInclude extends Model
         'include_product_id',
         'quantity'
     ];
+
+    protected $dates = [
+        'deleted_at',
+    ];
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()

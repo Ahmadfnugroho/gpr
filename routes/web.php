@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\GoogleSheetSyncController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\ProductSearchController;
@@ -43,6 +44,24 @@ Route::prefix('api/regions')->group(function () {
 // Admin Panel Redirect
 Route::get('/admin-login', function () {
     return redirect('/admin');
+});
+
+// Customer Management Routes
+Route::prefix('customers')->name('customers.')->middleware('auth')->group(function () {
+    Route::get('/', [CustomerController::class, 'index'])->name('index');
+    Route::get('/create', [CustomerController::class, 'create'])->name('create');
+    Route::post('/', [CustomerController::class, 'store'])->name('store');
+    Route::get('/{customer}', [CustomerController::class, 'show'])->name('show');
+    Route::get('/{customer}/edit', [CustomerController::class, 'edit'])->name('edit');
+    Route::put('/{customer}', [CustomerController::class, 'update'])->name('update');
+    Route::delete('/{customer}', [CustomerController::class, 'destroy'])->name('destroy');
+    
+    // Import/Export routes
+    Route::get('/import/form', [CustomerController::class, 'importForm'])->name('import.form');
+    Route::post('/import', [CustomerController::class, 'import'])->name('import');
+    Route::get('/export', [CustomerController::class, 'export'])->name('export');
+    Route::get('/import/template', [CustomerController::class, 'downloadTemplate'])->name('import.template');
+    Route::post('/bulk-action', [CustomerController::class, 'bulkAction'])->name('bulk-action');
 });
 
 // WhatsApp Management Routes (protected by auth)

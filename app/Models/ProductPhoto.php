@@ -22,6 +22,10 @@ class ProductPhoto extends Model
         'photo',
     ];
 
+    protected $dates = [
+        'deleted_at',
+    ];
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()

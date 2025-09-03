@@ -5,7 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\SubCategoryResource\Pages;
 use App\Filament\Resources\SubCategoryResource\RelationManagers;
 use App\Filament\Imports\SubCategoryImporter;
-
+use App\Filament\Exports\SubCategoryExporter;
 use App\Models\SubCategory;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Notifications\Notification;
 use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\ExportAction;
 use Filament\Tables\Columns\ImageColumn;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 
@@ -55,6 +56,8 @@ class SubCategoryResource extends Resource
             ->headerActions([
                 ImportAction::make()
                     ->importer(SubCategoryImporter::class),
+                ExportAction::make()
+                    ->exporter(SubCategoryExporter::class),
             ])
 
             ->columns([

@@ -3,12 +3,16 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PromoResource\Pages;
+use App\Filament\Imports\PromoImporter;
+use App\Filament\Exports\PromoExporter;
 use App\Models\Promo;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\ToggleColumn;
+use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\ExportAction;
 use Filament\Tables\Table;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 
@@ -110,6 +114,14 @@ class PromoResource extends Resource
     {
         return $table
             ->defaultPaginationPageOption(50)
+            ->headerActions([
+                ImportAction::make()
+                    ->importer(PromoImporter::class)
+                    ->label('Import Promo'),
+                ExportAction::make()
+                    ->exporter(PromoExporter::class)
+                    ->label('Export Promo'),
+            ])
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nama Promo')

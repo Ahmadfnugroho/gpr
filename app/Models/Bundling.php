@@ -64,6 +64,11 @@ class Bundling extends Model
         return $this->hasMany(BundlingProduct::class, 'bundling_id');
     }
 
+    public function bundlingPhotos()
+    {
+        return $this->hasMany(BundlingPhoto::class, 'bundling_id');
+    }
+
     public function rentalIncludes()
     {
         return $this->hasManyThrough(

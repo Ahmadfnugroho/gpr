@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\BrandResource\Pages;
 use App\Filament\Resources\BrandResource\RelationManagers;
 use App\Filament\Imports\BrandImporter;
+use App\Filament\Exports\BrandExporter;
 use App\Models\Brand;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Notifications\Notification;
 use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\ExportAction;
 use Filament\Tables\Columns\ImageColumn;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 
@@ -57,6 +59,8 @@ class BrandResource extends Resource
             ->headerActions([
                 ImportAction::make()
                     ->importer(BrandImporter::class),
+                ExportAction::make()
+                    ->exporter(BrandExporter::class),
             ])
 
             ->columns([

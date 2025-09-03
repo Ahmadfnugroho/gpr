@@ -26,6 +26,7 @@
         "laravel/tinker": "^2.9",
         "league/flysystem-aws-s3-v3": "3.0",
         "livewire/livewire": "^3.6",
+        "maatwebsite/excel": "^3.1",
         "pxlrbt/filament-activity-log": "^1.1",
         "revolution/laravel-google-sheets": "^7.0",
         "rmsramos/activitylog": "^1.0",

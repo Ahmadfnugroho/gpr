@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Imports\BundlingPhotoImporter;
+use App\Filament\Exports\BundlingPhotoExporter;
 use App\Filament\Resources\BundlingPhotoResource\Pages;
 use App\Filament\Resources\BundlingPhotoResource\RelationManagers;
 use App\Models\BundlingPhoto;
@@ -13,6 +14,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\ExportAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -61,7 +63,9 @@ class BundlingPhotoResource extends Resource
                 ImportAction::make()
                     ->importer(BundlingPhotoImporter::class)
                     ->label('Import Bundling Photo'),
-
+                ExportAction::make()
+                    ->exporter(BundlingPhotoExporter::class)
+                    ->label('Export Bundling Photo'),
             ])
 
             ->columns([
@@ -83,6 +87,14 @@ class BundlingPhotoResource extends Resource
 
             ])
             ->actions([
+                Tables\Actions\Action::make('view_full_photo')
+                    ->label('Lihat Besar')
+                    ->icon('heroicon-o-eye')
+                    ->color('info')
+                    ->modalHeading(fn($record) => 'Foto Bundling - ' . $record->bundling->name)
+                    ->modalContent(fn($record) => view('filament.resources.bundling-photo-resource.pages.view-full-photo', ['bundlingPhoto' => $record]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup'),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\DeleteAction::make(),

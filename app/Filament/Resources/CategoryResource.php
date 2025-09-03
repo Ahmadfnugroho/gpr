@@ -13,7 +13,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Notifications\Notification;
 use App\Filament\Imports\CategoryImporter;
+use App\Filament\Exports\CategoryExporter;
 use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\ExportAction;
 use App\Models\Str;
 use Filament\Tables\Columns\ImageColumn;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
@@ -59,6 +61,8 @@ class CategoryResource extends Resource
             ->headerActions([
                 ImportAction::make()
                     ->importer(CategoryImporter::class),
+                ExportAction::make()
+                    ->exporter(CategoryExporter::class),
             ])
             ->columns([
                 Tables\Columns\TextColumn::make('name')

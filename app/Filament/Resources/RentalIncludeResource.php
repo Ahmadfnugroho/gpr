@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Imports\RentalIncludeImporter;
+use App\Filament\Exports\RentalIncludeExporter;
 use App\Filament\Resources\RentalIncludeResource\Pages;
 use App\Filament\Resources\RentalIncludeResource\RelationManagers;
 use App\Models\RentalInclude;
@@ -11,6 +12,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\ExportAction;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -54,13 +56,12 @@ class RentalIncludeResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->headerActions([
-
-
-                // Tombol Import Produk
                 ImportAction::make()
                     ->importer(RentalIncludeImporter::class)
                     ->label('Import Rental Include'),
-
+                ExportAction::make()
+                    ->exporter(RentalIncludeExporter::class)
+                    ->label('Export Rental Include'),
             ])
 
             ->columns([
