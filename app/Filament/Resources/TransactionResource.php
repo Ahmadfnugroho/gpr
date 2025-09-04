@@ -1714,11 +1714,7 @@ class TransactionResource extends Resource
                         'on_rented' => 'heroicon-o-shopping-bag',
                         'done' => 'heroicon-o-check',
                         'paid' => 'heroicon-o-banknotes',
-                        // Legacy status mapping for existing data
-                        'booking' => 'heroicon-o-clock',
-                        'cancel' => 'heroicon-o-x-circle',
-                        'on_rented' => 'heroicon-o-shopping-bag',
-                        'done' => 'heroicon-o-check',
+                        default => 'heroicon-o-question-mark-circle',
                     })
                     ->color(fn(string $state): string => match ($state) {
                         'booking' => 'warning',
@@ -1726,11 +1722,7 @@ class TransactionResource extends Resource
                         'on_rented' => 'info',
                         'done' => 'success',
                         'paid' => 'success',
-                        // Legacy status mapping for existing data
-                        'booking' => 'warning',
-                        'cancel' => 'danger',
-                        'on_rented' => 'info',
-                        'done' => 'success',
+                        default => 'gray',
                     }),
             ])
             ->filters([
