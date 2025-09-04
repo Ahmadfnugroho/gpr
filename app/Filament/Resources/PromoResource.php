@@ -114,14 +114,6 @@ class PromoResource extends Resource
     {
         return $table
             ->defaultPaginationPageOption(50)
-            ->headerActions([
-                ImportAction::make()
-                    ->importer(PromoImporter::class)
-                    ->label('Import Promo'),
-                ExportAction::make()
-                    ->exporter(PromoExporter::class)
-                    ->label('Export Promo'),
-            ])
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nama Promo')

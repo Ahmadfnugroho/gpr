@@ -1760,7 +1760,7 @@ class TransactionResource extends Resource
                         $filePath = $service->generateTemplate();
                         return response()->download($filePath, 'transaction_reference_template.xlsx')->deleteFileAfterSend();
                     }),
-                    
+
                 Action::make('export')
                     ->label('Export All')
                     ->icon('heroicon-o-arrow-down-tray')
@@ -2029,7 +2029,7 @@ class TransactionResource extends Resource
                                 ->title('Berhasil Mengubah Status Booking Transaksi')
                                 ->send();
                         }),
-                    
+
                     BulkAction::make('exportSelected')
                         ->label('Export Selected')
                         ->icon('heroicon-o-arrow-down-tray')
@@ -2041,7 +2041,6 @@ class TransactionResource extends Resource
                             return response()->download($filePath, 'transactions_selected_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
                         }),
 
-                ]),
                 ]),
             ]);
     }
