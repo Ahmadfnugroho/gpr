@@ -25,7 +25,6 @@ use Filament\Forms\Components\Checkbox;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Forms\Components\Select;
-use Filament\Notifications\Notification;
 use Filament\Support\Enums\Alignment;
 use Filament\Tables\Columns\ColumnGroup;
 use Illuminate\Database\Eloquent\Model;
@@ -254,7 +253,7 @@ class ProductResource extends Resource
                         $filePath = $service->generateTemplate();
                         return response()->download($filePath, 'product_import_template.xlsx')->deleteFileAfterSend();
                     }),
-                    
+
                 Action::make('import')
                     ->label('Import Excel')
                     ->icon('heroicon-o-arrow-up-tray')
@@ -276,7 +275,7 @@ class ProductResource extends Resource
                             $service = new ProductImportExportService();
                             $file = $data['excel_file'];
                             $updateExisting = $data['update_existing'] ?? false;
-                            
+
                             // Convert to UploadedFile if needed
                             if (is_string($file)) {
                                 $filePath = storage_path('app/public/' . $file);
@@ -288,11 +287,11 @@ class ProductResource extends Resource
                                     true
                                 );
                             }
-                            
+
                             $results = $service->importProducts($file, $updateExisting);
-                            
+
                             $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
-                            
+
                             if (!empty($results['errors'])) {
                                 Notification::make()
                                     ->title('Import Completed with Errors')
@@ -306,7 +305,6 @@ class ProductResource extends Resource
                                     ->success()
                                     ->send();
                             }
-                            
                         } catch (\Exception $e) {
                             Notification::make()
                                 ->title('Import Failed')
@@ -315,7 +313,7 @@ class ProductResource extends Resource
                                 ->send();
                         }
                     }),
-                    
+
                 Action::make('export')
                     ->label('Export All')
                     ->icon('heroicon-o-arrow-down-tray')
@@ -516,7 +514,7 @@ class ProductResource extends Resource
                     ->label('Ubah Featured Produk'),
 
                 Tables\Actions\DeleteBulkAction::make(),
-                
+
                 Action::make('exportSelected')
                     ->label('Export Selected')
                     ->icon('heroicon-o-arrow-down-tray')
