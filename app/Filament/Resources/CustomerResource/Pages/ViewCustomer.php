@@ -36,10 +36,10 @@ class ViewCustomer extends ViewRecord
                     return null;
                 })
                 ->openUrlInNewTab()
-                ->visible(fn () => $this->record->customerPhoneNumbers->isNotEmpty()),
-                
+                ->visible(fn() => $this->record->customerPhoneNumbers->isNotEmpty()),
+
             Actions\EditAction::make()
-                ->successRedirectUrl(fn () => static::getResource()::getUrl('view', ['record' => $this->record])),
+                ->successRedirectUrl(fn() => static::getResource()::getUrl('view', ['record' => $this->record])),
         ];
     }
 
@@ -55,50 +55,50 @@ class ViewCustomer extends ViewRecord
                                     ->label('Nama Lengkap')
                                     ->weight(FontWeight::SemiBold)
                                     ->size('lg'),
-                                    
+
                                 TextEntry::make('email')
                                     ->label('Email')
                                     ->copyable()
                                     ->copyMessage('Email berhasil disalin!')
                                     ->icon('heroicon-m-envelope'),
-                                    
+
                                 TextEntry::make('status')
                                     ->label('Status')
                                     ->badge()
-                                    ->color(fn (string $state): string => match ($state) {
+                                    ->color(fn(string $state): string => match ($state) {
                                         'active' => 'success',
                                         'inactive' => 'warning',
                                         'blacklist' => 'danger',
                                         default => 'gray',
                                     })
-                                    ->formatStateUsing(fn (string $state): string => match($state) {
+                                    ->formatStateUsing(fn(string $state): string => match ($state) {
                                         'active' => 'Aktif',
                                         'inactive' => 'Tidak Aktif',
                                         'blacklist' => 'Blacklist',
                                         default => ucfirst($state)
                                     }),
                             ]),
-                            
+
                         Grid::make(3)
                             ->schema([
                                 TextEntry::make('gender')
                                     ->label('Jenis Kelamin')
-                                    ->formatStateUsing(fn (string $state): string => match($state) {
+                                    ->formatStateUsing(fn(string $state): string => match ($state) {
                                         'male' => 'Laki-laki',
                                         'female' => 'Perempuan',
                                         default => $state
                                     })
-                                    ->icon(fn (string $state): string => match($state) {
+                                    ->icon(fn(string $state): string => match ($state) {
                                         'male' => 'heroicon-m-user',
                                         'female' => 'heroicon-m-user',
                                         default => 'heroicon-m-user'
                                     }),
-                                    
+
                                 TextEntry::make('source_info')
                                     ->label('Sumber Info')
                                     ->badge()
                                     ->color('info'),
-                                    
+
                                 TextEntry::make('created_at')
                                     ->label('Terdaftar')
                                     ->dateTime('d M Y, H:i')
@@ -112,31 +112,31 @@ class ViewCustomer extends ViewRecord
                             ->label('Alamat Lengkap')
                             ->placeholder('Tidak ada alamat')
                             ->columnSpanFull(),
-                            
+
                         Grid::make(2)
                             ->schema([
                                 TextEntry::make('job')
                                     ->label('Pekerjaan')
                                     ->placeholder('Tidak diisi')
                                     ->icon('heroicon-m-briefcase'),
-                                    
+
                                 TextEntry::make('office_address')
                                     ->label('Alamat Kantor')
                                     ->placeholder('Tidak diisi'),
                             ]),
-                            
+
                         Grid::make(2)
                             ->schema([
                                 TextEntry::make('emergency_contact_name')
                                     ->label('Kontak Emergency')
                                     ->placeholder('Tidak diisi')
                                     ->icon('heroicon-m-user-plus'),
-                                    
+
                                 TextEntry::make('emergency_contact_number')
                                     ->label('No. HP Emergency')
                                     ->placeholder('Tidak diisi')
                                     ->copyable()
-                                    ->url(fn ($record) => $record->emergency_contact_number ? "tel:{$record->emergency_contact_number}" : null)
+                                    ->url(fn($record) => $record->emergency_contact_number ? "tel:{$record->emergency_contact_number}" : null)
                                     ->icon('heroicon-m-phone'),
                             ]),
                     ])->columns(1),
@@ -149,16 +149,10 @@ class ViewCustomer extends ViewRecord
                                     ->label('Instagram')
                                     ->placeholder('Tidak diisi')
                                     ->prefix('@')
-                                    ->url(fn ($record) => $record->instagram_username ? "https://instagram.com/{$record->instagram_username}" : null)
+                                    ->url(fn($record) => $record->instagram_username ? "https://instagram.com/{$record->instagram_username}" : null)
                                     ->openUrlInNewTab()
                                     ->color('primary'),
-                                    
-                                TextEntry::make('facebook_username')
-                                    ->label('Facebook')
-                                    ->placeholder('Tidak diisi')
-                                    ->url(fn ($record) => $record->facebook_username ? "https://facebook.com/{$record->facebook_username}" : null)
-                                    ->openUrlInNewTab()
-                                    ->color('primary'),
+
                             ]),
                     ])
                     ->columns(1)
@@ -170,28 +164,28 @@ class ViewCustomer extends ViewRecord
                             ->schema([
                                 TextEntry::make('customerPhotos')
                                     ->label('Total Foto')
-                                    ->formatStateUsing(fn ($record) => $record->customerPhotos->count() . ' foto')
+                                    ->formatStateUsing(fn($record) => $record->customerPhotos->count() . ' foto')
                                     ->icon('heroicon-m-camera')
                                     ->color('info'),
-                                    
+
                                 TextEntry::make('customerPhoneNumbers')
                                     ->label('Total Nomor HP')
-                                    ->formatStateUsing(fn ($record) => $record->customerPhoneNumbers->count() . ' nomor')
+                                    ->formatStateUsing(fn($record) => $record->customerPhoneNumbers->count() . ' nomor')
                                     ->icon('heroicon-m-phone')
                                     ->color('success'),
-                                    
+
                                 TextEntry::make('transactions')
                                     ->label('Total Transaksi')
-                                    ->formatStateUsing(fn ($record) => $record->transactions->count() . ' transaksi')
+                                    ->formatStateUsing(fn($record) => $record->transactions->count() . ' transaksi')
                                     ->icon('heroicon-m-shopping-bag')
                                     ->color('warning'),
-                                    
+
                                 TextEntry::make('email_verified_at')
                                     ->label('Email Verified')
-                                    ->formatStateUsing(fn ($record) => $record->email_verified_at ? 'Terverifikasi' : 'Belum Verifikasi')
+                                    ->formatStateUsing(fn($record) => $record->email_verified_at ? 'Terverifikasi' : 'Belum Verifikasi')
                                     ->badge()
-                                    ->color(fn ($record) => $record->email_verified_at ? 'success' : 'danger')
-                                    ->icon(fn ($record) => $record->email_verified_at ? 'heroicon-m-check-badge' : 'heroicon-m-x-circle'),
+                                    ->color(fn($record) => $record->email_verified_at ? 'success' : 'danger')
+                                    ->icon(fn($record) => $record->email_verified_at ? 'heroicon-m-check-badge' : 'heroicon-m-x-circle'),
                             ]),
                     ])->columns(1),
             ]);

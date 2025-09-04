@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
-use App\Imports\CustomerImporter;
-use App\Models\Customer;
+use App\Imports\ProductImporter;
+use App\Models\Product;
+use App\Models\Brand;
+use App\Models\Category;
+use App\Models\SubCategory;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
@@ -13,12 +16,12 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class CustomerImportExportService
+class ProductImportExportService
 {
     /**
-     * Import customers from Excel file
+     * Import products from Excel file
      */
-    public function importCustomers(UploadedFile $file, bool $updateExisting = false): array
+    public function importProducts(UploadedFile $file, bool $updateExisting = false): array
     {
         try {
             // Validate file type
@@ -33,13 +36,14 @@ class CustomerImportExportService
             }
 
             // Create importer instance
-            $importer = new CustomerImporter($updateExisting);
+            $importer = new ProductImporter($updateExisting);
 
             // Import the file
             Excel::import($importer, $file);
 
             // Get import results
             return $importer->getImportResults();
+
         } catch (\Exception $e) {
             return [
                 'total' => 0,
@@ -52,15 +56,15 @@ class CustomerImportExportService
     }
 
     /**
-     * Export customers to Excel
+     * Export products to Excel
      */
-    public function exportCustomers(array $customerIds = null): string
+    public function exportProducts(array $productIds = null): string
     {
-        $export = new CustomerExport($customerIds);
-        $filename = 'customers_export_' . date('Y-m-d_H-i-s') . '.xlsx';
-
+        $export = new ProductExport($productIds);
+        $filename = 'products_export_' . date('Y-m-d_H-i-s') . '.xlsx';
+        
         Excel::store($export, $filename, 'public');
-
+        
         return Storage::disk('public')->path($filename);
     }
 
@@ -69,28 +73,21 @@ class CustomerImportExportService
      */
     public function generateTemplate(): string
     {
-        $template = new CustomerImportTemplate();
-        $filename = 'customer_import_template.xlsx';
-
+        $template = new ProductImportTemplate();
+        $filename = 'product_import_template.xlsx';
+        
         Excel::store($template, $filename, 'public');
-
+        
         return Storage::disk('public')->path($filename);
     }
 
     /**
      * Validate Excel file structure
-     * TEMPORARILY DISABLED - Excel package not properly installed
      */
     public function validateFileStructure(UploadedFile $file): array
     {
-        return [
-            'valid' => false,
-            'errors' => ['Excel validation temporarily disabled - package not properly installed']
-        ];
-
-        /* ORIGINAL CODE - COMMENTED OUT UNTIL EXCEL PACKAGE IS FIXED
         try {
-            $data = Excel::toArray(new CustomerImporter(), $file);
+            $data = Excel::toArray(new ProductImporter(), $file);
             
             if (empty($data) || empty($data[0])) {
                 return [
@@ -100,7 +97,7 @@ class CustomerImportExportService
             }
 
             $headers = array_keys($data[0][0] ?? []);
-            $expectedHeaders = CustomerImporter::getExpectedHeaders();
+            $expectedHeaders = ProductImporter::getExpectedHeaders();
             $missingHeaders = array_diff($expectedHeaders, $headers);
 
             if (!empty($missingHeaders)) {
@@ -125,30 +122,29 @@ class CustomerImportExportService
                 'errors' => ['File validation error: ' . $e->getMessage()]
             ];
         }
-        */
     }
 }
 
 /**
- * Customer Export Class
+ * Product Export Class
  */
-class CustomerExport implements FromCollection, WithHeadings, WithMapping, WithStyles
+class ProductExport implements FromCollection, WithHeadings, WithMapping, WithStyles
 {
-    protected $customerIds;
+    protected $productIds;
 
-    public function __construct(array $customerIds = null)
+    public function __construct(array $productIds = null)
     {
-        $this->customerIds = $customerIds;
+        $this->productIds = $productIds;
     }
 
     public function collection()
     {
-        $query = Customer::with(['customerPhoneNumbers']);
-
-        if ($this->customerIds) {
-            $query->whereIn('id', $this->customerIds);
+        $query = Product::with(['category', 'brand', 'subCategory']);
+        
+        if ($this->productIds) {
+            $query->whereIn('id', $this->productIds);
         }
-
+        
         return $query->get();
     }
 
@@ -156,45 +152,35 @@ class CustomerExport implements FromCollection, WithHeadings, WithMapping, WithS
     {
         return [
             'ID',
-            'Nama Lengkap',
-            'Email',
-            'Nomor HP 1',
-            'Nomor HP 2',
-            'Jenis Kelamin',
+            'Nama Produk',
+            'Harga',
             'Status',
-            'Alamat',
-            'Pekerjaan',
-            'Alamat Kantor',
-            'Instagram',
-            'Kontak Emergency',
-            'HP Emergency',
-            'Sumber Info',
+            'Kategori',
+            'Brand',
+            'Sub Kategori',
+            'Premiere',
+            'Thumbnail',
+            'Slug',
             'Tanggal Dibuat',
             'Terakhir Update'
         ];
     }
 
-    public function map($customer): array
+    public function map($product): array
     {
-        $phoneNumbers = $customer->customerPhoneNumbers->pluck('phone_number')->toArray();
-
         return [
-            $customer->id,
-            $customer->name,
-            $customer->email,
-            $phoneNumbers[0] ?? '',
-            $phoneNumbers[1] ?? '',
-            $customer->gender,
-            $customer->status,
-            $customer->address,
-            $customer->job,
-            $customer->office_address,
-            $customer->instagram_username,
-            $customer->emergency_contact_name,
-            $customer->emergency_contact_number,
-            $customer->source_info,
-            $customer->created_at?->format('Y-m-d H:i:s'),
-            $customer->updated_at?->format('Y-m-d H:i:s')
+            $product->id,
+            $product->name,
+            $product->price,
+            $product->status,
+            $product->category->name ?? '',
+            $product->brand->name ?? '',
+            $product->subCategory->name ?? '',
+            $product->premiere ? 'Ya' : 'Tidak',
+            $product->thumbnail ?? '',
+            $product->slug,
+            $product->created_at?->format('Y-m-d H:i:s'),
+            $product->updated_at?->format('Y-m-d H:i:s')
         ];
     }
 
@@ -203,50 +189,43 @@ class CustomerExport implements FromCollection, WithHeadings, WithMapping, WithS
         return [
             // Style the first row as bold text
             1 => ['font' => ['bold' => true]],
-
+            
             // Set auto width for all columns
-            'A:Q' => ['alignment' => ['wrapText' => true]]
+            'A:L' => ['alignment' => ['wrapText' => true]]
         ];
     }
 }
 
 /**
- * Customer Import Template Class
+ * Product Import Template Class
  */
-class CustomerImportTemplate implements FromCollection, WithHeadings, WithStyles
+class ProductImportTemplate implements FromCollection, WithHeadings, WithStyles
 {
     public function collection()
     {
         // Return empty collection with sample data
         return collect([
             [
-                'John Doe',
-                'john@example.com',
-                '081234567890',
-                '087654321098',
-                'male',
-                'active',
-                'Jl. Contoh No. 123, Jakarta',
-                'Software Developer',
-                'Jl. Kantor No. 456, Jakarta',
-                'johndoe',
-                'john.doe',
-                'Jane Doe',
-                '081987654321',
-                'Website'
+                'Kamera DSLR Canon',
+                '5000000',
+                'available',
+                'Camera',
+                'Canon',
+                'DSLR',
+                'Ya',
             ]
         ]);
     }
 
     public function headings(): array
     {
-        return CustomerImporter::getExpectedHeaders();
+        return ProductImporter::getExpectedHeaders();
     }
 
     public function styles(Worksheet $sheet)
     {
         // Set header row style
-        $sheet->getStyle('A1:N1')->applyFromArray([
+        $sheet->getStyle('A1:G1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF']
@@ -256,25 +235,25 @@ class CustomerImportTemplate implements FromCollection, WithHeadings, WithStyles
                 'startColor' => ['rgb' => '4CAF50']
             ]
         ]);
-
+     
         // Set sample data row style
-        $sheet->getStyle('A2:N2')->applyFromArray([
+        $sheet->getStyle('A2:G2')->applyFromArray([
             'fill' => [
                 'fillType' => 'solid',
                 'startColor' => ['rgb' => 'E8F5E8']
             ]
         ]);
-
+     
         // Auto-size columns
-        foreach (range('A', 'N') as $column) {
+        foreach (range('A', 'G') as $column) {
             $sheet->getColumnDimension($column)->setAutoSize(true);
         }
-
-        // Add data validation for gender column (E)
-        $validation = $sheet->getCell('E2')->getDataValidation();
+     
+        // Add data validation for status column (C)
+        $validation = $sheet->getCell('C2')->getDataValidation();
         $validation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
         $validation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
-        $validation->setAllowBlank(true);
+        $validation->setAllowBlank(false);
         $validation->setShowInputMessage(true);
         $validation->setShowErrorMessage(true);
         $validation->setShowDropDown(true);
@@ -282,22 +261,22 @@ class CustomerImportTemplate implements FromCollection, WithHeadings, WithStyles
         $validation->setError('Value is not in list.');
         $validation->setPromptTitle('Pick from list');
         $validation->setPrompt('Please pick a value from the drop-down list.');
-        $validation->setFormula1('"male,female"');
-
-        // Add data validation for status column (F)
-        $statusValidation = $sheet->getCell('F2')->getDataValidation();
-        $statusValidation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
-        $statusValidation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
-        $statusValidation->setAllowBlank(true);
-        $statusValidation->setShowInputMessage(true);
-        $statusValidation->setShowErrorMessage(true);
-        $statusValidation->setShowDropDown(true);
-        $statusValidation->setErrorTitle('Input error');
-        $statusValidation->setError('Value is not in list.');
-        $statusValidation->setPromptTitle('Pick from list');
-        $statusValidation->setPrompt('Please pick a value from the drop-down list.');
-        $statusValidation->setFormula1('"active,inactive,blacklist"');
-
+        $validation->setFormula1('"available,unavailable,maintenance"');
+     
+        // Add data validation for premiere column (G)
+        $premiereValidation = $sheet->getCell('G2')->getDataValidation();
+        $premiereValidation->setType(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::TYPE_LIST);
+        $premiereValidation->setErrorStyle(\PhpOffice\PhpSpreadsheet\Cell\DataValidation::STYLE_INFORMATION);
+        $premiereValidation->setAllowBlank(true);
+        $premiereValidation->setShowInputMessage(true);
+        $premiereValidation->setShowErrorMessage(true);
+        $premiereValidation->setShowDropDown(true);
+        $premiereValidation->setErrorTitle('Input error');
+        $premiereValidation->setError('Value is not in list.');
+        $premiereValidation->setPromptTitle('Pick from list');
+        $premiereValidation->setPrompt('Please pick a value from the drop-down list.');
+        $premiereValidation->setFormula1('"Ya,Tidak"');
+     
         return [];
     }
 }

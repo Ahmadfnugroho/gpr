@@ -17,10 +17,10 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use Illuminate\Support\Collection;
 
-class CustomerExporter implements 
-    FromCollection, 
-    WithHeadings, 
-    WithMapping, 
+class CustomerExporter implements
+    FromCollection,
+    WithHeadings,
+    WithMapping,
     WithStyles,
     WithColumnWidths,
     WithTitle,
@@ -82,14 +82,13 @@ class CustomerExporter implements
             'Nama Lengkap',
             'Email',
             'Nomor HP 1',
-            'Nomor HP 2', 
+            'Nomor HP 2',
             'Jenis Kelamin',
             'Status',
             'Alamat',
             'Pekerjaan',
             'Alamat Kantor',
             'Instagram',
-            'Facebook',
             'Kontak Emergency',
             'HP Emergency',
             'Sumber Info',
@@ -112,14 +111,14 @@ class CustomerExporter implements
             $customer->email,
             $customer->customerPhoneNumbers->get(0)?->phone_number ?? '',
             $customer->customerPhoneNumbers->get(1)?->phone_number ?? '',
-            match($customer->gender) {
+            match ($customer->gender) {
                 'male' => 'Laki-laki',
                 'female' => 'Perempuan',
                 default => $customer->gender ?: ''
             },
-            match($customer->status) {
+            match ($customer->status) {
                 'active' => 'Aktif',
-                'inactive' => 'Tidak Aktif', 
+                'inactive' => 'Tidak Aktif',
                 'blacklist' => 'Blacklist',
                 default => $customer->status ?: ''
             },

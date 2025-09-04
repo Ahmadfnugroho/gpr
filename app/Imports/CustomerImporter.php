@@ -23,9 +23,9 @@ use Maatwebsite\Excel\Validators\Failure;
 use Carbon\Carbon;
 use Exception;
 
-class CustomerImporter implements 
-    ToCollection, 
-    WithHeadingRow, 
+class CustomerImporter implements
+    ToCollection,
+    WithHeadingRow,
     WithBatchInserts,
     WithChunkReading,
     SkipsOnError,
@@ -76,10 +76,10 @@ class CustomerImporter implements
     {
         // Normalize and validate row data
         $customerData = $this->normalizeRowData($row);
-        
+
         // Validate the data
         $validator = $this->validateRowData($customerData, $rowNumber);
-        
+
         if ($validator->fails()) {
             $this->importResults['failed']++;
             foreach ($validator->errors()->all() as $error) {
@@ -90,7 +90,7 @@ class CustomerImporter implements
 
         // Check if customer exists
         $existingCustomer = Customer::where('email', $customerData['email'])->first();
-        
+
         if ($existingCustomer) {
             if ($this->updateExisting) {
                 $this->updateCustomer($existingCustomer, $customerData, $rowNumber);
@@ -120,7 +120,6 @@ class CustomerImporter implements
             'job' => trim($row['pekerjaan'] ?? $row['job'] ?? ''),
             'office_address' => trim($row['alamat_kantor'] ?? $row['office_address'] ?? ''),
             'instagram_username' => $this->formatInstagram($row['instagram'] ?? $row['instagram_username'] ?? ''),
-            'facebook_username' => trim($row['facebook'] ?? $row['facebook_username'] ?? ''),
             'emergency_contact_name' => trim($row['kontak_emergency'] ?? $row['emergency_contact_name'] ?? ''),
             'emergency_contact_number' => $this->formatPhoneNumber($row['hp_emergency'] ?? $row['emergency_contact_number'] ?? ''),
             'source_info' => trim($row['sumber_info'] ?? $row['source_info'] ?? ''),
@@ -164,13 +163,13 @@ class CustomerImporter implements
         // Set default values
         $data['status'] = $data['status'] ?: Customer::STATUS_BLACKLIST;
         $data['password'] = Hash::make('password123'); // Default password
-        
+
         // Create customer
         $customer = Customer::create($data);
-        
+
         // Add phone numbers
         $this->addPhoneNumbers($customer, $data);
-        
+
         $this->importResults['success']++;
         Log::info("Customer imported successfully", [
             'row' => $rowNumber,
@@ -186,13 +185,13 @@ class CustomerImporter implements
     {
         // Don't update email and password
         unset($data['email'], $data['password']);
-        
+
         // Update customer data
         $customer->update($data);
-        
+
         // Update phone numbers
         $this->updatePhoneNumbers($customer, $data);
-        
+
         $this->importResults['updated']++;
         Log::info("Customer updated successfully", [
             'row' => $rowNumber,
@@ -228,7 +227,7 @@ class CustomerImporter implements
     {
         // Delete existing phone numbers
         $customer->customerPhoneNumbers()->delete();
-        
+
         // Add new phone numbers
         $this->addPhoneNumbers($customer, $data);
     }
@@ -239,9 +238,9 @@ class CustomerImporter implements
     protected function formatPhoneNumber(?string $phone): ?string
     {
         if (empty($phone)) return null;
-        
+
         $phone = preg_replace('/\D/', '', $phone);
-        
+
         if (str_starts_with($phone, '62')) {
             return '+' . $phone;
         } elseif (str_starts_with($phone, '0')) {
@@ -249,7 +248,7 @@ class CustomerImporter implements
         } elseif (!empty($phone)) {
             return '+62' . $phone;
         }
-        
+
         return null;
     }
 
@@ -259,15 +258,15 @@ class CustomerImporter implements
     protected function normalizeGender(?string $gender): ?string
     {
         if (empty($gender)) return null;
-        
+
         $gender = strtolower(trim($gender));
-        
+
         if (in_array($gender, ['laki-laki', 'laki', 'l', 'male', 'm', 'pria'])) {
             return 'male';
         } elseif (in_array($gender, ['perempuan', 'wanita', 'p', 'female', 'f', 'cewek'])) {
             return 'female';
         }
-        
+
         return null;
     }
 
@@ -277,9 +276,9 @@ class CustomerImporter implements
     protected function normalizeStatus(?string $status): ?string
     {
         if (empty($status)) return null;
-        
+
         $status = strtolower(trim($status));
-        
+
         if (in_array($status, ['aktif', 'active', 'a'])) {
             return 'active';
         } elseif (in_array($status, ['tidak aktif', 'inactive', 'nonaktif', 'i'])) {
@@ -287,7 +286,7 @@ class CustomerImporter implements
         } elseif (in_array($status, ['blacklist', 'hitam', 'banned', 'b'])) {
             return 'blacklist';
         }
-        
+
         return null;
     }
 
@@ -297,14 +296,14 @@ class CustomerImporter implements
     protected function formatInstagram(?string $instagram): ?string
     {
         if (empty($instagram)) return null;
-        
+
         $instagram = trim($instagram);
-        
+
         // Remove @ if present
         if (str_starts_with($instagram, '@')) {
             $instagram = substr($instagram, 1);
         }
-        
+
         return $instagram;
     }
 
@@ -339,7 +338,7 @@ class CustomerImporter implements
     {
         return [
             'nama_lengkap',
-            'email', 
+            'email',
             'nomor_hp_1',
             'nomor_hp_2',
             'jenis_kelamin',
@@ -348,7 +347,6 @@ class CustomerImporter implements
             'pekerjaan',
             'alamat_kantor',
             'instagram',
-            'facebook',
             'kontak_emergency',
             'hp_emergency',
             'sumber_info'

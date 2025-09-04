@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\TransactionResource\Number;
 use App\Filament\Resources\TransactionResource\Pages;
+use App\Services\TransactionImportExportService;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
@@ -1749,49 +1750,26 @@ class TransactionResource extends Resource
                     ->default(['booking', 'paid', 'on_rented']),
             ])
             ->headerActions([
-                Action::make('export_settings')
-                    ->label('Export Settings')
-                    ->icon('heroicon-o-cog-6-tooth')
-                    ->color('gray')
-                    ->form([
-                        CheckboxList::make('included_columns')
-                            ->label('Select Columns to Export')
-                            ->options(\App\Models\ExportSetting::getAvailableColumns('TransactionResource'))
-                            ->default(function () {
-                                $settings = \App\Models\ExportSetting::getSettings('TransactionResource');
-                                return $settings['included_columns'] ?? [];
-                            })
-                            ->columns(2)
-                            ->required()
-                    ])
-                    ->action(function (array $data) {
-                        $settings = [
-                            'included_columns' => $data['included_columns'],
-                            'excluded_columns' => ['serial_numbers', 'customer_phone'] // Keep these excluded by default
-                        ];
-                        \App\Models\ExportSetting::updateSettings('TransactionResource', $settings);
-
-                        \Filament\Notifications\Notification::make()
-                            ->title('Export settings updated successfully')
-                            ->success()
-                            ->send();
-                    })
-                    ->modalHeading('Configure Export Columns')
-                    ->modalSubmitActionLabel('Save Settings'),
-                \Filament\Actions\ExportAction::make()
-                    ->exporter(TransactionExporter::class)
-                    ->label('Export Transactions')
+                Action::make('downloadTemplate')
+                    ->label('Download Reference Template')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('warning')
+                    ->tooltip('Note: Transaction import is not supported due to business complexity')
+                    ->action(function () {
+                        $service = new TransactionImportExportService();
+                        $filePath = $service->generateTemplate();
+                        return response()->download($filePath, 'transaction_reference_template.xlsx')->deleteFileAfterSend();
+                    }),
+                    
+                Action::make('export')
+                    ->label('Export All')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
-                    ->formats([
-                        ExportFormat::Xlsx,
-                        ExportFormat::Csv,
-                    ])
-                    ->fileName(fn(): string => 'transactions-' . now()->format('Y-m-d-H-i-s'))
-                    ->columnMapping(false)
-                    ->modalHeading('Export Transaction Data')
-                    ->modalDescription('Export transaction data to Excel or CSV format. You can choose the export format and date range.')
-                    ->modalSubmitActionLabel('Export')
+                    ->action(function () {
+                        $service = new TransactionImportExportService();
+                        $filePath = $service->exportTransactions();
+                        return response()->download($filePath, 'transactions_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
+                    }),
             ])
             ->actions([
                 BulkActionGroup::make([
@@ -1967,7 +1945,7 @@ class TransactionResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records) {
-                            $records->each(function($record) {
+                            $records->each(function ($record) {
                                 $record->update(['booking_status' => 'booking']);
                             });
                             Notification::make()
@@ -1986,7 +1964,7 @@ class TransactionResource extends Resource
 
 
                         ->action(function (Collection $records) {
-                            $records->each(function($record) {
+                            $records->each(function ($record) {
                                 $record->update(['booking_status' => 'paid']);
                             });
                             Notification::make()
@@ -2024,7 +2002,7 @@ class TransactionResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records) {
-                            $records->each(function($record) {
+                            $records->each(function ($record) {
                                 $record->update([
                                     'booking_status' => 'on_rented',
                                     'down_payment' => $record->grand_total,
@@ -2043,7 +2021,7 @@ class TransactionResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records) {
-                            $records->each(function($record) {
+                            $records->each(function ($record) {
                                 $record->update(['booking_status' => 'done']);
                             });
                             Notification::make()
@@ -2051,9 +2029,19 @@ class TransactionResource extends Resource
                                 ->title('Berhasil Mengubah Status Booking Transaksi')
                                 ->send();
                         }),
+                    
+                    BulkAction::make('exportSelected')
+                        ->label('Export Selected')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->color('info')
+                        ->action(function (Collection $records) {
+                            $service = new TransactionImportExportService();
+                            $transactionIds = $records->pluck('id')->toArray();
+                            $filePath = $service->exportTransactions($transactionIds);
+                            return response()->download($filePath, 'transactions_selected_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
+                        }),
 
-
-
+                ]),
                 ]),
             ]);
     }

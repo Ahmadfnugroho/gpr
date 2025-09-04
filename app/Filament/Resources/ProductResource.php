@@ -5,21 +5,22 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource\RelationManagers;
-use App\Filament\Exports\ProductExporter;
-use App\Filament\Imports\ProductImporter;
 use App\Models\Category;
 use App\Models\Brand;
 use App\Models\SubCategory;
-
 use App\Models\Product;
+use App\Services\ProductImportExportService;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Tables\Actions\ExportAction;
-use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\HeaderActions;
+use Filament\Forms\Components\FileUpload;
+use Filament\Notifications\Notification;
+use Filament\Forms\Components\Checkbox;
 
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Actions\Exports\Enums\ExportFormat;
@@ -244,18 +245,86 @@ class ProductResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->headerActions([
-                // Tombol ekspor produk
-                ExportAction::make()
-                    ->exporter(ProductExporter::class)
-                    ->formats([
-                        ExportFormat::Xlsx,
-                    ]),
-
-                // Tombol Import Produk
-                ImportAction::make()
-                    ->importer(ProductImporter::class)
-                    ->label('Import Product'),
-
+                Action::make('downloadTemplate')
+                    ->label('Download Template')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
+                    ->action(function () {
+                        $service = new ProductImportExportService();
+                        $filePath = $service->generateTemplate();
+                        return response()->download($filePath, 'product_import_template.xlsx')->deleteFileAfterSend();
+                    }),
+                    
+                Action::make('import')
+                    ->label('Import Excel')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('primary')
+                    ->form([
+                        FileUpload::make('excel_file')
+                            ->label('Excel File')
+                            ->acceptedFileTypes(['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'])
+                            ->required()
+                            ->maxSize(2048)
+                            ->helperText('Upload Excel file (.xls, .xlsx, .csv). Maximum 2MB'),
+                        Checkbox::make('update_existing')
+                            ->label('Update existing products (based on name)')
+                            ->default(false)
+                            ->helperText('If unchecked, products with existing names will be skipped')
+                    ])
+                    ->action(function (array $data) {
+                        try {
+                            $service = new ProductImportExportService();
+                            $file = $data['excel_file'];
+                            $updateExisting = $data['update_existing'] ?? false;
+                            
+                            // Convert to UploadedFile if needed
+                            if (is_string($file)) {
+                                $filePath = storage_path('app/public/' . $file);
+                                $file = new \Illuminate\Http\UploadedFile(
+                                    $filePath,
+                                    basename($filePath),
+                                    mime_content_type($filePath),
+                                    null,
+                                    true
+                                );
+                            }
+                            
+                            $results = $service->importProducts($file, $updateExisting);
+                            
+                            $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
+                            
+                            if (!empty($results['errors'])) {
+                                Notification::make()
+                                    ->title('Import Completed with Errors')
+                                    ->body($message . "\n\nErrors: " . implode(', ', array_slice($results['errors'], 0, 3)))
+                                    ->warning()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Import Successful')
+                                    ->body($message)
+                                    ->success()
+                                    ->send();
+                            }
+                            
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Import Failed')
+                                ->body('Error: ' . $e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                    
+                Action::make('export')
+                    ->label('Export All')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('info')
+                    ->action(function () {
+                        $service = new ProductImportExportService();
+                        $filePath = $service->exportProducts();
+                        return response()->download($filePath, 'products_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
+                    }),
             ])
 
             ->columns([
@@ -447,6 +516,17 @@ class ProductResource extends Resource
                     ->label('Ubah Featured Produk'),
 
                 Tables\Actions\DeleteBulkAction::make(),
+                
+                Action::make('exportSelected')
+                    ->label('Export Selected')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('info')
+                    ->action(function ($records) {
+                        $service = new ProductImportExportService();
+                        $productIds = $records->pluck('id')->toArray();
+                        $filePath = $service->exportProducts($productIds);
+                        return response()->download($filePath, 'products_selected_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
+                    }),
             ]);
     }
 

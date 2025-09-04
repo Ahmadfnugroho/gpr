@@ -74,7 +74,7 @@ class ProductAvailabilityResource extends Resource
                     ->sortable()
                     ->weight(FontWeight::SemiBold)
                     ->wrap(),
-                
+
                 TextColumn::make('total_items')
                     ->label('Total Items')
                     ->getStateUsing(function ($record) {
@@ -88,12 +88,12 @@ class ProductAvailabilityResource extends Resource
                     ->getStateUsing(function ($record) {
                         $startDate = request('tableFilters.date_range.start_date');
                         $endDate = request('tableFilters.date_range.end_date');
-                        
+
                         if (!$startDate || !$endDate) {
                             $startDate = now()->format('Y-m-d');
                             $endDate = now()->addDays(7)->format('Y-m-d');
                         }
-                        
+
                         return static::getAvailableItemsCount($record->id, $startDate, $endDate);
                     })
                     ->alignCenter()
@@ -112,12 +112,12 @@ class ProductAvailabilityResource extends Resource
                     ->getStateUsing(function ($record) {
                         $startDate = request('tableFilters.date_range.start_date');
                         $endDate = request('tableFilters.date_range.end_date');
-                        
+
                         if (!$startDate || !$endDate) {
                             $startDate = now()->format('Y-m-d');
                             $endDate = now()->addDays(7)->format('Y-m-d');
                         }
-                        
+
                         return static::getRentalStatusInfo($record->id, $startDate, $endDate);
                     })
                     ->html()
@@ -137,12 +137,12 @@ class ProductAvailabilityResource extends Resource
                     ->getStateUsing(function ($record) {
                         $startDate = request('tableFilters.date_range.start_date');
                         $endDate = request('tableFilters.date_range.end_date');
-                        
+
                         if (!$startDate || !$endDate) {
                             $startDate = now()->format('Y-m-d');
                             $endDate = now()->addDays(7)->format('Y-m-d');
                         }
-                        
+
                         return static::getAvailableSerialNumbers($record->id, $startDate, $endDate);
                     })
                     ->wrap()
@@ -161,7 +161,7 @@ class ProductAvailabilityResource extends Resource
                                     ->displayFormat('d M Y')
                                     ->required(),
                                 DatePicker::make('end_date')
-                                    ->label('End Date')  
+                                    ->label('End Date')
                                     ->default(now()->addDays(7))
                                     ->native(false)
                                     ->displayFormat('d M Y')
@@ -179,8 +179,8 @@ class ProductAvailabilityResource extends Resource
                             return null;
                         }
 
-                        return 'Date range: ' . Carbon::parse($data['start_date'])->format('d M Y') 
-                             . ' - ' . Carbon::parse($data['end_date'])->format('d M Y');
+                        return 'Date range: ' . Carbon::parse($data['start_date'])->format('d M Y')
+                            . ' - ' . Carbon::parse($data['end_date'])->format('d M Y');
                     }),
 
                 Filter::make('availability_status')
@@ -204,11 +204,11 @@ class ProductAvailabilityResource extends Resource
                                     ->where('t.booking_status', '!=', 'cancel')
                                     ->where(function ($q) use ($startDate, $endDate) {
                                         $q->whereBetween('t.start_date', [$startDate, $endDate])
-                                          ->orWhereBetween('t.end_date', [$startDate, $endDate])
-                                          ->orWhere(function ($q2) use ($startDate, $endDate) {
-                                              $q2->where('t.start_date', '<=', $startDate)
-                                                 ->where('t.end_date', '>=', $endDate);
-                                          });
+                                            ->orWhereBetween('t.end_date', [$startDate, $endDate])
+                                            ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                                $q2->where('t.start_date', '<=', $startDate)
+                                                    ->where('t.end_date', '>=', $endDate);
+                                            });
                                     });
                             });
                         });
@@ -237,20 +237,20 @@ class ProductAvailabilityResource extends Resource
     {
         $usedItemIds = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
             $query->where('booking_status', '!=', 'cancel')
-                  ->where(function ($q) use ($startDate, $endDate) {
-                      $q->whereBetween('start_date', [$startDate, $endDate])
+                ->where(function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('start_date', [$startDate, $endDate])
                         ->orWhereBetween('end_date', [$startDate, $endDate])
                         ->orWhere(function ($q2) use ($startDate, $endDate) {
                             $q2->where('start_date', '<=', $startDate)
-                               ->where('end_date', '>=', $endDate);
+                                ->where('end_date', '>=', $endDate);
                         });
-                  });
+                });
         })
-        ->whereHas('productItem', function ($q) use ($productId) {
-            $q->where('product_id', $productId);
-        })
-        ->pluck('product_item_id')
-        ->unique();
+            ->whereHas('productItem', function ($q) use ($productId) {
+                $q->where('product_id', $productId);
+            })
+            ->pluck('product_item_id')
+            ->unique();
 
         return ProductItem::where('product_id', $productId)
             ->whereNotIn('id', $usedItemIds)
@@ -264,29 +264,29 @@ class ProductAvailabilityResource extends Resource
     {
         $rentals = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
             $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-                  ->where(function ($q) use ($startDate, $endDate) {
-                      $q->whereBetween('start_date', [$startDate, $endDate])
+                ->where(function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('start_date', [$startDate, $endDate])
                         ->orWhereBetween('end_date', [$startDate, $endDate])
                         ->orWhere(function ($q2) use ($startDate, $endDate) {
                             $q2->where('start_date', '<=', $startDate)
-                               ->where('end_date', '>=', $endDate);
+                                ->where('end_date', '>=', $endDate);
                         });
-                  });
+                });
         })
-        ->whereHas('productItem', function ($q) use ($productId) {
-            $q->where('product_id', $productId);
-        })
-        ->with(['detailTransaction.transaction'])
-        ->get()
-        ->groupBy('detailTransaction.transaction.booking_status');
+            ->whereHas('productItem', function ($q) use ($productId) {
+                $q->where('product_id', $productId);
+            })
+            ->with(['detailTransaction.transaction'])
+            ->get()
+            ->groupBy('detailTransaction.transaction.booking_status');
 
         $statusInfo = [];
         foreach (['booking', 'paid', 'on_rented'] as $status) {
             $count = $rentals->get($status, collect())->count();
             if ($count > 0) {
-                $color = match($status) {
+                $color = match ($status) {
                     'booking' => 'orange',
-                    'paid' => 'blue', 
+                    'paid' => 'blue',
                     'on_rented' => 'green',
                     default => 'gray'
                 };
@@ -304,14 +304,14 @@ class ProductAvailabilityResource extends Resource
     {
         $nextRental = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) {
             $query->where('booking_status', '!=', 'cancel')
-                  ->where('end_date', '>', now());
+                ->where('end_date', '>', now());
         })
-        ->whereHas('productItem', function ($q) use ($productId) {
-            $q->where('product_id', $productId);
-        })
-        ->with(['detailTransaction.transaction'])
-        ->get()
-        ->min('detailTransaction.transaction.end_date');
+            ->whereHas('productItem', function ($q) use ($productId) {
+                $q->where('product_id', $productId);
+            })
+            ->with(['detailTransaction.transaction'])
+            ->get()
+            ->min('detailTransaction.transaction.end_date');
 
         return $nextRental ? Carbon::parse($nextRental)->addDay()->format('Y-m-d') : null;
     }
@@ -323,20 +323,20 @@ class ProductAvailabilityResource extends Resource
     {
         $usedItemIds = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
             $query->where('booking_status', '!=', 'cancel')
-                  ->where(function ($q) use ($startDate, $endDate) {
-                      $q->whereBetween('start_date', [$startDate, $endDate])
+                ->where(function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('start_date', [$startDate, $endDate])
                         ->orWhereBetween('end_date', [$startDate, $endDate])
                         ->orWhere(function ($q2) use ($startDate, $endDate) {
                             $q2->where('start_date', '<=', $startDate)
-                               ->where('end_date', '>=', $endDate);
+                                ->where('end_date', '>=', $endDate);
                         });
-                  });
+                });
         })
-        ->whereHas('productItem', function ($q) use ($productId) {
-            $q->where('product_id', $productId);
-        })
-        ->pluck('product_item_id')
-        ->unique();
+            ->whereHas('productItem', function ($q) use ($productId) {
+                $q->where('product_id', $productId);
+            })
+            ->pluck('product_item_id')
+            ->unique();
 
         $availableSerials = ProductItem::where('product_id', $productId)
             ->whereNotIn('id', $usedItemIds)
@@ -354,7 +354,7 @@ class ProductAvailabilityResource extends Resource
 
         $first5 = $availableSerials->take(5)->implode(', ');
         $remaining = $availableSerials->count() - 5;
-        
+
         return $first5 . " <span style='color: #6b7280; font-style: italic;'>and {$remaining} more</span>";
     }
 

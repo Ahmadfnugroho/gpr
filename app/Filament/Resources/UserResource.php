@@ -4,21 +4,20 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource\RelationManagers;
-use App\Filament\Imports\UserImporter;
-use App\Filament\Exports\UserExporter;
-
 use App\Models\User;
+use App\Services\UserImportExportService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\HeaderActions;
+use Filament\Forms\Components\FileUpload;
+use Filament\Notifications\Notification;
+use Filament\Forms\Components\Checkbox;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
-use Filament\Tables\Actions\ExportAction;
-use Filament\Actions\Exports\Enums\ExportFormat;
-use Filament\Tables\Actions\ImportAction;
-use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Http as FacadesHttp;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 
@@ -111,46 +110,86 @@ class UserResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->headerActions([
-                ExportAction::make()
-
-                    ->exporter(UserExporter::class)
-                    ->formats([
-                        ExportFormat::Xlsx,
-                    ]),
-
-                // Tombol Import Produk
-                ImportAction::make()
-                    ->importer(UserImporter::class)
-                    ->label('Import User'),
-
-                // Tables\Actions\Action::make('Import dari Google Sheets')
-                //     ->color('primary')
-                //     ->icon('heroicon-o-arrow-down-tray')
-                //     ->requiresConfirmation()
-                //     ->action(function () {
-                //         $response = FacadesHttp::get(route('sync'));
-
-                //         if ($response->json('redirect')) {
-                //             $this->dispatchBrowserEvent('open-new-tab', ['url' => $response->json('redirect')]);
-                //             return;
-                //         }
-
-                //         if ($response->successful()) {
-                //             Notification::make()
-                //                 ->title('Import Berhasil')
-                //                 ->body('Data pengguna berhasil diimpor dari Google Sheets.')
-                //                 ->success()
-                //                 ->send();
-                //         } else {
-                //             Notification::make()
-                //                 ->title('Import Gagal')
-                //                 ->body('Terjadi kesalahan saat mengimpor data: ' . $response->body())
-                //                 ->danger()
-                //                 ->send();
-                //         }
-                //     }),
-
-
+                Action::make('downloadTemplate')
+                    ->label('Download Template')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
+                    ->action(function () {
+                        $service = new UserImportExportService();
+                        $filePath = $service->generateTemplate();
+                        return response()->download($filePath, 'user_import_template.xlsx')->deleteFileAfterSend();
+                    }),
+                    
+                Action::make('import')
+                    ->label('Import Excel')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('primary')
+                    ->form([
+                        FileUpload::make('excel_file')
+                            ->label('Excel File')
+                            ->acceptedFileTypes(['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'])
+                            ->required()
+                            ->maxSize(2048)
+                            ->helperText('Upload Excel file (.xls, .xlsx, .csv). Maximum 2MB'),
+                        Checkbox::make('update_existing')
+                            ->label('Update existing users (based on email)')
+                            ->default(false)
+                            ->helperText('If unchecked, users with existing emails will be skipped')
+                    ])
+                    ->action(function (array $data) {
+                        try {
+                            $service = new UserImportExportService();
+                            $file = $data['excel_file'];
+                            $updateExisting = $data['update_existing'] ?? false;
+                            
+                            // Convert to UploadedFile if needed
+                            if (is_string($file)) {
+                                $filePath = storage_path('app/public/' . $file);
+                                $file = new \Illuminate\Http\UploadedFile(
+                                    $filePath,
+                                    basename($filePath),
+                                    mime_content_type($filePath),
+                                    null,
+                                    true
+                                );
+                            }
+                            
+                            $results = $service->importUsers($file, $updateExisting);
+                            
+                            $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
+                            
+                            if (!empty($results['errors'])) {
+                                Notification::make()
+                                    ->title('Import Completed with Errors')
+                                    ->body($message . "\n\nErrors: " . implode(', ', array_slice($results['errors'], 0, 3)))
+                                    ->warning()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Import Successful')
+                                    ->body($message)
+                                    ->success()
+                                    ->send();
+                            }
+                            
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Import Failed')
+                                ->body('Error: ' . $e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                    
+                Action::make('export')
+                    ->label('Export All')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('info')
+                    ->action(function () {
+                        $service = new UserImportExportService();
+                        $filePath = $service->exportUsers();
+                        return response()->download($filePath, 'users_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
+                    }),
             ])
 
             ->columns([
@@ -319,6 +358,17 @@ class UserResource extends Resource
                         ->label('Ubah Status User'),
 
                     Tables\Actions\DeleteBulkAction::make(),
+                    
+                    Action::make('exportSelected')
+                        ->label('Export Selected')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->color('info')
+                        ->action(function ($records) {
+                            $service = new UserImportExportService();
+                            $userIds = $records->pluck('id')->toArray();
+                            $filePath = $service->exportUsers($userIds);
+                            return response()->download($filePath, 'users_selected_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
+                        }),
                 ]),
             ]);
     }

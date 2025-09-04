@@ -80,7 +80,7 @@ class CustomerResource extends Resource
                                     ->placeholder('How did they find us?'),
                             ]),
                     ]),
-                
+
                 Section::make('Contact Information')
                     ->schema([
                         Textarea::make('address')
@@ -107,7 +107,7 @@ class CustomerResource extends Resource
                                     ->maxLength(20),
                             ]),
                     ]),
-                
+
                 Section::make('Social Media')
                     ->schema([
                         Grid::make(2)
@@ -115,9 +115,6 @@ class CustomerResource extends Resource
                                 TextInput::make('instagram_username')
                                     ->label('Instagram Username')
                                     ->prefix('@')
-                                    ->maxLength(255),
-                                TextInput::make('facebook_username')
-                                    ->label('Facebook Username')
                                     ->maxLength(255),
                             ]),
                     ])
@@ -149,13 +146,13 @@ class CustomerResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         Customer::STATUS_ACTIVE => 'success',
-                        Customer::STATUS_INACTIVE => 'warning', 
+                        Customer::STATUS_INACTIVE => 'warning',
                         Customer::STATUS_BLACKLIST => 'danger',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn (string $state): string => Customer::STATUS_LABELS[$state] ?? $state)
+                    ->formatStateUsing(fn(string $state): string => Customer::STATUS_LABELS[$state] ?? $state)
                     ->sortable(),
                 TextColumn::make('transactions_count')
                     ->label('Transactions')
@@ -183,7 +180,7 @@ class CustomerResource extends Resource
                 SelectFilter::make('source_info')
                     ->options([
                         'Instagram' => 'Instagram',
-                        'Google' => 'Google', 
+                        'Google' => 'Google',
                         'Teman' => 'Teman',
                         'TikTok' => 'TikTok',
                         'Lainnya' => 'Lainnya',
@@ -210,7 +207,7 @@ class CustomerResource extends Resource
                         $filePath = $service->generateTemplate();
                         return response()->download($filePath, 'customer_import_template.xlsx')->deleteFileAfterSend();
                     }),
-                    
+
                 Action::make('import')
                     ->label('Import Excel')
                     ->icon('heroicon-o-arrow-up-tray')
@@ -232,7 +229,7 @@ class CustomerResource extends Resource
                             $service = new CustomerImportExportService();
                             $file = $data['excel_file'];
                             $updateExisting = $data['update_existing'] ?? false;
-                            
+
                             // Convert to UploadedFile if needed
                             if (is_string($file)) {
                                 $filePath = storage_path('app/public/' . $file);
@@ -244,11 +241,11 @@ class CustomerResource extends Resource
                                     true
                                 );
                             }
-                            
+
                             $results = $service->importCustomers($file, $updateExisting);
-                            
+
                             $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
-                            
+
                             if (!empty($results['errors'])) {
                                 Notification::make()
                                     ->title('Import Completed with Errors')
@@ -262,7 +259,6 @@ class CustomerResource extends Resource
                                     ->success()
                                     ->send();
                             }
-                            
                         } catch (\Exception $e) {
                             Notification::make()
                                 ->title('Import Failed')
@@ -271,7 +267,7 @@ class CustomerResource extends Resource
                                 ->send();
                         }
                     }),
-                    
+
                 Action::make('export')
                     ->label('Export All')
                     ->icon('heroicon-o-arrow-down-tray')
@@ -300,7 +296,7 @@ class CustomerResource extends Resource
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->action(function ($records) {
-                            $records->each(fn ($record) => $record->update(['status' => Customer::STATUS_ACTIVE]));
+                            $records->each(fn($record) => $record->update(['status' => Customer::STATUS_ACTIVE]));
                             Notification::make()
                                 ->title('Customers Activated')
                                 ->body(count($records) . ' customers have been activated')
@@ -312,7 +308,7 @@ class CustomerResource extends Resource
                         ->icon('heroicon-o-pause-circle')
                         ->color('warning')
                         ->action(function ($records) {
-                            $records->each(fn ($record) => $record->update(['status' => Customer::STATUS_INACTIVE]));
+                            $records->each(fn($record) => $record->update(['status' => Customer::STATUS_INACTIVE]));
                             Notification::make()
                                 ->title('Customers Deactivated')
                                 ->body(count($records) . ' customers have been deactivated')
@@ -324,7 +320,7 @@ class CustomerResource extends Resource
                         ->icon('heroicon-o-no-symbol')
                         ->color('danger')
                         ->action(function ($records) {
-                            $records->each(fn ($record) => $record->update(['status' => Customer::STATUS_BLACKLIST]));
+                            $records->each(fn($record) => $record->update(['status' => Customer::STATUS_BLACKLIST]));
                             Notification::make()
                                 ->title('Customers Blacklisted')
                                 ->body(count($records) . ' customers have been blacklisted')

@@ -26,8 +26,8 @@
 
                     <!-- Download Template Button -->
                     <div class="mb-4">
-                        <a href="{{ route('customers.import.template') }}" 
-                           class="btn btn-success">
+                        <a href="{{ route('customers.import.template') }}"
+                            class="btn btn-success">
                             <i class="fas fa-download me-1"></i>Download Template Excel
                         </a>
                     </div>
@@ -35,34 +35,34 @@
                     <!-- Import Form -->
                     <form action="{{ route('customers.import') }}" method="POST" enctype="multipart/form-data">
                         @csrf
-                        
+
                         <div class="row">
                             <div class="col-md-8">
                                 <div class="mb-3">
                                     <label for="excel_file" class="form-label">
                                         <strong>File Excel Customer <span class="text-danger">*</span></strong>
                                     </label>
-                                    <input type="file" 
-                                           class="form-control @error('excel_file') is-invalid @enderror" 
-                                           id="excel_file" 
-                                           name="excel_file" 
-                                           accept=".xlsx,.xls,.csv"
-                                           required>
+                                    <input type="file"
+                                        class="form-control @error('excel_file') is-invalid @enderror"
+                                        id="excel_file"
+                                        name="excel_file"
+                                        accept=".xlsx,.xls,.csv"
+                                        required>
                                     <small class="form-text text-muted">
                                         Format yang didukung: .xlsx, .xls, .csv (Maksimal 2MB)
                                     </small>
                                     @error('excel_file')
-                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
 
                                 <div class="form-check mb-3">
-                                    <input class="form-check-input" 
-                                           type="checkbox" 
-                                           id="update_existing" 
-                                           name="update_existing" 
-                                           value="1"
-                                           {{ old('update_existing') ? 'checked' : '' }}>
+                                    <input class="form-check-input"
+                                        type="checkbox"
+                                        id="update_existing"
+                                        name="update_existing"
+                                        value="1"
+                                        {{ old('update_existing') ? 'checked' : '' }}>
                                     <label class="form-check-label" for="update_existing">
                                         Update data customer yang sudah ada (berdasarkan email)
                                     </label>
@@ -165,12 +165,6 @@
                                     <td><span class="badge bg-secondary">Tidak</span></td>
                                 </tr>
                                 <tr>
-                                    <td><code>facebook</code></td>
-                                    <td>Username Facebook</td>
-                                    <td>john.doe</td>
-                                    <td><span class="badge bg-secondary">Tidak</span></td>
-                                </tr>
-                                <tr>
                                     <td><code>kontak_emergency</code></td>
                                     <td>Nama kontak darurat</td>
                                     <td>Jane Doe</td>
@@ -211,23 +205,24 @@
 
 @push('scripts')
 <script>
-document.getElementById('excel_file').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        const fileSize = file.size / 1024 / 1024; // in MB
-        if (fileSize > 2) {
-            alert('File terlalu besar! Maksimal 2MB.');
-            e.target.value = '';
+    document.getElementById('excel_file').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const fileSize = file.size / 1024 / 1024; // in MB
+            if (fileSize > 2) {
+                alert('File terlalu besar! Maksimal 2MB.');
+                e.target.value = '';
+            }
+
+            const validTypes = ['application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'text/csv'
+            ];
+            if (!validTypes.includes(file.type)) {
+                alert('Tipe file tidak didukung! Gunakan .xlsx, .xls, atau .csv');
+                e.target.value = '';
+            }
         }
-        
-        const validTypes = ['application/vnd.ms-excel', 
-                          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                          'text/csv'];
-        if (!validTypes.includes(file.type)) {
-            alert('Tipe file tidak didukung! Gunakan .xlsx, .xls, atau .csv');
-            e.target.value = '';
-        }
-    }
-});
+    });
 </script>
 @endpush
