@@ -1702,7 +1702,7 @@ class TransactionResource extends Resource
                     ->formatStateUsing(fn(?string $state): HtmlString => new HtmlString(
                         $state && $state != '0' ? 'Rp ' . number_format((int) $state, 0, ',', '.') : '-'
                     ))
-                    ->visible(fn($record) => $record->booking_status === 'cancel')
+                    ->visible(fn($record) => $record && $record->booking_status === 'cancel')
                     ->color('danger'),
                 TextColumn::make('booking_status')
                     ->label('')
