@@ -29,7 +29,7 @@ use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
-use Filament\Notifications\Collection;
+use Illuminate\Database\Eloquent\Collection;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\ActionSize;
@@ -49,6 +49,7 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Actions\Exports\Enums\ExportFormat;
 use App\Filament\Exports\TransactionExporter;
+use Illuminate\Support\Facades\DB;
 
 use Filament\Tables\Columns\TextInputColumn;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
@@ -1748,12 +1749,12 @@ class TransactionResource extends Resource
                     ->default(['booking', 'paid', 'on_rented']),
             ])
             ->headerActions([
-                \Filament\Actions\Action::make('export_settings')
+                Action::make('export_settings')
                     ->label('Export Settings')
                     ->icon('heroicon-o-cog-6-tooth')
                     ->color('gray')
                     ->form([
-                        \Filament\Forms\Components\CheckboxList::make('included_columns')
+                        CheckboxList::make('included_columns')
                             ->label('Select Columns to Export')
                             ->options(\App\Models\ExportSetting::getAvailableColumns('TransactionResource'))
                             ->default(function () {
@@ -1966,7 +1967,9 @@ class TransactionResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records) {
-                            $records->each->update(['booking_status' => 'booking']);
+                            $records->each(function($record) {
+                                $record->update(['booking_status' => 'booking']);
+                            });
                             Notification::make()
                                 ->success()
                                 ->title('Berhasil Mengubah Status Booking Transaksi')
@@ -1983,7 +1986,9 @@ class TransactionResource extends Resource
 
 
                         ->action(function (Collection $records) {
-                            $records->each->update(['booking_status' => 'paid']);
+                            $records->each(function($record) {
+                                $record->update(['booking_status' => 'paid']);
+                            });
                             Notification::make()
                                 ->success()
                                 ->title('Berhasil Mengubah Status Booking Transaksi')
@@ -2019,10 +2024,12 @@ class TransactionResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records) {
-                            $records->each->update([
-                                'booking_status' => 'on_rented',
-                                'down_payment' => DB::raw('grand_total'),
-                            ]);
+                            $records->each(function($record) {
+                                $record->update([
+                                    'booking_status' => 'on_rented',
+                                    'down_payment' => $record->grand_total,
+                                ]);
+                            });
                             Notification::make()
                                 ->success()
                                 ->title('Berhasil Mengubah Status Booking Transaksi')
@@ -2036,7 +2043,9 @@ class TransactionResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records) {
-                            $records->each->update(['booking_status' => 'done']);
+                            $records->each(function($record) {
+                                $record->update(['booking_status' => 'done']);
+                            });
                             Notification::make()
                                 ->success()
                                 ->title('Berhasil Mengubah Status Booking Transaksi')
@@ -2062,31 +2071,3 @@ class TransactionResource extends Resource
         ];
     }
 }
-                            // Select::make('serial_numbers')
-                            //     ->label('Pilih Serial Number')
-                            //     ->visible(fn(Get $get): bool => !$get('is_bundling'))
-                            //     ->searchable()
-                            //     ->preload()
-                            //     ->reactive()
-                            //     ->options(function (Get $get) {
-                            //         // Ambil product_id dari field lain di repeater ini
-                            //         $productId = $get('product_id');
-                            //         if (!$productId) return [];
-
-                            //         // Ambil start_date & end_date dari form
-                            //         $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
-                            //         $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
-
-                            //         // Ambil semua item produk yang tersedia di periode tersebut
-                            //         $items = ProductItem::where('product_id', $productId)
-                            //             ->actuallyAvailableForPeriod($startDate, $endDate)
-                            //             ->pluck('serial_number', 'id');
-
-                            //         return $items->mapWithKeys(fn($sn, $id) => [$id => $sn])->toArray();
-                            //     })
-                            //     ->multiple()
-                            //     ->minItems(fn(Get $get) => $get('quantity') ?? 1)
-                            //     ->maxItems(fn(Get $get) => $get('quantity') ?? 1)
-                            //     ->helperText(fn(Get $get) => 'Pilih tepat ' . ($get('quantity') ?? 1) . ' serial number')
-
-                            //     ->required(fn(Get $get): bool => !$get('is_bundling')),

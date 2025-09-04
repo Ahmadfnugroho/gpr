@@ -187,7 +187,7 @@ class ProductAvailabilityResource extends Resource
                     ->label('Availability Status')
                     ->toggle()
                     ->query(function (Builder $query, array $data): Builder {
-                        if (!$data['value']) {
+                        if (empty($data['value']) || !$data['value']) {
                             return $query;
                         }
 
@@ -214,7 +214,7 @@ class ProductAvailabilityResource extends Resource
                         });
                     })
                     ->indicateUsing(function (array $data): ?string {
-                        return $data['value'] ? 'Only available products' : null;
+                        return (!empty($data['value']) && $data['value']) ? 'Only available products' : null;
                     }),
             ])
             ->actions([

@@ -24,7 +24,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\HeaderActions;
 use Illuminate\Support\HtmlString;
+use Illuminate\Http\Response;
+use App\Services\CustomerImportExportService;
+use Filament\Forms\Components\FileUpload;
+use Filament\Notifications\Notification;
+use Filament\Forms\Components\Checkbox;
 
 class CustomerResource extends Resource
 {
@@ -194,9 +200,137 @@ class CustomerResource extends Resource
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
+            ->headerActions([
+                Action::make('downloadTemplate')
+                    ->label('Download Template')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
+                    ->action(function () {
+                        $service = new CustomerImportExportService();
+                        $filePath = $service->generateTemplate();
+                        return response()->download($filePath, 'customer_import_template.xlsx')->deleteFileAfterSend();
+                    }),
+                    
+                Action::make('import')
+                    ->label('Import Excel')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('primary')
+                    ->form([
+                        FileUpload::make('excel_file')
+                            ->label('Excel File')
+                            ->acceptedFileTypes(['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'])
+                            ->required()
+                            ->maxSize(2048)
+                            ->helperText('Upload Excel file (.xls, .xlsx, .csv). Maximum 2MB'),
+                        Checkbox::make('update_existing')
+                            ->label('Update existing customers (based on email)')
+                            ->default(false)
+                            ->helperText('If unchecked, customers with existing emails will be skipped')
+                    ])
+                    ->action(function (array $data) {
+                        try {
+                            $service = new CustomerImportExportService();
+                            $file = $data['excel_file'];
+                            $updateExisting = $data['update_existing'] ?? false;
+                            
+                            // Convert to UploadedFile if needed
+                            if (is_string($file)) {
+                                $filePath = storage_path('app/public/' . $file);
+                                $file = new \Illuminate\Http\UploadedFile(
+                                    $filePath,
+                                    basename($filePath),
+                                    mime_content_type($filePath),
+                                    null,
+                                    true
+                                );
+                            }
+                            
+                            $results = $service->importCustomers($file, $updateExisting);
+                            
+                            $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
+                            
+                            if (!empty($results['errors'])) {
+                                Notification::make()
+                                    ->title('Import Completed with Errors')
+                                    ->body($message . "\n\nErrors: " . implode(', ', array_slice($results['errors'], 0, 3)))
+                                    ->warning()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Import Successful')
+                                    ->body($message)
+                                    ->success()
+                                    ->send();
+                            }
+                            
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Import Failed')
+                                ->body('Error: ' . $e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                    
+                Action::make('export')
+                    ->label('Export All')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('info')
+                    ->action(function () {
+                        $service = new CustomerImportExportService();
+                        $filePath = $service->exportCustomers();
+                        return response()->download($filePath, 'customers_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
+                    }),
+            ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    Action::make('exportSelected')
+                        ->label('Export Selected')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->color('info')
+                        ->action(function ($records) {
+                            $service = new CustomerImportExportService();
+                            $customerIds = $records->pluck('id')->toArray();
+                            $filePath = $service->exportCustomers($customerIds);
+                            return response()->download($filePath, 'customers_selected_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
+                        }),
+                    Action::make('bulkActivate')
+                        ->label('Activate')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->action(function ($records) {
+                            $records->each(fn ($record) => $record->update(['status' => Customer::STATUS_ACTIVE]));
+                            Notification::make()
+                                ->title('Customers Activated')
+                                ->body(count($records) . ' customers have been activated')
+                                ->success()
+                                ->send();
+                        }),
+                    Action::make('bulkDeactivate')
+                        ->label('Deactivate')
+                        ->icon('heroicon-o-pause-circle')
+                        ->color('warning')
+                        ->action(function ($records) {
+                            $records->each(fn ($record) => $record->update(['status' => Customer::STATUS_INACTIVE]));
+                            Notification::make()
+                                ->title('Customers Deactivated')
+                                ->body(count($records) . ' customers have been deactivated')
+                                ->warning()
+                                ->send();
+                        }),
+                    Action::make('bulkBlacklist')
+                        ->label('Blacklist')
+                        ->icon('heroicon-o-no-symbol')
+                        ->color('danger')
+                        ->action(function ($records) {
+                            $records->each(fn ($record) => $record->update(['status' => Customer::STATUS_BLACKLIST]));
+                            Notification::make()
+                                ->title('Customers Blacklisted')
+                                ->body(count($records) . ' customers have been blacklisted')
+                                ->danger()
+                                ->send();
+                        }),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
