@@ -61,14 +61,21 @@ trait EnhancedImportControllerTrait
      */
     protected function storeFailedRowsInSession(array $failedRows, string $importerClass): void
     {
+        // Limit memory usage - store only first 500 rows for viewing, but keep all for download
+        $displayRows = array_slice($failedRows, 0, 500);
+        $totalFailed = count($failedRows);
+        
         $sessionKey = 'failed_import_' . Str::slug(class_basename($importerClass)) . '_' . time();
         
         session([
             $sessionKey => [
-                'failed_rows' => $failedRows,
+                'failed_rows' => $failedRows, // Keep all for download
+                'display_rows' => $displayRows, // Limited for memory-safe viewing
                 'importer_class' => $importerClass,
                 'timestamp' => now()->toDateTimeString(),
-                'total_failed' => count($failedRows)
+                'total_failed' => $totalFailed,
+                'display_limit' => 500,
+                'has_more' => $totalFailed > 500
             ]
         ]);
 
@@ -221,11 +228,17 @@ trait EnhancedImportControllerTrait
 
         $failedData = session($sessionKey);
         
+        // Use display_rows for memory-safe viewing
+        $displayRows = $failedData['display_rows'] ?? array_slice($failedData['failed_rows'], 0, 500);
+        
         return view('import.errors', [
-            'failed_rows' => $failedData['failed_rows'],
+            'failed_rows' => $displayRows, // Only show limited rows
             'importer_class' => class_basename($failedData['importer_class']),
             'timestamp' => $failedData['timestamp'],
             'total_failed' => $failedData['total_failed'],
+            'display_limit' => $failedData['display_limit'] ?? 500,
+            'has_more' => $failedData['has_more'] ?? false,
+            'showing_count' => count($displayRows),
             'download_url' => route('import.download-failed')
         ]);
     }
@@ -293,20 +306,24 @@ trait EnhancedImportControllerTrait
         }
 
         $failedData = session($sessionKey);
-        $failedRows = $failedData['failed_rows'];
+        // Use display_rows for memory safety
+        $displayRows = $failedData['display_rows'] ?? array_slice($failedData['failed_rows'], 0, 500);
         
-        $total = count($failedRows);
+        $displayTotal = count($displayRows);
+        $actualTotal = $failedData['total_failed'];
         $offset = ($page - 1) * $perPage;
-        $paginatedRows = array_slice($failedRows, $offset, $perPage);
+        $paginatedRows = array_slice($displayRows, $offset, $perPage);
         
         return [
             'rows' => $paginatedRows,
             'pagination' => [
                 'current_page' => $page,
                 'per_page' => $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage),
-                'has_more' => $offset + $perPage < $total
+                'total_displayed' => $displayTotal,
+                'total_actual' => $actualTotal,
+                'last_page' => ceil($displayTotal / $perPage),
+                'has_more' => $offset + $perPage < $displayTotal,
+                'is_limited' => $actualTotal > 500
             ]
         ];
     }

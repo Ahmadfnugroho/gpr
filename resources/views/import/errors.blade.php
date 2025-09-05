@@ -26,6 +26,15 @@
                         <p class="text-gray-600 mt-1">
                             Total {{ $total_failed }} baris gagal diimport pada {{ $timestamp }}
                         </p>
+                        @if($has_more)
+                        <div class="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded">
+                            <p class="text-yellow-800 text-sm">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Menampilkan {{ $showing_count }} dari {{ $total_failed }} error untuk menghemat memory. 
+                                Download file Excel untuk melihat semua error.
+                            </p>
+                        </div>
+                        @endif
                     </div>
                     <div class="flex space-x-3">
                         <a href="{{ $download_url }}" 
@@ -48,14 +57,20 @@
                     <div class="text-center">
                         <div class="text-2xl font-bold text-red-600">{{ $total_failed }}</div>
                         <div class="text-sm text-gray-600">Total Failed</div>
+                        @if($has_more)
+                        <div class="text-xs text-yellow-600 mt-1">(Showing {{ $showing_count }})</div>
+                        @endif
                     </div>
                     <div class="text-center">
                         <div class="text-2xl font-bold text-blue-600">{{ count(array_unique(array_column($failed_rows, 'error_reason'))) }}</div>
                         <div class="text-sm text-gray-600">Unique Errors</div>
+                        @if($has_more)
+                        <div class="text-xs text-yellow-600 mt-1">(From displayed)</div>
+                        @endif
                     </div>
                     <div class="text-center">
                         <div class="text-2xl font-bold text-purple-600">{{ count(array_unique(array_column($failed_rows, 'row_number'))) }}</div>
-                        <div class="text-sm text-gray-600">Affected Rows</div>
+                        <div class="text-sm text-gray-600">Displayed Rows</div>
                     </div>
                     <div class="text-center">
                         <div class="text-2xl font-bold text-green-600">{{ round((1 - $total_failed / ($total_failed + 169)) * 100, 1) }}%</div>
@@ -120,7 +135,23 @@
         <div class="bg-white rounded-lg shadow-lg">
             <div class="px-6 py-4 border-b">
                 <h2 class="text-lg font-semibold text-gray-900">Detail Errors</h2>
-                <p class="text-sm text-gray-600">Showing <span id="displayedCount">{{ count($failed_rows) }}</span> of {{ $total_failed }} failed rows</p>
+                <div class="flex items-center justify-between">
+                    <p class="text-sm text-gray-600">
+                        Showing <span id="displayedCount">{{ count($failed_rows) }}</span> 
+                        @if($has_more)
+                            of {{ $showing_count }} displayed ({{ $total_failed }} total) failed rows
+                        @else
+                            of {{ $total_failed }} failed rows
+                        @endif
+                    </p>
+                    @if($has_more)
+                    <div class="bg-yellow-100 px-3 py-1 rounded-full">
+                        <span class="text-yellow-800 text-xs font-medium">
+                            <i class="fas fa-memory mr-1"></i>Memory Limited View
+                        </span>
+                    </div>
+                    @endif
+                </div>
             </div>
             
             <div class="overflow-x-auto">
@@ -188,13 +219,27 @@
             </div>
         </div>
 
-        <!-- Pagination (if needed) -->
-        @if(count($failed_rows) > 50)
-        <div class="bg-white rounded-lg shadow-lg mt-6 px-6 py-4">
-            <div class="flex justify-center">
-                <p class="text-sm text-gray-600">
-                    Showing first 1000 results. Download Excel file to see all {{ $total_failed }} failed rows.
-                </p>
+        <!-- Memory Limit Notice -->
+        @if($has_more)
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg shadow-lg mt-6 px-6 py-4">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-exclamation-triangle text-yellow-400 text-xl"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">Memory Limit Protection Active</h3>
+                    <p class="text-sm text-yellow-700 mt-1">
+                        Hanya menampilkan {{ $showing_count }} dari {{ $total_failed }} error untuk mencegah memory exhaustion.
+                        <strong>Download file Excel untuk melihat semua {{ $total_failed }} error.</strong>
+                    </p>
+                </div>
+                <div class="ml-auto">
+                    <a href="{{ $download_url }}" 
+                       class="inline-flex items-center px-4 py-2 bg-yellow-600 text-white text-sm rounded-lg hover:bg-yellow-700 transition-colors">
+                        <i class="fas fa-download mr-2"></i>
+                        Download All
+                    </a>
+                </div>
             </div>
         </div>
         @endif

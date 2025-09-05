@@ -48,6 +48,7 @@ return [
          */
         App\Providers\AppServiceProvider::class,
         App\Providers\EventServiceProvider::class,
+        App\Providers\CustomNotificationServiceProvider::class,
     ],
     'name' => env('APP_NAME', 'GPR'),
 

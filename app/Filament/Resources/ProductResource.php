@@ -20,6 +20,7 @@ use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\HeaderActions;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
+use App\Services\CustomNotificationService;
 use Filament\Forms\Components\Checkbox;
 
 use Illuminate\Database\Eloquent\Builder;
@@ -54,10 +55,9 @@ class ProductResource extends Resource
     public static function getGlobalSearchEloquentQuery(): Builder
     {
         return parent::getGlobalSearchEloquentQuery()
-            ->with([
-                'detailTransactions.transaction:id,start_date,end_date,booking_status'
-            ])
-            ->where('status', '!=', 'deleted');
+            ->select(['id', 'name', 'status', 'price'])
+            ->where('status', '!=', 'deleted')
+            ->limit(100);
     }
 
     public static function modifyGlobalSearchQuery(Builder $query, string $search): void
@@ -242,7 +242,10 @@ class ProductResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->defaultPaginationPageOption(50)
+            ->paginationPageOptions([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
+            ->deferLoading()
+            ->poll('30s')
             ->headerActions([
                 Action::make('downloadTemplate')
                     ->label('Download Template')
@@ -290,27 +293,10 @@ class ProductResource extends Resource
 
                             $results = $service->importProducts($file, $updateExisting);
 
-                            $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
-
-                            if (!empty($results['errors'])) {
-                                Notification::make()
-                                    ->title('Import Completed with Errors')
-                                    ->body($message . "\n\nErrors: " . implode(', ', array_slice($results['errors'], 0, 3)))
-                                    ->warning()
-                                    ->send();
-                            } else {
-                                Notification::make()
-                                    ->title('Import Successful')
-                                    ->body($message)
-                                    ->success()
-                                    ->send();
-                            }
+                            // Use custom notification service
+                            CustomNotificationService::showImportResults($results, 'product');
                         } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Import Failed')
-                                ->body('Error: ' . $e->getMessage())
-                                ->danger()
-                                ->send();
+                            CustomNotificationService::showError('Import Failed', 'Error: ' . $e->getMessage());
                         }
                     }),
 
@@ -389,7 +375,7 @@ class ProductResource extends Resource
                     ->wrapHeader()
 
             ])
-            ->modifyQueryUsing(fn(Builder $query) => $query->withCount('items'))
+            ->modifyQueryUsing(fn(Builder $query) => $query->withCount('items')->limit(500))
 
 
 

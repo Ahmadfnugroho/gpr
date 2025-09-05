@@ -101,10 +101,8 @@ class ProductImporter implements
             if ($this->updateExisting) {
                 $this->updateProduct($existingProduct, $productData, $rowNumber);
             } else {
-                $this->importResults['failed']++;
-                $errorMessage = "Produk '{$productData['name']}' sudah ada";
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$errorMessage}";
-                $this->addFailedRow($row, $rowNumber, $errorMessage);
+                // Skip duplicate but don't count as failed
+                $this->importResults['errors'][] = "Baris {$rowNumber}: Produk '{$productData['name']}' sudah ada, dilewati";
                 return;
             }
         } else {

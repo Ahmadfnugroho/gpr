@@ -105,5 +105,9 @@ Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
     });
 });
 
+// Failed Import Download Routes
+Route::get('/failed-import/download', [App\Http\Controllers\FailedImportDownloadController::class, 'download'])->name('failed-import.download');
+Route::post('/failed-import/clear', [App\Http\Controllers\FailedImportDownloadController::class, 'clearNotification'])->name('failed-import.clear');
+
 // Include import error handling routes
 require __DIR__.'/import.php';
