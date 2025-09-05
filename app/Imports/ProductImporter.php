@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Product;
+use App\Models\ProductItem;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\SubCategory;
@@ -113,11 +114,13 @@ class ProductImporter implements
         return [
             'name' => trim($row['nama_produk'] ?? $row['name'] ?? ''),
             'price' => $this->normalizePrice($row['harga'] ?? $row['price'] ?? ''),
+            'thumbnail' => trim($row['thumbnail'] ?? $row['foto'] ?? ''),
             'status' => $this->normalizeStatus($row['status'] ?? ''),
             'category' => trim($row['kategori'] ?? $row['category'] ?? ''),
             'brand' => trim($row['brand'] ?? ''),
             'sub_category' => trim($row['sub_kategori'] ?? $row['sub_category'] ?? ''),
             'premiere' => $this->normalizeBoolean($row['premiere'] ?? ''),
+            'serial_numbers' => $this->normalizeSerialNumbers($row['serial_numbers'] ?? $row['nomor_seri'] ?? ''),
         ];
     }
 
@@ -129,18 +132,26 @@ class ProductImporter implements
         return Validator::make($data, [
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
+            'thumbnail' => 'nullable|string|max:500',
             'status' => 'required|in:available,unavailable,maintenance',
             'category' => 'nullable|string|max:255',
             'brand' => 'nullable|string|max:255',
             'sub_category' => 'nullable|string|max:255',
             'premiere' => 'boolean',
+            'serial_numbers' => 'nullable|array',
+            'serial_numbers.*' => 'string|max:100|distinct',
         ], [
             'name.required' => 'Nama produk wajib diisi',
             'price.required' => 'Harga wajib diisi',
             'price.numeric' => 'Harga harus berupa angka',
             'price.min' => 'Harga tidak boleh kurang dari 0',
+            'thumbnail.max' => 'URL thumbnail maksimal 500 karakter',
             'status.required' => 'Status wajib diisi',
             'status.in' => 'Status harus: available, unavailable, atau maintenance',
+            'serial_numbers.array' => 'Serial numbers harus berupa array',
+            'serial_numbers.*.string' => 'Setiap serial number harus berupa string',
+            'serial_numbers.*.max' => 'Serial number maksimal 100 karakter',
+            'serial_numbers.*.distinct' => 'Serial number tidak boleh duplikat',
         ]);
     }
 
@@ -154,8 +165,8 @@ class ProductImporter implements
         $brandId = $this->getOrCreateBrand($data['brand']);
         $subCategoryId = $this->getOrCreateSubCategory($data['sub_category'], $categoryId);
         
-        // Create product
-        $product = Product::create([
+        // Prepare product data
+        $productData = [
             'name' => $data['name'],
             'price' => $data['price'],
             'status' => $data['status'],
@@ -163,13 +174,25 @@ class ProductImporter implements
             'brand_id' => $brandId,
             'sub_category_id' => $subCategoryId,
             'premiere' => $data['premiere'],
-        ]);
+        ];
+        
+        // Add thumbnail if provided
+        if (!empty($data['thumbnail'])) {
+            $productData['thumbnail'] = $data['thumbnail'];
+        }
+        
+        // Create product
+        $product = Product::create($productData);
+        
+        // Create serial numbers (ProductItems) if provided
+        $this->createProductItems($product, $data['serial_numbers'], $rowNumber);
         
         $this->importResults['success']++;
         Log::info("Product imported successfully", [
             'row' => $rowNumber,
             'product_id' => $product->id,
-            'name' => $product->name
+            'name' => $product->name,
+            'serial_numbers_count' => count($data['serial_numbers'])
         ]);
     }
 
@@ -183,8 +206,8 @@ class ProductImporter implements
         $brandId = $this->getOrCreateBrand($data['brand']);
         $subCategoryId = $this->getOrCreateSubCategory($data['sub_category'], $categoryId);
         
-        // Update product data
-        $product->update([
+        // Prepare update data
+        $updateData = [
             'name' => $data['name'],
             'price' => $data['price'],
             'status' => $data['status'],
@@ -192,13 +215,31 @@ class ProductImporter implements
             'brand_id' => $brandId,
             'sub_category_id' => $subCategoryId,
             'premiere' => $data['premiere'],
-        ]);
+        ];
+        
+        // Add thumbnail if provided
+        if (!empty($data['thumbnail'])) {
+            $updateData['thumbnail'] = $data['thumbnail'];
+        }
+        
+        // Update product data
+        $product->update($updateData);
+        
+        // Update serial numbers - remove existing ones and create new ones
+        if (!empty($data['serial_numbers'])) {
+            // Delete existing product items
+            $product->items()->delete();
+            
+            // Create new product items
+            $this->createProductItems($product, $data['serial_numbers'], $rowNumber);
+        }
         
         $this->importResults['updated']++;
         Log::info("Product updated successfully", [
             'row' => $rowNumber,
             'product_id' => $product->id,
-            'name' => $product->name
+            'name' => $product->name,
+            'serial_numbers_count' => count($data['serial_numbers'])
         ]);
     }
 
@@ -294,6 +335,76 @@ class ProductImporter implements
     }
 
     /**
+     * Normalize serial numbers from string to array
+     */
+    protected function normalizeSerialNumbers($serialNumbers): array
+    {
+        if (empty($serialNumbers)) return [];
+        
+        // Handle different separators: comma, semicolon, pipe, newline
+        $separators = [',', ';', '|', "\n", "\r\n"];
+        
+        foreach ($separators as $separator) {
+            if (strpos($serialNumbers, $separator) !== false) {
+                $numbers = explode($separator, $serialNumbers);
+                break;
+            }
+        }
+        
+        // If no separator found, treat as single serial number
+        if (!isset($numbers)) {
+            $numbers = [$serialNumbers];
+        }
+        
+        // Clean and filter serial numbers
+        return array_filter(array_map('trim', $numbers), function ($item) {
+            return !empty($item);
+        });
+    }
+
+    /**
+     * Create ProductItems (serial numbers) for a product
+     */
+    protected function createProductItems(Product $product, array $serialNumbers, int $rowNumber): void
+    {
+        if (empty($serialNumbers)) {
+            return;
+        }
+
+        foreach ($serialNumbers as $serialNumber) {
+            try {
+                // Check if serial number already exists
+                $existingItem = ProductItem::where('serial_number', $serialNumber)->first();
+                
+                if ($existingItem) {
+                    $this->importResults['errors'][] = "Baris {$rowNumber}: Serial number '{$serialNumber}' sudah ada pada produk '{$existingItem->product->name}'";
+                    continue;
+                }
+
+                ProductItem::create([
+                    'product_id' => $product->id,
+                    'serial_number' => $serialNumber,
+                    'is_available' => true,
+                ]);
+
+                Log::info("ProductItem created successfully", [
+                    'product_id' => $product->id,
+                    'serial_number' => $serialNumber,
+                    'row' => $rowNumber
+                ]);
+            } catch (Exception $e) {
+                $this->importResults['errors'][] = "Baris {$rowNumber}: Gagal membuat serial number '{$serialNumber}': {$e->getMessage()}";
+                Log::error("Failed to create ProductItem", [
+                    'product_id' => $product->id,
+                    'serial_number' => $serialNumber,
+                    'error' => $e->getMessage(),
+                    'row' => $rowNumber
+                ]);
+            }
+        }
+    }
+
+    /**
      * Get import results
      */
     public function getImportResults(): array
@@ -325,11 +436,13 @@ class ProductImporter implements
         return [
             'nama_produk',
             'harga',
+            'thumbnail',
             'status',
             'kategori',
             'brand',
             'sub_kategori',
-            'premiere'
+            'premiere',
+            'serial_numbers'
         ];
     }
 }

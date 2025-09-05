@@ -16,6 +16,7 @@ class SubCategory extends Model
         'name',
         'photo',
         'slug',
+        'category_id',
     ];
 
     protected $dates = [

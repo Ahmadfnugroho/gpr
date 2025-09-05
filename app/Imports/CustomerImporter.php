@@ -43,10 +43,16 @@ class CustomerImporter implements
     ];
 
     protected $updateExisting = false;
+    protected $defaultPasswordHash;
+    
+    // Pre-computed hash for 'password123' to avoid slow bcrypt operations
+    // Hash: $2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi
 
     public function __construct($updateExisting = false)
     {
         $this->updateExisting = $updateExisting;
+        // Pre-computed hash for 'password123' - avoids slow bcrypt during import
+        $this->defaultPasswordHash = '$2y$12$qEqBlUveXdsHy60sk6MoWeLnuh12UyGL89C.BXcq3bPtitVMTNxAm';
     }
 
     /**
@@ -133,7 +139,7 @@ class CustomerImporter implements
             
             // Prepare customer data for bulk insert
             $customerData['status'] = $customerData['status'] ?: Customer::STATUS_BLACKLIST;
-            $customerData['password'] = Hash::make('password123');
+            $customerData['password'] = $this->defaultPasswordHash; // Use pre-computed hash for speed
             $customerData['created_at'] = now();
             $customerData['updated_at'] = now();
             
@@ -249,7 +255,7 @@ class CustomerImporter implements
     {
         // Set default values
         $data['status'] = $data['status'] ?: Customer::STATUS_BLACKLIST;
-        $data['password'] = Hash::make('password123'); // Default password
+        $data['password'] = $this->defaultPasswordHash; // Use pre-computed hash for speed
 
         // Create customer
         $customer = Customer::create($data);

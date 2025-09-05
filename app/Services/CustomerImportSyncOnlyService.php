@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Imports\CustomerImporter;
 use App\Models\Customer;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -54,7 +55,7 @@ class CustomerImportSyncOnlyService
             $fileSize = $file->getSize();
             $estimatedRows = intval($fileSize / 250); // Rough estimate: 250 bytes per row
 
-            \Log::info('Starting sync import', [
+            Log::info('Starting sync import', [
                 'file_size' => $fileSize,
                 'estimated_rows' => $estimatedRows,
                 'file_name' => $file->getClientOriginalName()
@@ -66,7 +67,7 @@ class CustomerImportSyncOnlyService
                 ini_set('max_execution_time', '600'); // 10 minutes
                 set_time_limit(600);
 
-                \Log::info('Applied extended limits for large file', [
+                Log::info('Applied extended limits for large file', [
                     'memory_limit' => '1G',
                     'time_limit' => '600s'
                 ]);
@@ -98,7 +99,7 @@ class CustomerImportSyncOnlyService
             $results['memory_peak'] = $this->formatBytes(memory_get_peak_usage(true));
             $results['rows_per_second'] = $results['total'] > 0 ? round($results['total'] / $processingTime, 2) : 0;
 
-            \Log::info('Sync import completed successfully', [
+            Log::info('Sync import completed successfully', [
                 'results' => $results,
                 'processing_time' => $processingTime,
                 'memory_peak' => memory_get_peak_usage(true)
@@ -106,7 +107,7 @@ class CustomerImportSyncOnlyService
 
             return $results;
         } catch (\Exception $e) {
-            \Log::error('Sync import failed', [
+            Log::error('Sync import failed', [
                 'error' => $e->getMessage(),
                 'file_name' => $file->getClientOriginalName() ?? 'unknown',
                 'file_size' => $file->getSize() ?? 0
