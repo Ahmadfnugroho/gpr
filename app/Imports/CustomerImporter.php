@@ -5,6 +5,7 @@ namespace App\Imports;
 use App\Models\Customer;
 use App\Models\CustomerPhoneNumber;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -49,23 +50,109 @@ class CustomerImporter implements
     }
 
     /**
-     * Process the collection of imported data
+     * Process the collection of imported data with bulk operations
      */
     public function collection(Collection $rows): void
     {
-        foreach ($rows as $index => $row) {
-            $this->importResults['total']++;
-            $rowNumber = $index + 2; // +2 karena index dimulai dari 0 dan ada header
+        $this->importResults['total'] = $rows->count();
+        
+        // Process in smaller chunks to avoid memory issues
+        $rows->chunk(25)->each(function ($chunk, $chunkIndex) {
+            $this->processBulkChunk($chunk, $chunkIndex);
+            
+            // Force garbage collection after each chunk
+            if (function_exists('gc_collect_cycles')) {
+                gc_collect_cycles();
+            }
+        });
+    }
 
+    /**
+     * Process a chunk of rows with bulk operations
+     */
+    protected function processBulkChunk(Collection $chunk, int $chunkIndex): void
+    {
+        $validRows = [];
+        $customersToCreate = [];
+        $phoneNumbersToCreate = [];
+        $existingEmails = [];
+        
+        // First pass: Validate and normalize all rows
+        foreach ($chunk as $index => $row) {
+            $globalRowNumber = ($chunkIndex * 50) + $index + 2; // Global row number
+            
             try {
-                $this->processRow($row->toArray(), $rowNumber);
+                $customerData = $this->normalizeRowData($row->toArray());
+                $validator = $this->validateRowData($customerData, $globalRowNumber);
+                
+                if ($validator->fails()) {
+                    $this->importResults['failed']++;
+                    foreach ($validator->errors()->all() as $error) {
+                        $this->importResults['errors'][] = "Baris {$globalRowNumber}: {$error}";
+                    }
+                    continue;
+                }
+                
+                $validRows[] = [
+                    'data' => $customerData,
+                    'row_number' => $globalRowNumber
+                ];
+                
             } catch (Exception $e) {
                 $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$e->getMessage()}";
-                Log::error("Import error on row {$rowNumber}: " . $e->getMessage(), [
-                    'row_data' => $row->toArray()
-                ]);
+                $this->importResults['errors'][] = "Baris {$globalRowNumber}: {$e->getMessage()}";
+                Log::error("Import error on row {$globalRowNumber}: " . $e->getMessage());
             }
+        }
+        
+        if (empty($validRows)) {
+            return; // No valid rows in this chunk
+        }
+        
+        // Second pass: Check for existing customers in bulk
+        $emails = collect($validRows)->pluck('data.email')->toArray();
+        $existingCustomers = Customer::whereIn('email', $emails)
+            ->get()
+            ->keyBy('email');
+        
+        // Third pass: Prepare bulk insert data
+        foreach ($validRows as $validRow) {
+            $customerData = $validRow['data'];
+            $rowNumber = $validRow['row_number'];
+            $email = $customerData['email'];
+            
+            if ($existingCustomers->has($email)) {
+                if ($this->updateExisting) {
+                    $this->updateCustomer($existingCustomers->get($email), $customerData, $rowNumber);
+                } else {
+                    $this->importResults['failed']++;
+                    $this->importResults['errors'][] = "Baris {$rowNumber}: Email '{$email}' sudah terdaftar";
+                }
+                continue;
+            }
+            
+            // Prepare customer data for bulk insert
+            $customerData['status'] = $customerData['status'] ?: Customer::STATUS_BLACKLIST;
+            $customerData['password'] = Hash::make('password123');
+            $customerData['created_at'] = now();
+            $customerData['updated_at'] = now();
+            
+            // Remove phone data from customer data
+            $phone1 = $customerData['phone1'] ?? null;
+            $phone2 = $customerData['phone2'] ?? null;
+            unset($customerData['phone1'], $customerData['phone2']);
+            
+            $customersToCreate[] = [
+                'data' => $customerData,
+                'phone1' => $phone1,
+                'phone2' => $phone2,
+                'row_number' => $rowNumber
+            ];
+        }
+        
+        // Bulk insert customers
+        if (!empty($customersToCreate)) {
+            $this->bulkCreateCustomers($customersToCreate);
         }
     }
 
@@ -230,6 +317,95 @@ class CustomerImporter implements
 
         // Add new phone numbers
         $this->addPhoneNumbers($customer, $data);
+    }
+
+    /**
+     * Bulk create customers and their phone numbers
+     */
+    protected function bulkCreateCustomers(array $customersToCreate): void
+    {
+        DB::beginTransaction();
+        
+        try {
+            // Prepare customer data for bulk insert
+            $customerInsertData = [];
+            $phoneNumbersData = [];
+            
+            foreach ($customersToCreate as $customerInfo) {
+                $customerInsertData[] = $customerInfo['data'];
+            }
+            
+            // Bulk insert customers
+            Customer::insert($customerInsertData);
+            
+            // Get the newly created customers with their IDs
+            $emails = collect($customerInsertData)->pluck('email')->toArray();
+            $newCustomers = Customer::whereIn('email', $emails)
+                ->get()
+                ->keyBy('email');
+            
+            // Prepare phone numbers for bulk insert
+            foreach ($customersToCreate as $customerInfo) {
+                $email = $customerInfo['data']['email'];
+                $phone1 = $customerInfo['phone1'];
+                $phone2 = $customerInfo['phone2'];
+                $rowNumber = $customerInfo['row_number'];
+                
+                if ($newCustomers->has($email)) {
+                    $customerId = $newCustomers->get($email)->id;
+                    
+                    if (!empty($phone1)) {
+                        $phoneNumbersData[] = [
+                            'customer_id' => $customerId,
+                            'phone_number' => $phone1,
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ];
+                    }
+                    
+                    if (!empty($phone2) && $phone2 !== $phone1) {
+                        $phoneNumbersData[] = [
+                            'customer_id' => $customerId,
+                            'phone_number' => $phone2,
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ];
+                    }
+                    
+                    $this->importResults['success']++;
+                    
+                } else {
+                    $this->importResults['failed']++;
+                    $this->importResults['errors'][] = "Baris {$rowNumber}: Gagal membuat customer dengan email {$email}";
+                }
+            }
+            
+            // Bulk insert phone numbers if any
+            if (!empty($phoneNumbersData)) {
+                CustomerPhoneNumber::insert($phoneNumbersData);
+            }
+            
+            DB::commit();
+            
+            Log::info('Bulk customer import completed', [
+                'customers_created' => count($customersToCreate),
+                'phone_numbers_created' => count($phoneNumbersData)
+            ]);
+            
+        } catch (Exception $e) {
+            DB::rollBack();
+            
+            // Mark all customers in this batch as failed
+            foreach ($customersToCreate as $customerInfo) {
+                $this->importResults['failed']++;
+                $this->importResults['errors'][] = "Baris {$customerInfo['row_number']}: Gagal bulk insert - {$e->getMessage()}";
+            }
+            
+            Log::error('Bulk customer import failed', [
+                'error' => $e->getMessage(),
+                'customers_count' => count($customersToCreate)
+            ]);
+        }
     }
 
     /**

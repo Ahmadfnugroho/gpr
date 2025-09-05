@@ -16,7 +16,55 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 class CustomerImportExportService
 {
     /**
-     * Import customers from Excel file
+     * Import customers from Excel file (Async)
+     */
+    public function importCustomersAsync(UploadedFile $file, bool $updateExisting = false, ?int $userId = null): array
+    {
+        try {
+            // Validate file type
+            $allowedMimeTypes = [
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'text/csv'
+            ];
+
+            if (!in_array($file->getMimeType(), $allowedMimeTypes)) {
+                throw new \Exception('File type not supported. Please use Excel (.xls, .xlsx) or CSV files.');
+            }
+
+            // Validate file size (max 10MB for production)
+            if ($file->getSize() > 10 * 1024 * 1024) {
+                throw new \Exception('File too large. Maximum size is 10MB.');
+            }
+
+            // Store file temporarily
+            $importId = uniqid('import_');
+            $fileName = $importId . '_' . $file->getClientOriginalName();
+            $filePath = $file->storeAs('imports', $fileName, 'local');
+
+            // Dispatch job to queue
+            \App\Jobs\ImportCustomersJob::dispatch($filePath, $updateExisting, $userId, $importId)
+                ->onQueue('imports')
+                ->delay(now()->addSeconds(2)); // Small delay to ensure response is sent first
+
+            return [
+                'queued' => true,
+                'import_id' => $importId,
+                'message' => 'Import job has been queued. You will be notified when it completes.',
+                'estimated_time' => '2-5 minutes for large files'
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'queued' => false,
+                'error' => $e->getMessage(),
+                'message' => 'Failed to queue import job'
+            ];
+        }
+    }
+
+    /**
+     * Import customers from Excel file (Sync) - for small files only
      */
     public function importCustomers(UploadedFile $file, bool $updateExisting = false): array
     {
@@ -31,6 +79,15 @@ class CustomerImportExportService
             if (!in_array($file->getMimeType(), $allowedMimeTypes)) {
                 throw new \Exception('File type not supported. Please use Excel (.xls, .xlsx) or CSV files.');
             }
+
+            // Limit sync import to smaller files (1MB max)
+            if ($file->getSize() > 1024 * 1024) {
+                throw new \Exception('File too large for synchronous import. Please use async import for files larger than 1MB.');
+            }
+
+            // Set memory and time limits for sync import
+            ini_set('memory_limit', '256M');
+            set_time_limit(120);
 
             // Create importer instance
             $importer = new CustomerImporter($updateExisting);
@@ -49,6 +106,56 @@ class CustomerImportExportService
                 'errors' => ['Error: ' . $e->getMessage()]
             ];
         }
+    }
+
+    /**
+     * Get import results by import ID
+     */
+    public function getImportResults(string $importId): ?array
+    {
+        return cache()->get("customer_import_results_{$importId}");
+    }
+
+    /**
+     * Check import status
+     */
+    public function getImportStatus(string $importId): array
+    {
+        $results = $this->getImportResults($importId);
+        
+        if (!$results) {
+            // Check if job is still processing
+            $queuedJobs = \Illuminate\Support\Facades\DB::table('jobs')
+                ->where('payload', 'like', '%' . $importId . '%')
+                ->count();
+                
+            $failedJobs = \Illuminate\Support\Facades\DB::table('failed_jobs')
+                ->where('payload', 'like', '%' . $importId . '%')
+                ->count();
+
+            if ($queuedJobs > 0) {
+                return [
+                    'status' => 'processing',
+                    'message' => 'Import is still being processed...'
+                ];
+            } elseif ($failedJobs > 0) {
+                return [
+                    'status' => 'failed',
+                    'message' => 'Import job failed. Please try again.'
+                ];
+            } else {
+                return [
+                    'status' => 'not_found',
+                    'message' => 'Import not found or expired.'
+                ];
+            }
+        }
+
+        return [
+            'status' => 'completed',
+            'results' => $results['results'],
+            'completed_at' => $results['completed_at']
+        ];
     }
 
     /**
