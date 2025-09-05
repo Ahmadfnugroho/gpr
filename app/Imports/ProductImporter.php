@@ -40,7 +40,8 @@ class ProductImporter implements
         'success' => 0,
         'failed' => 0,
         'updated' => 0,
-        'errors' => []
+        'errors' => [],
+        'failed_rows' => []
     ];
 
     protected $updateExisting = false;
@@ -84,9 +85,12 @@ class ProductImporter implements
         
         if ($validator->fails()) {
             $this->importResults['failed']++;
+            $errorMessages = [];
             foreach ($validator->errors()->all() as $error) {
                 $this->importResults['errors'][] = "Baris {$rowNumber}: {$error}";
+                $errorMessages[] = $error;
             }
+            $this->addFailedRow($row, $rowNumber, implode(' | ', $errorMessages));
             return;
         }
 
@@ -98,7 +102,9 @@ class ProductImporter implements
                 $this->updateProduct($existingProduct, $productData, $rowNumber);
             } else {
                 $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Produk '{$productData['name']}' sudah ada";
+                $errorMessage = "Produk '{$productData['name']}' sudah ada";
+                $this->importResults['errors'][] = "Baris {$rowNumber}: {$errorMessage}";
+                $this->addFailedRow($row, $rowNumber, $errorMessage);
                 return;
             }
         } else {
@@ -426,6 +432,57 @@ class ProductImporter implements
     public function chunkSize(): int
     {
         return 100;
+    }
+
+    /**
+     * Add failed row data for export
+     */
+    protected function addFailedRow(array $originalRow, int $rowNumber, string $errorMessage): void
+    {
+        $this->importResults['failed_rows'][] = [
+            'row_number' => $rowNumber,
+            'nama_produk' => $originalRow['nama_produk'] ?? $originalRow['name'] ?? '',
+            'harga' => $originalRow['harga'] ?? $originalRow['price'] ?? '',
+            'thumbnail' => $originalRow['thumbnail'] ?? $originalRow['foto'] ?? '',
+            'status' => $originalRow['status'] ?? '',
+            'kategori' => $originalRow['kategori'] ?? $originalRow['category'] ?? '',
+            'brand' => $originalRow['brand'] ?? '',
+            'sub_kategori' => $originalRow['sub_kategori'] ?? $originalRow['sub_category'] ?? '',
+            'premiere' => $originalRow['premiere'] ?? '',
+            'serial_numbers' => $originalRow['serial_numbers'] ?? $originalRow['nomor_seri'] ?? '',
+            'error_message' => $errorMessage,
+            'suggestions' => $this->generateSuggestions($errorMessage)
+        ];
+    }
+
+    /**
+     * Generate helpful suggestions based on error message
+     */
+    protected function generateSuggestions(string $errorMessage): string
+    {
+        $suggestions = [];
+        
+        if (str_contains($errorMessage, 'Nama produk wajib diisi')) {
+            $suggestions[] = "Pastikan kolom 'nama_produk' tidak kosong";
+        }
+        
+        if (str_contains($errorMessage, 'Harga wajib diisi') || str_contains($errorMessage, 'Harga harus berupa angka')) {
+            $suggestions[] = "Pastikan kolom 'harga' berisi angka tanpa simbol mata uang";
+        }
+        
+        if (str_contains($errorMessage, 'Status harus')) {
+            $suggestions[] = "Status harus salah satu dari: available, unavailable, maintenance";
+        }
+        
+        if (str_contains($errorMessage, 'sudah ada')) {
+            $suggestions[] = "Gunakan mode update untuk mengubah data yang sudah ada";
+        }
+        
+        if (str_contains($errorMessage, 'Serial number')) {
+            $suggestions[] = "Periksa format serial number dan pastikan tidak ada duplikasi";
+        }
+        
+        return implode(' | ', $suggestions) ?: 'Periksa format data sesuai dengan template';
     }
 
     /**

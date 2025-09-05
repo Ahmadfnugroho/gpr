@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Imports\ProductImporter;
+use App\Exports\FailedImportExport;
 use App\Models\Product;
 use App\Models\Brand;
 use App\Models\Category;
@@ -79,6 +80,61 @@ class ProductImportExportService
         Excel::store($template, $filename, 'public');
         
         return Storage::disk('public')->path($filename);
+    }
+
+    /**
+     * Export failed import rows to Excel
+     */
+    public function exportFailedImport(array $failedRows, string $importType = 'product'): string
+    {
+        if (empty($failedRows)) {
+            throw new \Exception('No failed rows to export');
+        }
+
+        $export = new FailedImportExport($failedRows, $importType);
+        $filename = 'failed_import_' . $importType . '_' . date('Y-m-d_H-i-s') . '.xlsx';
+        
+        Excel::store($export, $filename, 'public');
+        
+        return Storage::disk('public')->path($filename);
+    }
+
+    /**
+     * Generate preview of import data
+     */
+    public function previewImport(UploadedFile $file, int $maxRows = 10): array
+    {
+        try {
+            $data = Excel::toArray(new ProductImporter(), $file);
+            
+            if (empty($data) || empty($data[0])) {
+                return [
+                    'success' => false,
+                    'error' => 'File is empty or corrupted'
+                ];
+            }
+
+            $headers = array_keys($data[0][0] ?? []);
+            $rows = array_slice($data[0], 0, $maxRows);
+            
+            // Validate structure
+            $validation = $this->validateFileStructure($file);
+            
+            return [
+                'success' => true,
+                'headers' => $headers,
+                'sample_rows' => $rows,
+                'total_rows' => count($data[0]),
+                'validation' => $validation,
+                'expected_headers' => ProductImporter::getExpectedHeaders()
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => 'Preview error: ' . $e->getMessage()
+            ];
+        }
     }
 
     /**

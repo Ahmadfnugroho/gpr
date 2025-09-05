@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use App\Models\User;
 use Spatie\Permission\Models\Role;
+use App\Traits\EnhancedImporterTrait;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -31,17 +32,7 @@ class UserImporter implements
     SkipsOnError,
     SkipsOnFailure
 {
-    use Importable, SkipsErrors, SkipsFailures;
-
-    protected $importResults = [
-        'total' => 0,
-        'success' => 0,
-        'failed' => 0,
-        'updated' => 0,
-        'errors' => []
-    ];
-
-    protected $updateExisting = false;
+    use Importable, SkipsErrors, SkipsFailures, EnhancedImporterTrait;
 
     public function __construct($updateExisting = false)
     {
@@ -54,17 +45,22 @@ class UserImporter implements
     public function collection(Collection $rows): void
     {
         foreach ($rows as $index => $row) {
-            $this->importResults['total']++;
-            $rowNumber = $index + 2; // +2 because index starts from 0 and there's a header
+            $this->incrementTotal();
+            $rowNumber = $index + 2;
+            $rowArray = $row->toArray();
+
+            if ($this->shouldSkipRow($rowArray)) {
+                continue;
+            }
 
             try {
-                $this->processRow($row->toArray(), $rowNumber);
+                $this->processRow($rowArray, $rowNumber);
             } catch (Exception $e) {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$e->getMessage()}";
-                Log::error("Import error on row {$rowNumber}: " . $e->getMessage(), [
-                    'row_data' => $row->toArray()
-                ]);
+                $this->incrementFailed();
+                $errorMessage = $e->getMessage();
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($rowArray, $rowNumber, $errorMessage);
+                $this->logImportError($errorMessage, $rowNumber, $rowArray);
             }
         }
     }
@@ -81,10 +77,13 @@ class UserImporter implements
         $validator = $this->validateRowData($userData, $rowNumber);
         
         if ($validator->fails()) {
-            $this->importResults['failed']++;
+            $this->incrementFailed();
+            $errorMessages = [];
             foreach ($validator->errors()->all() as $error) {
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$error}";
+                $this->addError("Baris {$rowNumber}: {$error}");
+                $errorMessages[] = $error;
             }
+            $this->addFailedRow($row, $rowNumber, implode(' | ', $errorMessages));
             return;
         }
 
@@ -95,8 +94,10 @@ class UserImporter implements
             if ($this->updateExisting) {
                 $this->updateUser($existingUser, $userData, $rowNumber);
             } else {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: User '{$userData['email']}' sudah ada";
+                $this->incrementFailed();
+                $errorMessage = "User '{$userData['email']}' sudah ada";
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($row, $rowNumber, $errorMessage);
                 return;
             }
         } else {
@@ -142,23 +143,27 @@ class UserImporter implements
      */
     protected function createUser(array $data, int $rowNumber): void
     {
-        // Create user
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'email_verified_at' => now(), // Auto-verify imported users
-        ]);
-        
-        // Assign role
-        $this->assignRole($user, $data['role']);
-        
-        $this->importResults['success']++;
-        Log::info("User imported successfully", [
-            'row' => $rowNumber,
-            'user_id' => $user->id,
-            'email' => $user->email
-        ]);
+        try {
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'email_verified_at' => now(),
+            ]);
+            
+            $this->assignRole($user, $data['role']);
+            
+            $this->incrementSuccess();
+            $this->addMessage("Baris {$rowNumber}: Berhasil menambahkan user '{$user->name}'");
+            Log::info("User imported successfully", [
+                'row' => $rowNumber,
+                'user_id' => $user->id,
+                'email' => $user->email
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal menambahkan user - {$e->getMessage()}");
+        }
     }
 
     /**
@@ -166,27 +171,27 @@ class UserImporter implements
      */
     protected function updateUser(User $user, array $data, int $rowNumber): void
     {
-        // Update user data (but don't update password unless specified)
-        $updateData = [
-            'name' => $data['name'],
-        ];
-        
-        // Only update password if it's not the default
-        if ($data['password'] !== 'password123') {
-            $updateData['password'] = Hash::make($data['password']);
+        try {
+            $updateData = ['name' => $data['name']];
+            
+            if ($data['password'] !== 'password123') {
+                $updateData['password'] = Hash::make($data['password']);
+            }
+            
+            $user->update($updateData);
+            $this->assignRole($user, $data['role']);
+            
+            $this->incrementUpdated();
+            $this->addMessage("Baris {$rowNumber}: Berhasil mengupdate user '{$user->name}'");
+            Log::info("User updated successfully", [
+                'row' => $rowNumber,
+                'user_id' => $user->id,
+                'email' => $user->email
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal mengupdate user - {$e->getMessage()}");
         }
-        
-        $user->update($updateData);
-        
-        // Update role
-        $this->assignRole($user, $data['role']);
-        
-        $this->importResults['updated']++;
-        Log::info("User updated successfully", [
-            'row' => $rowNumber,
-            'user_id' => $user->id,
-            'email' => $user->email
-        ]);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use App\Models\ProductPhoto;
 use App\Models\Product;
+use App\Traits\EnhancedImporterTrait;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -28,17 +29,9 @@ class ProductPhotoImporter implements
     SkipsOnError,
     SkipsOnFailure
 {
-    use Importable, SkipsErrors, SkipsFailures;
+    use Importable, SkipsErrors, SkipsFailures, EnhancedImporterTrait;
 
-    protected $importResults = [
-        'total' => 0,
-        'success' => 0,
-        'failed' => 0,
-        'updated' => 0,
-        'errors' => []
-    ];
-
-    protected $updateExisting = false;
+    // importResults and updateExisting moved to EnhancedImporterTrait
 
     public function __construct($updateExisting = false)
     {
@@ -51,17 +44,23 @@ class ProductPhotoImporter implements
     public function collection(Collection $rows): void
     {
         foreach ($rows as $index => $row) {
-            $this->importResults['total']++;
+            $this->incrementTotal();
             $rowNumber = $index + 2; // +2 because index starts from 0 and there's a header
+            $rowArray = $row->toArray();
+
+            // Skip empty rows
+            if ($this->shouldSkipRow($rowArray)) {
+                continue;
+            }
 
             try {
-                $this->processRow($row->toArray(), $rowNumber);
+                $this->processRow($rowArray, $rowNumber);
             } catch (Exception $e) {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$e->getMessage()}";
-                Log::error("Import error on row {$rowNumber}: " . $e->getMessage(), [
-                    'row_data' => $row->toArray()
-                ]);
+                $this->incrementFailed();
+                $errorMessage = $e->getMessage();
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($rowArray, $rowNumber, $errorMessage);
+                $this->logImportError($errorMessage, $rowNumber, $rowArray);
             }
         }
     }
@@ -71,12 +70,6 @@ class ProductPhotoImporter implements
      */
     protected function processRow(array $row, int $rowNumber): void
     {
-        // Skip rows that are empty or only reference data
-        if (empty($row['product_id']) && empty($row['photo'])) {
-            $this->importResults['total']--; // Don't count empty rows
-            return;
-        }
-
         // Normalize and validate row data
         $photoData = $this->normalizeRowData($row);
         
@@ -84,18 +77,23 @@ class ProductPhotoImporter implements
         $validator = $this->validateRowData($photoData, $rowNumber);
         
         if ($validator->fails()) {
-            $this->importResults['failed']++;
+            $this->incrementFailed();
+            $errorMessages = [];
             foreach ($validator->errors()->all() as $error) {
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$error}";
+                $this->addError("Baris {$rowNumber}: {$error}");
+                $errorMessages[] = $error;
             }
+            $this->addFailedRow($row, $rowNumber, implode(' | ', $errorMessages));
             return;
         }
 
         // Check if product exists
         $product = Product::find($photoData['product_id']);
         if (!$product) {
-            $this->importResults['failed']++;
-            $this->importResults['errors'][] = "Baris {$rowNumber}: Product ID {$photoData['product_id']} tidak ditemukan";
+            $this->incrementFailed();
+            $errorMessage = "Product ID {$photoData['product_id']} tidak ditemukan";
+            $this->addError("Baris {$rowNumber}: {$errorMessage}");
+            $this->addFailedRow($row, $rowNumber, $errorMessage);
             return;
         }
 
@@ -108,8 +106,10 @@ class ProductPhotoImporter implements
             if ($this->updateExisting) {
                 $this->updateProductPhoto($existingPhoto, $photoData, $rowNumber);
             } else {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Photo '{$photoData['photo']}' untuk produk '{$product->name}' sudah ada";
+                $this->incrementFailed();
+                $errorMessage = "Photo '{$photoData['photo']}' untuk produk '{$product->name}' sudah ada";
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($row, $rowNumber, $errorMessage);
                 return;
             }
         } else {
@@ -148,18 +148,24 @@ class ProductPhotoImporter implements
      */
     protected function createProductPhoto(array $data, int $rowNumber): void
     {
-        $photo = ProductPhoto::create([
-            'product_id' => $data['product_id'],
-            'photo' => $data['photo'],
-        ]);
-        
-        $this->importResults['success']++;
-        Log::info("ProductPhoto imported successfully", [
-            'row' => $rowNumber,
-            'photo_id' => $photo->id,
-            'product_id' => $photo->product_id,
-            'photo' => $photo->photo
-        ]);
+        try {
+            $photo = ProductPhoto::create([
+                'product_id' => $data['product_id'],
+                'photo' => $data['photo'],
+            ]);
+            
+            $this->incrementSuccess();
+            $this->addMessage("Baris {$rowNumber}: Berhasil menambahkan foto produk '{$data['photo']}'");
+            Log::info("ProductPhoto imported successfully", [
+                'row' => $rowNumber,
+                'photo_id' => $photo->id,
+                'product_id' => $photo->product_id,
+                'photo' => $photo->photo
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal menambahkan foto produk - {$e->getMessage()}");
+        }
     }
 
     /**
@@ -167,19 +173,25 @@ class ProductPhotoImporter implements
      */
     protected function updateProductPhoto(ProductPhoto $photo, array $data, int $rowNumber): void
     {
-        // For photos, we typically don't need to update much since filename is the key
-        // But we can update the photo filename if needed
-        $photo->update([
-            'photo' => $data['photo'],
-        ]);
-        
-        $this->importResults['updated']++;
-        Log::info("ProductPhoto updated successfully", [
-            'row' => $rowNumber,
-            'photo_id' => $photo->id,
-            'product_id' => $photo->product_id,
-            'photo' => $photo->photo
-        ]);
+        try {
+            // For photos, we typically don't need to update much since filename is the key
+            // But we can update the photo filename if needed
+            $photo->update([
+                'photo' => $data['photo'],
+            ]);
+            
+            $this->incrementUpdated();
+            $this->addMessage("Baris {$rowNumber}: Berhasil mengupdate foto produk '{$data['photo']}'");
+            Log::info("ProductPhoto updated successfully", [
+                'row' => $rowNumber,
+                'photo_id' => $photo->id,
+                'product_id' => $photo->product_id,
+                'photo' => $photo->photo
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal mengupdate foto produk - {$e->getMessage()}");
+        }
     }
 
     /**

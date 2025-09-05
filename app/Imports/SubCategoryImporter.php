@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\SubCategory;
+use App\Traits\EnhancedImporterTrait;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -29,17 +30,9 @@ class SubCategoryImporter implements
     SkipsOnError,
     SkipsOnFailure
 {
-    use Importable, SkipsErrors, SkipsFailures;
+    use Importable, SkipsErrors, SkipsFailures, EnhancedImporterTrait;
 
-    protected $importResults = [
-        'total' => 0,
-        'success' => 0,
-        'failed' => 0,
-        'updated' => 0,
-        'errors' => []
-    ];
-
-    protected $updateExisting = false;
+    // importResults and updateExisting moved to EnhancedImporterTrait
 
     public function __construct($updateExisting = false)
     {
@@ -52,17 +45,23 @@ class SubCategoryImporter implements
     public function collection(Collection $rows): void
     {
         foreach ($rows as $index => $row) {
-            $this->importResults['total']++;
+            $this->incrementTotal();
             $rowNumber = $index + 2; // +2 because index starts from 0 and there's a header
+            $rowArray = $row->toArray();
+
+            // Skip empty rows
+            if ($this->shouldSkipRow($rowArray)) {
+                continue;
+            }
 
             try {
-                $this->processRow($row->toArray(), $rowNumber);
+                $this->processRow($rowArray, $rowNumber);
             } catch (Exception $e) {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$e->getMessage()}";
-                Log::error("Import error on row {$rowNumber}: " . $e->getMessage(), [
-                    'row_data' => $row->toArray()
-                ]);
+                $this->incrementFailed();
+                $errorMessage = $e->getMessage();
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($rowArray, $rowNumber, $errorMessage);
+                $this->logImportError($errorMessage, $rowNumber, $rowArray);
             }
         }
     }
@@ -79,10 +78,13 @@ class SubCategoryImporter implements
         $validator = $this->validateRowData($subCategoryData, $rowNumber);
         
         if ($validator->fails()) {
-            $this->importResults['failed']++;
+            $this->incrementFailed();
+            $errorMessages = [];
             foreach ($validator->errors()->all() as $error) {
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$error}";
+                $this->addError("Baris {$rowNumber}: {$error}");
+                $errorMessages[] = $error;
             }
+            $this->addFailedRow($row, $rowNumber, implode(' | ', $errorMessages));
             return;
         }
 
@@ -93,8 +95,10 @@ class SubCategoryImporter implements
             if ($this->updateExisting) {
                 $this->updateSubCategory($existingSubCategory, $subCategoryData, $rowNumber);
             } else {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Sub Kategori '{$subCategoryData['name']}' sudah ada";
+                $this->incrementFailed();
+                $errorMessage = "Sub Kategori '{$subCategoryData['name']}' sudah ada";
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($row, $rowNumber, $errorMessage);
                 return;
             }
         } else {
@@ -132,18 +136,24 @@ class SubCategoryImporter implements
      */
     protected function createSubCategory(array $data, int $rowNumber): void
     {
-        // Create subcategory
-        $subCategory = SubCategory::create([
-            'name' => $data['name'],
-            'photo' => $data['photo'] ?? null,
-        ]);
-        
-        $this->importResults['success']++;
-        Log::info("SubCategory imported successfully", [
-            'row' => $rowNumber,
-            'subcategory_id' => $subCategory->id,
-            'name' => $subCategory->name
-        ]);
+        try {
+            // Create subcategory
+            $subCategory = SubCategory::create([
+                'name' => $data['name'],
+                'photo' => $data['photo'] ?? null,
+            ]);
+            
+            $this->incrementSuccess();
+            $this->addMessage("Baris {$rowNumber}: Berhasil menambahkan sub kategori '{$data['name']}'")
+            Log::info("SubCategory imported successfully", [
+                'row' => $rowNumber,
+                'subcategory_id' => $subCategory->id,
+                'name' => $subCategory->name
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal menambahkan sub kategori - {$e->getMessage()}");
+        }
     }
 
     /**
@@ -151,18 +161,24 @@ class SubCategoryImporter implements
      */
     protected function updateSubCategory(SubCategory $subCategory, array $data, int $rowNumber): void
     {
-        // Update subcategory data
-        $subCategory->update([
-            'name' => $data['name'],
-            'photo' => $data['photo'] ?? null,
-        ]);
-        
-        $this->importResults['updated']++;
-        Log::info("SubCategory updated successfully", [
-            'row' => $rowNumber,
-            'subcategory_id' => $subCategory->id,
-            'name' => $subCategory->name
-        ]);
+        try {
+            // Update subcategory data
+            $subCategory->update([
+                'name' => $data['name'],
+                'photo' => $data['photo'] ?? null,
+            ]);
+            
+            $this->incrementUpdated();
+            $this->addMessage("Baris {$rowNumber}: Berhasil mengupdate sub kategori '{$data['name']}'");
+            Log::info("SubCategory updated successfully", [
+                'row' => $rowNumber,
+                'subcategory_id' => $subCategory->id,
+                'name' => $subCategory->name
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal mengupdate sub kategori - {$e->getMessage()}");
+        }
     }
 
     /**

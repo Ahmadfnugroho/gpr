@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Brand;
+use App\Traits\EnhancedImporterTrait;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -29,17 +30,7 @@ class BrandImporter implements
     SkipsOnError,
     SkipsOnFailure
 {
-    use Importable, SkipsErrors, SkipsFailures;
-
-    protected $importResults = [
-        'total' => 0,
-        'success' => 0,
-        'failed' => 0,
-        'updated' => 0,
-        'errors' => []
-    ];
-
-    protected $updateExisting = false;
+    use Importable, SkipsErrors, SkipsFailures, EnhancedImporterTrait;
 
     public function __construct($updateExisting = false)
     {
@@ -52,17 +43,22 @@ class BrandImporter implements
     public function collection(Collection $rows): void
     {
         foreach ($rows as $index => $row) {
-            $this->importResults['total']++;
-            $rowNumber = $index + 2; // +2 because index starts from 0 and there's a header
+            $this->incrementTotal();
+            $rowNumber = $index + 2;
+            $rowArray = $row->toArray();
+
+            if ($this->shouldSkipRow($rowArray)) {
+                continue;
+            }
 
             try {
-                $this->processRow($row->toArray(), $rowNumber);
+                $this->processRow($rowArray, $rowNumber);
             } catch (Exception $e) {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$e->getMessage()}";
-                Log::error("Import error on row {$rowNumber}: " . $e->getMessage(), [
-                    'row_data' => $row->toArray()
-                ]);
+                $this->incrementFailed();
+                $errorMessage = $e->getMessage();
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($rowArray, $rowNumber, $errorMessage);
+                $this->logImportError($errorMessage, $rowNumber, $rowArray);
             }
         }
     }
@@ -79,10 +75,13 @@ class BrandImporter implements
         $validator = $this->validateRowData($brandData, $rowNumber);
         
         if ($validator->fails()) {
-            $this->importResults['failed']++;
+            $this->incrementFailed();
+            $errorMessages = [];
             foreach ($validator->errors()->all() as $error) {
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$error}";
+                $this->addError("Baris {$rowNumber}: {$error}");
+                $errorMessages[] = $error;
             }
+            $this->addFailedRow($row, $rowNumber, implode(' | ', $errorMessages));
             return;
         }
 
@@ -93,8 +92,10 @@ class BrandImporter implements
             if ($this->updateExisting) {
                 $this->updateBrand($existingBrand, $brandData, $rowNumber);
             } else {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Brand '{$brandData['name']}' sudah ada";
+                $this->incrementFailed();
+                $errorMessage = "Brand '{$brandData['name']}' sudah ada";
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($row, $rowNumber, $errorMessage);
                 return;
             }
         } else {
@@ -132,18 +133,23 @@ class BrandImporter implements
      */
     protected function createBrand(array $data, int $rowNumber): void
     {
-        // Create brand
-        $brand = Brand::create([
-            'name' => $data['name'],
-            'logo' => $data['logo'] ?? null,
-        ]);
-        
-        $this->importResults['success']++;
-        Log::info("Brand imported successfully", [
-            'row' => $rowNumber,
-            'brand_id' => $brand->id,
-            'name' => $brand->name
-        ]);
+        try {
+            $brand = Brand::create([
+                'name' => $data['name'],
+                'logo' => $data['logo'] ?? null,
+            ]);
+            
+            $this->incrementSuccess();
+            $this->addMessage("Baris {$rowNumber}: Berhasil menambahkan brand '{$brand->name}'");
+            Log::info("Brand imported successfully", [
+                'row' => $rowNumber,
+                'brand_id' => $brand->id,
+                'name' => $brand->name
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal menambahkan brand - {$e->getMessage()}");
+        }
     }
 
     /**
@@ -151,18 +157,23 @@ class BrandImporter implements
      */
     protected function updateBrand(Brand $brand, array $data, int $rowNumber): void
     {
-        // Update brand data
-        $brand->update([
-            'name' => $data['name'],
-            'logo' => $data['logo'] ?? null,
-        ]);
-        
-        $this->importResults['updated']++;
-        Log::info("Brand updated successfully", [
-            'row' => $rowNumber,
-            'brand_id' => $brand->id,
-            'name' => $brand->name
-        ]);
+        try {
+            $brand->update([
+                'name' => $data['name'],
+                'logo' => $data['logo'] ?? null,
+            ]);
+            
+            $this->incrementUpdated();
+            $this->addMessage("Baris {$rowNumber}: Berhasil mengupdate brand '{$brand->name}'");
+            Log::info("Brand updated successfully", [
+                'row' => $rowNumber,
+                'brand_id' => $brand->id,
+                'name' => $brand->name
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal mengupdate brand - {$e->getMessage()}");
+        }
     }
 
 

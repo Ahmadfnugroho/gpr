@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Category;
+use App\Traits\EnhancedImporterTrait;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -29,17 +30,9 @@ class CategoryImporter implements
     SkipsOnError,
     SkipsOnFailure
 {
-    use Importable, SkipsErrors, SkipsFailures;
+    use Importable, SkipsErrors, SkipsFailures, EnhancedImporterTrait;
 
-    protected $importResults = [
-        'total' => 0,
-        'success' => 0,
-        'failed' => 0,
-        'updated' => 0,
-        'errors' => []
-    ];
-
-    protected $updateExisting = false;
+    // importResults and updateExisting moved to EnhancedImporterTrait
 
     public function __construct($updateExisting = false)
     {
@@ -52,17 +45,23 @@ class CategoryImporter implements
     public function collection(Collection $rows): void
     {
         foreach ($rows as $index => $row) {
-            $this->importResults['total']++;
+            $this->incrementTotal();
             $rowNumber = $index + 2; // +2 because index starts from 0 and there's a header
+            $rowArray = $row->toArray();
+
+            // Skip empty rows
+            if ($this->shouldSkipRow($rowArray)) {
+                continue;
+            }
 
             try {
-                $this->processRow($row->toArray(), $rowNumber);
+                $this->processRow($rowArray, $rowNumber);
             } catch (Exception $e) {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$e->getMessage()}";
-                Log::error("Import error on row {$rowNumber}: " . $e->getMessage(), [
-                    'row_data' => $row->toArray()
-                ]);
+                $this->incrementFailed();
+                $errorMessage = $e->getMessage();
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($rowArray, $rowNumber, $errorMessage);
+                $this->logImportError($errorMessage, $rowNumber, $rowArray);
             }
         }
     }
@@ -79,10 +78,13 @@ class CategoryImporter implements
         $validator = $this->validateRowData($categoryData, $rowNumber);
 
         if ($validator->fails()) {
-            $this->importResults['failed']++;
+            $this->incrementFailed();
+            $errorMessages = [];
             foreach ($validator->errors()->all() as $error) {
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$error}";
+                $this->addError("Baris {$rowNumber}: {$error}");
+                $errorMessages[] = $error;
             }
+            $this->addFailedRow($row, $rowNumber, implode(' | ', $errorMessages));
             return;
         }
 
@@ -93,8 +95,10 @@ class CategoryImporter implements
             if ($this->updateExisting) {
                 $this->updateCategory($existingCategory, $categoryData, $rowNumber);
             } else {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Kategori '{$categoryData['name']}' sudah ada";
+                $this->incrementFailed();
+                $errorMessage = "Kategori '{$categoryData['name']}' sudah ada";
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($row, $rowNumber, $errorMessage);
                 return;
             }
         } else {
@@ -135,19 +139,24 @@ class CategoryImporter implements
      */
     protected function createCategory(array $data, int $rowNumber): void
     {
-        // Create category
-        $category = Category::create([
-            'name' => $data['name'],
-            'photo' => $data['photo'] ?? null,
+        try {
+            // Create category
+            $category = Category::create([
+                'name' => $data['name'],
+                'photo' => $data['photo'] ?? null,
+            ]);
 
-        ]);
-
-        $this->importResults['success']++;
-        Log::info("Category imported successfully", [
-            'row' => $rowNumber,
-            'category_id' => $category->id,
-            'name' => $category->name
-        ]);
+            $this->incrementSuccess();
+            $this->addMessage("Baris {$rowNumber}: Berhasil menambahkan kategori '{$data['name']}'");
+            Log::info("Category imported successfully", [
+                'row' => $rowNumber,
+                'category_id' => $category->id,
+                'name' => $category->name
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal menambahkan kategori - {$e->getMessage()}");
+        }
     }
 
     /**
@@ -155,19 +164,24 @@ class CategoryImporter implements
      */
     protected function updateCategory(Category $category, array $data, int $rowNumber): void
     {
-        // Update category data
-        $category->update([
-            'name' => $data['name'],
-            'photo' => $data['photo'] ?? null,
+        try {
+            // Update category data
+            $category->update([
+                'name' => $data['name'],
+                'photo' => $data['photo'] ?? null,
+            ]);
 
-        ]);
-
-        $this->importResults['updated']++;
-        Log::info("Category updated successfully", [
-            'row' => $rowNumber,
-            'category_id' => $category->id,
-            'name' => $category->name
-        ]);
+            $this->incrementUpdated();
+            $this->addMessage("Baris {$rowNumber}: Berhasil mengupdate kategori '{$data['name']}'");
+            Log::info("Category updated successfully", [
+                'row' => $rowNumber,
+                'category_id' => $category->id,
+                'name' => $category->name
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal mengupdate kategori - {$e->getMessage()}");
+        }
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Imports;
 
 use App\Models\ProductSpecification;
 use App\Models\Product;
+use App\Traits\EnhancedImporterTrait;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -28,17 +29,9 @@ class ProductSpecificationImporter implements
     SkipsOnError,
     SkipsOnFailure
 {
-    use Importable, SkipsErrors, SkipsFailures;
+    use Importable, SkipsErrors, SkipsFailures, EnhancedImporterTrait;
 
-    protected $importResults = [
-        'total' => 0,
-        'success' => 0,
-        'failed' => 0,
-        'updated' => 0,
-        'errors' => []
-    ];
-
-    protected $updateExisting = false;
+    // importResults and updateExisting moved to EnhancedImporterTrait
 
     public function __construct($updateExisting = false)
     {
@@ -51,17 +44,23 @@ class ProductSpecificationImporter implements
     public function collection(Collection $rows): void
     {
         foreach ($rows as $index => $row) {
-            $this->importResults['total']++;
+            $this->incrementTotal();
             $rowNumber = $index + 2; // +2 because index starts from 0 and there's a header
+            $rowArray = $row->toArray();
+
+            // Skip empty rows
+            if ($this->shouldSkipRow($rowArray)) {
+                continue;
+            }
 
             try {
-                $this->processRow($row->toArray(), $rowNumber);
+                $this->processRow($rowArray, $rowNumber);
             } catch (Exception $e) {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$e->getMessage()}";
-                Log::error("Import error on row {$rowNumber}: " . $e->getMessage(), [
-                    'row_data' => $row->toArray()
-                ]);
+                $this->incrementFailed();
+                $errorMessage = $e->getMessage();
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($rowArray, $rowNumber, $errorMessage);
+                $this->logImportError($errorMessage, $rowNumber, $rowArray);
             }
         }
     }
@@ -71,12 +70,6 @@ class ProductSpecificationImporter implements
      */
     protected function processRow(array $row, int $rowNumber): void
     {
-        // Skip rows that are empty or only reference data
-        if (empty($row['product_id']) && empty($row['name'])) {
-            $this->importResults['total']--; // Don't count empty rows
-            return;
-        }
-
         // Normalize and validate row data
         $specificationData = $this->normalizeRowData($row);
         
@@ -84,18 +77,23 @@ class ProductSpecificationImporter implements
         $validator = $this->validateRowData($specificationData, $rowNumber);
         
         if ($validator->fails()) {
-            $this->importResults['failed']++;
+            $this->incrementFailed();
+            $errorMessages = [];
             foreach ($validator->errors()->all() as $error) {
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$error}";
+                $this->addError("Baris {$rowNumber}: {$error}");
+                $errorMessages[] = $error;
             }
+            $this->addFailedRow($row, $rowNumber, implode(' | ', $errorMessages));
             return;
         }
 
         // Check if product exists
         $product = Product::find($specificationData['product_id']);
         if (!$product) {
-            $this->importResults['failed']++;
-            $this->importResults['errors'][] = "Baris {$rowNumber}: Product ID {$specificationData['product_id']} tidak ditemukan";
+            $this->incrementFailed();
+            $errorMessage = "Product ID {$specificationData['product_id']} tidak ditemukan";
+            $this->addError("Baris {$rowNumber}: {$errorMessage}");
+            $this->addFailedRow($row, $rowNumber, $errorMessage);
             return;
         }
 
@@ -108,8 +106,10 @@ class ProductSpecificationImporter implements
             if ($this->updateExisting) {
                 $this->updateProductSpecification($existingSpecification, $specificationData, $rowNumber);
             } else {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Spesifikasi '{$specificationData['name']}' untuk produk '{$product->name}' sudah ada";
+                $this->incrementFailed();
+                $errorMessage = "Spesifikasi '{$specificationData['name']}' untuk produk '{$product->name}' sudah ada";
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($row, $rowNumber, $errorMessage);
                 return;
             }
         } else {
@@ -148,18 +148,24 @@ class ProductSpecificationImporter implements
      */
     protected function createProductSpecification(array $data, int $rowNumber): void
     {
-        $specification = ProductSpecification::create([
-            'product_id' => $data['product_id'],
-            'name' => $data['name'],
-        ]);
-        
-        $this->importResults['success']++;
-        Log::info("ProductSpecification imported successfully", [
-            'row' => $rowNumber,
-            'specification_id' => $specification->id,
-            'product_id' => $specification->product_id,
-            'name' => $specification->name
-        ]);
+        try {
+            $specification = ProductSpecification::create([
+                'product_id' => $data['product_id'],
+                'name' => $data['name'],
+            ]);
+            
+            $this->incrementSuccess();
+            $this->addMessage("Baris {$rowNumber}: Berhasil menambahkan spesifikasi '{$data['name']}'");
+            Log::info("ProductSpecification imported successfully", [
+                'row' => $rowNumber,
+                'specification_id' => $specification->id,
+                'product_id' => $specification->product_id,
+                'name' => $specification->name
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal menambahkan spesifikasi - {$e->getMessage()}");
+        }
     }
 
     /**
@@ -167,17 +173,23 @@ class ProductSpecificationImporter implements
      */
     protected function updateProductSpecification(ProductSpecification $specification, array $data, int $rowNumber): void
     {
-        $specification->update([
-            'name' => $data['name'],
-        ]);
-        
-        $this->importResults['updated']++;
-        Log::info("ProductSpecification updated successfully", [
-            'row' => $rowNumber,
-            'specification_id' => $specification->id,
-            'product_id' => $specification->product_id,
-            'name' => $specification->name
-        ]);
+        try {
+            $specification->update([
+                'name' => $data['name'],
+            ]);
+            
+            $this->incrementUpdated();
+            $this->addMessage("Baris {$rowNumber}: Berhasil mengupdate spesifikasi '{$data['name']}'");
+            Log::info("ProductSpecification updated successfully", [
+                'row' => $rowNumber,
+                'specification_id' => $specification->id,
+                'product_id' => $specification->product_id,
+                'name' => $specification->name
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal mengupdate spesifikasi - {$e->getMessage()}");
+        }
     }
 
     /**

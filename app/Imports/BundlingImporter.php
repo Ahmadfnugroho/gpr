@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Bundling;
+use App\Traits\EnhancedImporterTrait;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -27,17 +28,7 @@ class BundlingImporter implements
     SkipsOnError,
     SkipsOnFailure
 {
-    use Importable, SkipsErrors, SkipsFailures;
-
-    protected $importResults = [
-        'total' => 0,
-        'success' => 0,
-        'failed' => 0,
-        'updated' => 0,
-        'errors' => []
-    ];
-
-    protected $updateExisting = false;
+    use Importable, SkipsErrors, SkipsFailures, EnhancedImporterTrait;
 
     public function __construct($updateExisting = false)
     {
@@ -50,17 +41,22 @@ class BundlingImporter implements
     public function collection(Collection $rows): void
     {
         foreach ($rows as $index => $row) {
-            $this->importResults['total']++;
-            $rowNumber = $index + 2; // +2 because index starts from 0 and there's a header
+            $this->incrementTotal();
+            $rowNumber = $index + 2;
+            $rowArray = $row->toArray();
+
+            if ($this->shouldSkipRow($rowArray)) {
+                continue;
+            }
 
             try {
-                $this->processRow($row->toArray(), $rowNumber);
+                $this->processRow($rowArray, $rowNumber);
             } catch (Exception $e) {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$e->getMessage()}";
-                Log::error("Import error on row {$rowNumber}: " . $e->getMessage(), [
-                    'row_data' => $row->toArray()
-                ]);
+                $this->incrementFailed();
+                $errorMessage = $e->getMessage();
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($rowArray, $rowNumber, $errorMessage);
+                $this->logImportError($errorMessage, $rowNumber, $rowArray);
             }
         }
     }
@@ -70,40 +66,33 @@ class BundlingImporter implements
      */
     protected function processRow(array $row, int $rowNumber): void
     {
-        // Skip rows that don't have required data
-        if (empty($row['name']) || trim($row['name']) === '') {
-            $this->importResults['total']--; // Don't count empty rows
-            return;
-        }
-
-        // Normalize and validate row data
         $bundlingData = $this->normalizeRowData($row);
-        
-        // Validate the data
         $validator = $this->validateRowData($bundlingData, $rowNumber);
         
         if ($validator->fails()) {
-            $this->importResults['failed']++;
+            $this->incrementFailed();
+            $errorMessages = [];
             foreach ($validator->errors()->all() as $error) {
-                $this->importResults['errors'][] = "Baris {$rowNumber}: {$error}";
+                $this->addError("Baris {$rowNumber}: {$error}");
+                $errorMessages[] = $error;
             }
+            $this->addFailedRow($row, $rowNumber, implode(' | ', $errorMessages));
             return;
         }
 
-        // Determine if this is an update or create operation
         $bundlingId = !empty($bundlingData['id']) ? (int) $bundlingData['id'] : null;
         $existingBundling = null;
 
         if ($bundlingId) {
-            // Look for existing by ID
             $existingBundling = Bundling::find($bundlingId);
             if (!$existingBundling) {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Bundling dengan ID {$bundlingId} tidak ditemukan";
+                $this->incrementFailed();
+                $errorMessage = "Bundling dengan ID {$bundlingId} tidak ditemukan";
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($row, $rowNumber, $errorMessage);
                 return;
             }
         } else {
-            // Look for existing by name (case insensitive)
             $existingBundling = Bundling::whereRaw('LOWER(name) = ?', [strtolower($bundlingData['name'])])->first();
         }
 
@@ -111,8 +100,10 @@ class BundlingImporter implements
             if ($this->updateExisting) {
                 $this->updateBundling($existingBundling, $bundlingData, $rowNumber);
             } else {
-                $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Bundling '{$bundlingData['name']}' sudah ada";
+                $this->incrementFailed();
+                $errorMessage = "Bundling '{$bundlingData['name']}' sudah ada";
+                $this->addError("Baris {$rowNumber}: {$errorMessage}");
+                $this->addFailedRow($row, $rowNumber, $errorMessage);
                 return;
             }
         } else {
@@ -162,24 +153,29 @@ class BundlingImporter implements
      */
     protected function createBundling(array $data, int $rowNumber): void
     {
-        // Remove id from data for creation
-        unset($data['id']);
+        try {
+            unset($data['id']);
 
-        $bundling = Bundling::create([
-            'name' => $data['name'],
-            'description' => $data['description'] ?: null,
-            'price' => $data['price'] ?: 0,
-            'status' => $data['status'] ?: 'active',
-        ]);
-        
-        $this->importResults['success']++;
-        Log::info("Bundling imported successfully", [
-            'row' => $rowNumber,
-            'bundling_id' => $bundling->id,
-            'name' => $bundling->name,
-            'price' => $bundling->price,
-            'status' => $bundling->status
-        ]);
+            $bundling = Bundling::create([
+                'name' => $data['name'],
+                'description' => $data['description'] ?: null,
+                'price' => $data['price'] ?: 0,
+                'status' => $data['status'] ?: 'active',
+            ]);
+            
+            $this->incrementSuccess();
+            $this->addMessage("Baris {$rowNumber}: Berhasil menambahkan bundling '{$bundling->name}'");
+            Log::info("Bundling imported successfully", [
+                'row' => $rowNumber,
+                'bundling_id' => $bundling->id,
+                'name' => $bundling->name,
+                'price' => $bundling->price,
+                'status' => $bundling->status
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal menambahkan bundling - {$e->getMessage()}");
+        }
     }
 
     /**
@@ -187,21 +183,27 @@ class BundlingImporter implements
      */
     protected function updateBundling(Bundling $bundling, array $data, int $rowNumber): void
     {
-        $bundling->update([
-            'name' => $data['name'],
-            'description' => $data['description'] ?: $bundling->description,
-            'price' => $data['price'] ?: $bundling->price,
-            'status' => $data['status'] ?: $bundling->status,
-        ]);
-        
-        $this->importResults['updated']++;
-        Log::info("Bundling updated successfully", [
-            'row' => $rowNumber,
-            'bundling_id' => $bundling->id,
-            'name' => $bundling->name,
-            'price' => $bundling->price,
-            'status' => $bundling->status
-        ]);
+        try {
+            $bundling->update([
+                'name' => $data['name'],
+                'description' => $data['description'] ?: $bundling->description,
+                'price' => $data['price'] ?: $bundling->price,
+                'status' => $data['status'] ?: $bundling->status,
+            ]);
+            
+            $this->incrementUpdated();
+            $this->addMessage("Baris {$rowNumber}: Berhasil mengupdate bundling '{$bundling->name}'");
+            Log::info("Bundling updated successfully", [
+                'row' => $rowNumber,
+                'bundling_id' => $bundling->id,
+                'name' => $bundling->name,
+                'price' => $bundling->price,
+                'status' => $bundling->status
+            ]);
+        } catch (Exception $e) {
+            $this->incrementFailed();
+            $this->addError("Baris {$rowNumber}: Gagal mengupdate bundling - {$e->getMessage()}");
+        }
     }
 
     /**
