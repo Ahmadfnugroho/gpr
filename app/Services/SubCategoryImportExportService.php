@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Imports\BrandImporter;
-use App\Models\Brand;
+use App\Imports\SubCategoryImporter;
+use App\Models\SubCategory;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
@@ -13,12 +13,12 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class BrandImportExportService
+class SubCategoryImportExportService
 {
     /**
-     * Import brands from Excel file
+     * Import subcategories from Excel file
      */
-    public function importBrands(UploadedFile $file, bool $updateExisting = false): array
+    public function importSubCategories(UploadedFile $file, bool $updateExisting = false): array
     {
         try {
             // Validate file type
@@ -33,7 +33,7 @@ class BrandImportExportService
             }
 
             // Create importer instance
-            $importer = new BrandImporter($updateExisting);
+            $importer = new SubCategoryImporter($updateExisting);
 
             // Import the file
             Excel::import($importer, $file);
@@ -53,12 +53,12 @@ class BrandImportExportService
     }
 
     /**
-     * Export brands to Excel
+     * Export subcategories to Excel
      */
-    public function exportBrands(array $brandIds = null): string
+    public function exportSubCategories(array $subCategoryIds = null): string
     {
-        $export = new BrandExport($brandIds);
-        $filename = 'brands_export_' . date('Y-m-d_H-i-s') . '.xlsx';
+        $export = new SubCategoryExport($subCategoryIds);
+        $filename = 'subcategories_export_' . date('Y-m-d_H-i-s') . '.xlsx';
         
         Excel::store($export, $filename, 'public');
         
@@ -70,8 +70,8 @@ class BrandImportExportService
      */
     public function generateTemplate(): string
     {
-        $template = new BrandImportTemplate();
-        $filename = 'brand_import_template.xlsx';
+        $template = new SubCategoryImportTemplate();
+        $filename = 'subcategory_import_template.xlsx';
         
         Excel::store($template, $filename, 'public');
         
@@ -84,7 +84,7 @@ class BrandImportExportService
     public function validateFileStructure(UploadedFile $file): array
     {
         try {
-            $data = Excel::toArray(new BrandImporter(), $file);
+            $data = Excel::toArray(new SubCategoryImporter(), $file);
             
             if (empty($data) || empty($data[0])) {
                 return [
@@ -94,7 +94,7 @@ class BrandImportExportService
             }
 
             $headers = array_keys($data[0][0] ?? []);
-            $expectedHeaders = BrandImporter::getExpectedHeaders();
+            $expectedHeaders = SubCategoryImporter::getExpectedHeaders();
             $missingHeaders = array_diff($expectedHeaders, $headers);
 
             if (!empty($missingHeaders)) {
@@ -123,23 +123,23 @@ class BrandImportExportService
 }
 
 /**
- * Brand Export Class
+ * SubCategory Export Class
  */
-class BrandExport implements FromCollection, WithHeadings, WithMapping, WithStyles
+class SubCategoryExport implements FromCollection, WithHeadings, WithMapping, WithStyles
 {
-    protected $brandIds;
+    protected $subCategoryIds;
 
-    public function __construct(array $brandIds = null)
+    public function __construct(array $subCategoryIds = null)
     {
-        $this->brandIds = $brandIds;
+        $this->subCategoryIds = $subCategoryIds;
     }
 
     public function collection()
     {
-        $query = Brand::query();
+        $query = SubCategory::with('category')->withCount('products');
         
-        if ($this->brandIds) {
-            $query->whereIn('id', $this->brandIds);
+        if ($this->subCategoryIds) {
+            $query->whereIn('id', $this->subCategoryIds);
         }
         
         return $query->get();
@@ -149,23 +149,25 @@ class BrandExport implements FromCollection, WithHeadings, WithMapping, WithStyl
     {
         return [
             'ID',
-            'Nama Brand',
-            'Logo',
-            'Slug',
+            'Nama Sub Kategori',
+            'Photo',
+            'Kategori',
+            'Jumlah Produk',
             'Tanggal Dibuat',
             'Terakhir Update'
         ];
     }
 
-    public function map($brand): array
+    public function map($subCategory): array
     {
         return [
-            $brand->id,
-            $brand->name,
-            $brand->logo ?? '',
-            $brand->slug,
-            $brand->created_at?->format('Y-m-d H:i:s'),
-            $brand->updated_at?->format('Y-m-d H:i:s')
+            $subCategory->id,
+            $subCategory->name,
+            $subCategory->photo ?? '',
+            $subCategory->category?->name ?? '',
+            $subCategory->products_count,
+            $subCategory->created_at?->format('Y-m-d H:i:s'),
+            $subCategory->updated_at?->format('Y-m-d H:i:s')
         ];
     }
 
@@ -176,30 +178,30 @@ class BrandExport implements FromCollection, WithHeadings, WithMapping, WithStyl
             1 => ['font' => ['bold' => true]],
             
             // Set auto width for all columns
-            'A:F' => ['alignment' => ['wrapText' => true]]
+            'A:G' => ['alignment' => ['wrapText' => true]]
         ];
     }
 }
 
 /**
- * Brand Import Template Class
+ * SubCategory Import Template Class
  */
-class BrandImportTemplate implements FromCollection, WithHeadings, WithStyles
+class SubCategoryImportTemplate implements FromCollection, WithHeadings, WithStyles
 {
     public function collection()
     {
         // Return empty collection with sample data
         return collect([
             [
-                'Canon',
-                'https://example.com/logo.jpg',
+                'Kamera DSLR',
+                'https://example.com/photo.jpg',
             ]
         ]);
     }
 
     public function headings(): array
     {
-        return BrandImporter::getExpectedHeaders();
+        return SubCategoryImporter::getExpectedHeaders();
     }
 
     public function styles(Worksheet $sheet)
@@ -225,9 +227,8 @@ class BrandImportTemplate implements FromCollection, WithHeadings, WithStyles
         ]);
      
         // Auto-size columns
-        foreach (range('A', 'B') as $column) {
-            $sheet->getColumnDimension($column)->setAutoSize(true);
-        }
+        $sheet->getColumnDimension('A')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setAutoSize(true);
      
         return [];
     }

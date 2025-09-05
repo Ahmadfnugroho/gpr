@@ -2,7 +2,7 @@
 
 namespace App\Imports;
 
-use App\Models\Brand;
+use App\Models\Bundling;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -11,17 +11,15 @@ use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
-use Maatwebsite\Excel\Concerns\WithValidation;
 use Maatwebsite\Excel\Concerns\Importable;
 use Maatwebsite\Excel\Concerns\SkipsErrors;
 use Maatwebsite\Excel\Concerns\SkipsFailures;
 use Maatwebsite\Excel\Concerns\SkipsOnError;
 use Maatwebsite\Excel\Concerns\SkipsOnFailure;
-use Maatwebsite\Excel\Validators\Failure;
 use Carbon\Carbon;
 use Exception;
 
-class BrandImporter implements 
+class BundlingImporter implements 
     ToCollection, 
     WithHeadingRow, 
     WithBatchInserts,
@@ -72,11 +70,17 @@ class BrandImporter implements
      */
     protected function processRow(array $row, int $rowNumber): void
     {
+        // Skip rows that don't have required data
+        if (empty($row['name']) || trim($row['name']) === '') {
+            $this->importResults['total']--; // Don't count empty rows
+            return;
+        }
+
         // Normalize and validate row data
-        $brandData = $this->normalizeRowData($row);
+        $bundlingData = $this->normalizeRowData($row);
         
         // Validate the data
-        $validator = $this->validateRowData($brandData, $rowNumber);
+        $validator = $this->validateRowData($bundlingData, $rowNumber);
         
         if ($validator->fails()) {
             $this->importResults['failed']++;
@@ -86,19 +90,33 @@ class BrandImporter implements
             return;
         }
 
-        // Check if brand exists (by name since it should be unique)
-        $existingBrand = Brand::where('name', $brandData['name'])->first();
-        
-        if ($existingBrand) {
-            if ($this->updateExisting) {
-                $this->updateBrand($existingBrand, $brandData, $rowNumber);
-            } else {
+        // Determine if this is an update or create operation
+        $bundlingId = !empty($bundlingData['id']) ? (int) $bundlingData['id'] : null;
+        $existingBundling = null;
+
+        if ($bundlingId) {
+            // Look for existing by ID
+            $existingBundling = Bundling::find($bundlingId);
+            if (!$existingBundling) {
                 $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Brand '{$brandData['name']}' sudah ada";
+                $this->importResults['errors'][] = "Baris {$rowNumber}: Bundling dengan ID {$bundlingId} tidak ditemukan";
                 return;
             }
         } else {
-            $this->createBrand($brandData, $rowNumber);
+            // Look for existing by name (case insensitive)
+            $existingBundling = Bundling::whereRaw('LOWER(name) = ?', [strtolower($bundlingData['name'])])->first();
+        }
+
+        if ($existingBundling) {
+            if ($this->updateExisting) {
+                $this->updateBundling($existingBundling, $bundlingData, $rowNumber);
+            } else {
+                $this->importResults['failed']++;
+                $this->importResults['errors'][] = "Baris {$rowNumber}: Bundling '{$bundlingData['name']}' sudah ada";
+                return;
+            }
+        } else {
+            $this->createBundling($bundlingData, $rowNumber);
         }
     }
 
@@ -108,8 +126,11 @@ class BrandImporter implements
     protected function normalizeRowData(array $row): array
     {
         return [
-            'name' => trim($row['nama_brand'] ?? $row['name'] ?? ''),
-            'logo' => trim($row['logo'] ?? ''),
+            'id' => !empty($row['id']) ? (int) $row['id'] : null,
+            'name' => trim($row['name'] ?? ''),
+            'description' => trim($row['description'] ?? ''),
+            'price' => !empty($row['price']) ? (float) str_replace(['.', ','], '', $row['price']) : 0,
+            'status' => strtolower(trim($row['status'] ?? 'active')),
         ];
     }
 
@@ -118,53 +139,70 @@ class BrandImporter implements
      */
     protected function validateRowData(array $data, int $rowNumber)
     {
-        return Validator::make($data, [
+        $rules = [
             'name' => 'required|string|max:255',
-            'logo' => 'nullable|string|max:255',
-        ], [
-            'name.required' => 'Nama brand wajib diisi',
-            'logo.string' => 'Logo harus berupa text/URL',
-        ]);
+            'description' => 'nullable|string',
+            'price' => 'nullable|numeric|min:0',
+            'status' => 'nullable|in:active,inactive',
+        ];
+
+        $messages = [
+            'name.required' => 'Nama bundling wajib diisi',
+            'name.max' => 'Nama bundling maksimal 255 karakter',
+            'price.numeric' => 'Harga harus berupa angka',
+            'price.min' => 'Harga tidak boleh negatif',
+            'status.in' => 'Status hanya boleh: active, inactive',
+        ];
+
+        return Validator::make($data, $rules, $messages);
     }
 
     /**
-     * Create new brand
+     * Create new bundling
      */
-    protected function createBrand(array $data, int $rowNumber): void
+    protected function createBundling(array $data, int $rowNumber): void
     {
-        // Create brand
-        $brand = Brand::create([
+        // Remove id from data for creation
+        unset($data['id']);
+
+        $bundling = Bundling::create([
             'name' => $data['name'],
-            'logo' => $data['logo'] ?? null,
+            'description' => $data['description'] ?: null,
+            'price' => $data['price'] ?: 0,
+            'status' => $data['status'] ?: 'active',
         ]);
         
         $this->importResults['success']++;
-        Log::info("Brand imported successfully", [
+        Log::info("Bundling imported successfully", [
             'row' => $rowNumber,
-            'brand_id' => $brand->id,
-            'name' => $brand->name
+            'bundling_id' => $bundling->id,
+            'name' => $bundling->name,
+            'price' => $bundling->price,
+            'status' => $bundling->status
         ]);
     }
 
     /**
-     * Update existing brand
+     * Update existing bundling
      */
-    protected function updateBrand(Brand $brand, array $data, int $rowNumber): void
+    protected function updateBundling(Bundling $bundling, array $data, int $rowNumber): void
     {
-        // Update brand data
-        $brand->update([
+        $bundling->update([
             'name' => $data['name'],
-            'logo' => $data['logo'] ?? null,
+            'description' => $data['description'] ?: $bundling->description,
+            'price' => $data['price'] ?: $bundling->price,
+            'status' => $data['status'] ?: $bundling->status,
         ]);
         
         $this->importResults['updated']++;
-        Log::info("Brand updated successfully", [
+        Log::info("Bundling updated successfully", [
             'row' => $rowNumber,
-            'brand_id' => $brand->id,
-            'name' => $brand->name
+            'bundling_id' => $bundling->id,
+            'name' => $bundling->name,
+            'price' => $bundling->price,
+            'status' => $bundling->status
         ]);
     }
-
 
     /**
      * Get import results
@@ -196,8 +234,11 @@ class BrandImporter implements
     public static function getExpectedHeaders(): array
     {
         return [
-            'nama_brand',
-            'logo'
+            'id',
+            'name',
+            'description',
+            'price',
+            'status'
         ];
     }
 }

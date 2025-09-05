@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
-use App\Imports\BrandImporter;
-use App\Models\Brand;
+use App\Imports\ProductPhotoImporter;
+use App\Models\ProductPhoto;
+use App\Models\Product;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
@@ -13,12 +14,12 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class BrandImportExportService
+class ProductPhotoImportExportService
 {
     /**
-     * Import brands from Excel file
+     * Import product photos from Excel file
      */
-    public function importBrands(UploadedFile $file, bool $updateExisting = false): array
+    public function importProductPhotos(UploadedFile $file, bool $updateExisting = false): array
     {
         try {
             // Validate file type
@@ -33,7 +34,7 @@ class BrandImportExportService
             }
 
             // Create importer instance
-            $importer = new BrandImporter($updateExisting);
+            $importer = new ProductPhotoImporter($updateExisting);
 
             // Import the file
             Excel::import($importer, $file);
@@ -53,12 +54,12 @@ class BrandImportExportService
     }
 
     /**
-     * Export brands to Excel
+     * Export product photos to Excel
      */
-    public function exportBrands(array $brandIds = null): string
+    public function exportProductPhotos(array $photoIds = null): string
     {
-        $export = new BrandExport($brandIds);
-        $filename = 'brands_export_' . date('Y-m-d_H-i-s') . '.xlsx';
+        $export = new ProductPhotoExport($photoIds);
+        $filename = 'product_photos_export_' . date('Y-m-d_H-i-s') . '.xlsx';
         
         Excel::store($export, $filename, 'public');
         
@@ -70,76 +71,33 @@ class BrandImportExportService
      */
     public function generateTemplate(): string
     {
-        $template = new BrandImportTemplate();
-        $filename = 'brand_import_template.xlsx';
+        $template = new ProductPhotoImportTemplate();
+        $filename = 'product_photo_import_template.xlsx';
         
         Excel::store($template, $filename, 'public');
         
         return Storage::disk('public')->path($filename);
     }
-
-    /**
-     * Validate Excel file structure
-     */
-    public function validateFileStructure(UploadedFile $file): array
-    {
-        try {
-            $data = Excel::toArray(new BrandImporter(), $file);
-            
-            if (empty($data) || empty($data[0])) {
-                return [
-                    'valid' => false,
-                    'errors' => ['File is empty or corrupted']
-                ];
-            }
-
-            $headers = array_keys($data[0][0] ?? []);
-            $expectedHeaders = BrandImporter::getExpectedHeaders();
-            $missingHeaders = array_diff($expectedHeaders, $headers);
-
-            if (!empty($missingHeaders)) {
-                return [
-                    'valid' => false,
-                    'errors' => [
-                        'Missing required columns: ' . implode(', ', $missingHeaders),
-                        'Expected columns: ' . implode(', ', $expectedHeaders)
-                    ]
-                ];
-            }
-
-            return [
-                'valid' => true,
-                'total_rows' => count($data[0]) - 1, // -1 for header
-                'headers' => $headers
-            ];
-
-        } catch (\Exception $e) {
-            return [
-                'valid' => false,
-                'errors' => ['File validation error: ' . $e->getMessage()]
-            ];
-        }
-    }
 }
 
 /**
- * Brand Export Class
+ * ProductPhoto Export Class
  */
-class BrandExport implements FromCollection, WithHeadings, WithMapping, WithStyles
+class ProductPhotoExport implements FromCollection, WithHeadings, WithMapping, WithStyles
 {
-    protected $brandIds;
+    protected $photoIds;
 
-    public function __construct(array $brandIds = null)
+    public function __construct(array $photoIds = null)
     {
-        $this->brandIds = $brandIds;
+        $this->photoIds = $photoIds;
     }
 
     public function collection()
     {
-        $query = Brand::query();
+        $query = ProductPhoto::with('product');
         
-        if ($this->brandIds) {
-            $query->whereIn('id', $this->brandIds);
+        if ($this->photoIds) {
+            $query->whereIn('id', $this->photoIds);
         }
         
         return $query->get();
@@ -149,23 +107,23 @@ class BrandExport implements FromCollection, WithHeadings, WithMapping, WithStyl
     {
         return [
             'ID',
-            'Nama Brand',
-            'Logo',
-            'Slug',
-            'Tanggal Dibuat',
-            'Terakhir Update'
+            'Product ID',
+            'Product Name',
+            'Photo Filename',
+            'Created At',
+            'Updated At'
         ];
     }
 
-    public function map($brand): array
+    public function map($photo): array
     {
         return [
-            $brand->id,
-            $brand->name,
-            $brand->logo ?? '',
-            $brand->slug,
-            $brand->created_at?->format('Y-m-d H:i:s'),
-            $brand->updated_at?->format('Y-m-d H:i:s')
+            $photo->id,
+            $photo->product_id,
+            $photo->product?->name ?? '',
+            $photo->photo ?? '',
+            $photo->created_at?->format('Y-m-d H:i:s'),
+            $photo->updated_at?->format('Y-m-d H:i:s')
         ];
     }
 
@@ -182,30 +140,50 @@ class BrandExport implements FromCollection, WithHeadings, WithMapping, WithStyl
 }
 
 /**
- * Brand Import Template Class
+ * ProductPhoto Import Template Class
  */
-class BrandImportTemplate implements FromCollection, WithHeadings, WithStyles
+class ProductPhotoImportTemplate implements FromCollection, WithHeadings, WithStyles
 {
     public function collection()
     {
-        // Return empty collection with sample data
-        return collect([
+        // Get all products for reference
+        $products = Product::select('id', 'name')->get();
+        
+        // Create sample data with product reference
+        $sampleData = [
             [
-                'Canon',
-                'https://example.com/logo.jpg',
+                1, // product_id
+                'photo1.jpg', // photo filename
             ]
-        ]);
+        ];
+
+        // Add product reference data to the right columns
+        foreach ($products as $index => $product) {
+            if ($index < count($sampleData)) {
+                $sampleData[$index] = array_merge($sampleData[$index], [$product->id, $product->name]);
+            } else {
+                $sampleData[] = ['', '', $product->id, $product->name];
+            }
+        }
+
+        return collect($sampleData);
     }
 
     public function headings(): array
     {
-        return BrandImporter::getExpectedHeaders();
+        return [
+            'product_id', 
+            'photo',
+            '', // separator
+            'REFERENCE - Product ID', 
+            'REFERENCE - Product Name'
+        ];
     }
 
     public function styles(Worksheet $sheet)
     {
         // Set header row style
-        $sheet->getStyle('A1:B1')->applyFromArray([
+        $sheet->getStyle('A1:E1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF']
@@ -213,6 +191,14 @@ class BrandImportTemplate implements FromCollection, WithHeadings, WithStyles
             'fill' => [
                 'fillType' => 'solid',
                 'startColor' => ['rgb' => '4CAF50']
+            ]
+        ]);
+
+        // Style reference columns
+        $sheet->getStyle('D1:E1')->applyFromArray([
+            'fill' => [
+                'fillType' => 'solid',
+                'startColor' => ['rgb' => '2196F3']
             ]
         ]);
      
@@ -223,9 +209,18 @@ class BrandImportTemplate implements FromCollection, WithHeadings, WithStyles
                 'startColor' => ['rgb' => 'E8F5E8']
             ]
         ]);
+
+        // Style reference data
+        $productCount = Product::count();
+        $sheet->getStyle('D2:E' . ($productCount + 1))->applyFromArray([
+            'fill' => [
+                'fillType' => 'solid',
+                'startColor' => ['rgb' => 'E3F2FD']
+            ]
+        ]);
      
         // Auto-size columns
-        foreach (range('A', 'B') as $column) {
+        foreach (range('A', 'E') as $column) {
             $sheet->getColumnDimension($column)->setAutoSize(true);
         }
      

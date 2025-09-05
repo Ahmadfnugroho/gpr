@@ -2,7 +2,8 @@
 
 namespace App\Imports;
 
-use App\Models\Brand;
+use App\Models\BundlingPhoto;
+use App\Models\Bundling;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -11,17 +12,15 @@ use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
-use Maatwebsite\Excel\Concerns\WithValidation;
 use Maatwebsite\Excel\Concerns\Importable;
 use Maatwebsite\Excel\Concerns\SkipsErrors;
 use Maatwebsite\Excel\Concerns\SkipsFailures;
 use Maatwebsite\Excel\Concerns\SkipsOnError;
 use Maatwebsite\Excel\Concerns\SkipsOnFailure;
-use Maatwebsite\Excel\Validators\Failure;
 use Carbon\Carbon;
 use Exception;
 
-class BrandImporter implements 
+class BundlingPhotoImporter implements 
     ToCollection, 
     WithHeadingRow, 
     WithBatchInserts,
@@ -72,11 +71,17 @@ class BrandImporter implements
      */
     protected function processRow(array $row, int $rowNumber): void
     {
+        // Skip rows that are empty or only reference data
+        if (empty($row['bundling_id']) && empty($row['photo'])) {
+            $this->importResults['total']--; // Don't count empty rows
+            return;
+        }
+
         // Normalize and validate row data
-        $brandData = $this->normalizeRowData($row);
+        $photoData = $this->normalizeRowData($row);
         
         // Validate the data
-        $validator = $this->validateRowData($brandData, $rowNumber);
+        $validator = $this->validateRowData($photoData, $rowNumber);
         
         if ($validator->fails()) {
             $this->importResults['failed']++;
@@ -86,19 +91,38 @@ class BrandImporter implements
             return;
         }
 
-        // Check if brand exists (by name since it should be unique)
-        $existingBrand = Brand::where('name', $brandData['name'])->first();
+        // Check if bundling exists
+        $bundling = Bundling::find($photoData['bundling_id']);
         
-        if ($existingBrand) {
+        if (!$bundling) {
+            $this->importResults['failed']++;
+            $this->importResults['errors'][] = "Baris {$rowNumber}: Bundling ID {$photoData['bundling_id']} tidak ditemukan";
+            return;
+        }
+
+        // Check if bundling photo exists (duplicate check based on bundling_id and photo)
+        $existingPhoto = BundlingPhoto::where('bundling_id', $photoData['bundling_id'])
+            ->where('photo', $photoData['photo'])
+            ->first();
+        
+        if ($existingPhoto) {
             if ($this->updateExisting) {
-                $this->updateBrand($existingBrand, $brandData, $rowNumber);
+                // For bundling photos, there's no additional data to update since we only have bundling_id and photo
+                // So we'll just log that the photo already exists
+                $this->importResults['updated']++;
+                Log::info("BundlingPhoto already exists", [
+                    'row' => $rowNumber,
+                    'bundling_photo_id' => $existingPhoto->id,
+                    'bundling_id' => $existingPhoto->bundling_id,
+                    'photo' => $existingPhoto->photo
+                ]);
             } else {
                 $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Brand '{$brandData['name']}' sudah ada";
+                $this->importResults['errors'][] = "Baris {$rowNumber}: Photo '{$photoData['photo']}' untuk bundling '{$bundling->name}' sudah ada";
                 return;
             }
         } else {
-            $this->createBrand($brandData, $rowNumber);
+            $this->createBundlingPhoto($photoData, $rowNumber);
         }
     }
 
@@ -108,8 +132,8 @@ class BrandImporter implements
     protected function normalizeRowData(array $row): array
     {
         return [
-            'name' => trim($row['nama_brand'] ?? $row['name'] ?? ''),
-            'logo' => trim($row['logo'] ?? ''),
+            'bundling_id' => (int) ($row['bundling_id'] ?? 0),
+            'photo' => trim($row['photo'] ?? ''),
         ];
     }
 
@@ -119,52 +143,34 @@ class BrandImporter implements
     protected function validateRowData(array $data, int $rowNumber)
     {
         return Validator::make($data, [
-            'name' => 'required|string|max:255',
-            'logo' => 'nullable|string|max:255',
+            'bundling_id' => 'required|integer|exists:bundlings,id',
+            'photo' => 'required|string|max:255',
         ], [
-            'name.required' => 'Nama brand wajib diisi',
-            'logo.string' => 'Logo harus berupa text/URL',
+            'bundling_id.required' => 'Bundling ID wajib diisi',
+            'bundling_id.exists' => 'Bundling ID tidak ditemukan di database',
+            'photo.required' => 'Photo wajib diisi',
+            'photo.max' => 'Photo maksimal 255 karakter',
         ]);
     }
 
     /**
-     * Create new brand
+     * Create new bundling photo
      */
-    protected function createBrand(array $data, int $rowNumber): void
+    protected function createBundlingPhoto(array $data, int $rowNumber): void
     {
-        // Create brand
-        $brand = Brand::create([
-            'name' => $data['name'],
-            'logo' => $data['logo'] ?? null,
+        $bundlingPhoto = BundlingPhoto::create([
+            'bundling_id' => $data['bundling_id'],
+            'photo' => $data['photo'],
         ]);
         
         $this->importResults['success']++;
-        Log::info("Brand imported successfully", [
+        Log::info("BundlingPhoto imported successfully", [
             'row' => $rowNumber,
-            'brand_id' => $brand->id,
-            'name' => $brand->name
+            'bundling_photo_id' => $bundlingPhoto->id,
+            'bundling_id' => $bundlingPhoto->bundling_id,
+            'photo' => $bundlingPhoto->photo
         ]);
     }
-
-    /**
-     * Update existing brand
-     */
-    protected function updateBrand(Brand $brand, array $data, int $rowNumber): void
-    {
-        // Update brand data
-        $brand->update([
-            'name' => $data['name'],
-            'logo' => $data['logo'] ?? null,
-        ]);
-        
-        $this->importResults['updated']++;
-        Log::info("Brand updated successfully", [
-            'row' => $rowNumber,
-            'brand_id' => $brand->id,
-            'name' => $brand->name
-        ]);
-    }
-
 
     /**
      * Get import results
@@ -196,8 +202,8 @@ class BrandImporter implements
     public static function getExpectedHeaders(): array
     {
         return [
-            'nama_brand',
-            'logo'
+            'bundling_id',
+            'photo'
         ];
     }
 }

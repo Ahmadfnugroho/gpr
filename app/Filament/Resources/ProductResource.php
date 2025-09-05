@@ -515,7 +515,7 @@ class ProductResource extends Resource
 
                 Tables\Actions\DeleteBulkAction::make(),
 
-                Action::make('exportSelected')
+                Tables\Actions\BulkAction::make('exportSelected')
                     ->label('Export Selected')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('info')

@@ -194,6 +194,7 @@ class CategoryImportTemplate implements FromCollection, WithHeadings, WithStyles
         return collect([
             [
                 'Kamera Digital',
+                'https://example.com/photo.jpg',
             ]
         ]);
     }
@@ -206,7 +207,7 @@ class CategoryImportTemplate implements FromCollection, WithHeadings, WithStyles
     public function styles(Worksheet $sheet)
     {
         // Set header row style
-        $sheet->getStyle('A1:A1')->applyFromArray([
+        $sheet->getStyle('A1:B1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF']
@@ -218,7 +219,7 @@ class CategoryImportTemplate implements FromCollection, WithHeadings, WithStyles
         ]);
      
         // Set sample data row style
-        $sheet->getStyle('A2:A2')->applyFromArray([
+        $sheet->getStyle('A2:B2')->applyFromArray([
             'fill' => [
                 'fillType' => 'solid',
                 'startColor' => ['rgb' => 'E8F5E8']
@@ -227,6 +228,7 @@ class CategoryImportTemplate implements FromCollection, WithHeadings, WithStyles
      
         // Auto-size columns
         $sheet->getColumnDimension('A')->setAutoSize(true);
+        $sheet->getColumnDimension('B')->setAutoSize(true);
      
         return [];
     }

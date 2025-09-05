@@ -2,7 +2,7 @@
 
 namespace App\Imports;
 
-use App\Models\Brand;
+use App\Models\SubCategory;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -21,7 +21,7 @@ use Maatwebsite\Excel\Validators\Failure;
 use Carbon\Carbon;
 use Exception;
 
-class BrandImporter implements 
+class SubCategoryImporter implements 
     ToCollection, 
     WithHeadingRow, 
     WithBatchInserts,
@@ -73,10 +73,10 @@ class BrandImporter implements
     protected function processRow(array $row, int $rowNumber): void
     {
         // Normalize and validate row data
-        $brandData = $this->normalizeRowData($row);
+        $subCategoryData = $this->normalizeRowData($row);
         
         // Validate the data
-        $validator = $this->validateRowData($brandData, $rowNumber);
+        $validator = $this->validateRowData($subCategoryData, $rowNumber);
         
         if ($validator->fails()) {
             $this->importResults['failed']++;
@@ -86,19 +86,19 @@ class BrandImporter implements
             return;
         }
 
-        // Check if brand exists (by name since it should be unique)
-        $existingBrand = Brand::where('name', $brandData['name'])->first();
+        // Check if subcategory exists (by name since it should be unique)
+        $existingSubCategory = SubCategory::where('name', $subCategoryData['name'])->first();
         
-        if ($existingBrand) {
+        if ($existingSubCategory) {
             if ($this->updateExisting) {
-                $this->updateBrand($existingBrand, $brandData, $rowNumber);
+                $this->updateSubCategory($existingSubCategory, $subCategoryData, $rowNumber);
             } else {
                 $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Brand '{$brandData['name']}' sudah ada";
+                $this->importResults['errors'][] = "Baris {$rowNumber}: Sub Kategori '{$subCategoryData['name']}' sudah ada";
                 return;
             }
         } else {
-            $this->createBrand($brandData, $rowNumber);
+            $this->createSubCategory($subCategoryData, $rowNumber);
         }
     }
 
@@ -108,8 +108,8 @@ class BrandImporter implements
     protected function normalizeRowData(array $row): array
     {
         return [
-            'name' => trim($row['nama_brand'] ?? $row['name'] ?? ''),
-            'logo' => trim($row['logo'] ?? ''),
+            'name' => trim($row['name'] ?? $row['nama'] ?? ''),
+            'photo' => trim($row['photo'] ?? ''),
         ];
     }
 
@@ -120,51 +120,50 @@ class BrandImporter implements
     {
         return Validator::make($data, [
             'name' => 'required|string|max:255',
-            'logo' => 'nullable|string|max:255',
+            'photo' => 'nullable|string|max:255',
         ], [
-            'name.required' => 'Nama brand wajib diisi',
-            'logo.string' => 'Logo harus berupa text/URL',
+            'name.required' => 'Nama sub kategori wajib diisi',
+            'photo.string' => 'Photo harus berupa text/URL',
         ]);
     }
 
     /**
-     * Create new brand
+     * Create new subcategory
      */
-    protected function createBrand(array $data, int $rowNumber): void
+    protected function createSubCategory(array $data, int $rowNumber): void
     {
-        // Create brand
-        $brand = Brand::create([
+        // Create subcategory
+        $subCategory = SubCategory::create([
             'name' => $data['name'],
-            'logo' => $data['logo'] ?? null,
+            'photo' => $data['photo'] ?? null,
         ]);
         
         $this->importResults['success']++;
-        Log::info("Brand imported successfully", [
+        Log::info("SubCategory imported successfully", [
             'row' => $rowNumber,
-            'brand_id' => $brand->id,
-            'name' => $brand->name
+            'subcategory_id' => $subCategory->id,
+            'name' => $subCategory->name
         ]);
     }
 
     /**
-     * Update existing brand
+     * Update existing subcategory
      */
-    protected function updateBrand(Brand $brand, array $data, int $rowNumber): void
+    protected function updateSubCategory(SubCategory $subCategory, array $data, int $rowNumber): void
     {
-        // Update brand data
-        $brand->update([
+        // Update subcategory data
+        $subCategory->update([
             'name' => $data['name'],
-            'logo' => $data['logo'] ?? null,
+            'photo' => $data['photo'] ?? null,
         ]);
         
         $this->importResults['updated']++;
-        Log::info("Brand updated successfully", [
+        Log::info("SubCategory updated successfully", [
             'row' => $rowNumber,
-            'brand_id' => $brand->id,
-            'name' => $brand->name
+            'subcategory_id' => $subCategory->id,
+            'name' => $subCategory->name
         ]);
     }
-
 
     /**
      * Get import results
@@ -196,8 +195,8 @@ class BrandImporter implements
     public static function getExpectedHeaders(): array
     {
         return [
-            'nama_brand',
-            'logo'
+            'name',
+            'photo'
         ];
     }
 }

@@ -109,6 +109,7 @@ class CategoryImporter implements
     {
         return [
             'name' => trim($row['nama_kategori'] ?? $row['name'] ?? ''),
+            'photo' => trim($row['photo'] ?? ''),
         ];
     }
 
@@ -119,8 +120,10 @@ class CategoryImporter implements
     {
         return Validator::make($data, [
             'name' => 'required|string|max:255',
+            'photo' => 'nullable|string|max:255',
         ], [
             'name.required' => 'Nama kategori wajib diisi',
+            'photo.string' => 'Photo harus berupa text/URL',
         ]);
     }
 
@@ -132,6 +135,7 @@ class CategoryImporter implements
         // Create category
         $category = Category::create([
             'name' => $data['name'],
+            'photo' => $data['photo'] ?? null,
         ]);
         
         $this->importResults['success']++;
@@ -150,6 +154,7 @@ class CategoryImporter implements
         // Update category data
         $category->update([
             'name' => $data['name'],
+            'photo' => $data['photo'] ?? null,
         ]);
         
         $this->importResults['updated']++;
@@ -190,7 +195,8 @@ class CategoryImporter implements
     public static function getExpectedHeaders(): array
     {
         return [
-            'nama_kategori'
+            'nama_kategori',
+            'photo'
         ];
     }
 }

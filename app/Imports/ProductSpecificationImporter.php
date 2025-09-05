@@ -2,7 +2,8 @@
 
 namespace App\Imports;
 
-use App\Models\Brand;
+use App\Models\ProductSpecification;
+use App\Models\Product;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -11,17 +12,15 @@ use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
-use Maatwebsite\Excel\Concerns\WithValidation;
 use Maatwebsite\Excel\Concerns\Importable;
 use Maatwebsite\Excel\Concerns\SkipsErrors;
 use Maatwebsite\Excel\Concerns\SkipsFailures;
 use Maatwebsite\Excel\Concerns\SkipsOnError;
 use Maatwebsite\Excel\Concerns\SkipsOnFailure;
-use Maatwebsite\Excel\Validators\Failure;
 use Carbon\Carbon;
 use Exception;
 
-class BrandImporter implements 
+class ProductSpecificationImporter implements 
     ToCollection, 
     WithHeadingRow, 
     WithBatchInserts,
@@ -72,11 +71,17 @@ class BrandImporter implements
      */
     protected function processRow(array $row, int $rowNumber): void
     {
+        // Skip rows that are empty or only reference data
+        if (empty($row['product_id']) && empty($row['name'])) {
+            $this->importResults['total']--; // Don't count empty rows
+            return;
+        }
+
         // Normalize and validate row data
-        $brandData = $this->normalizeRowData($row);
+        $specificationData = $this->normalizeRowData($row);
         
         // Validate the data
-        $validator = $this->validateRowData($brandData, $rowNumber);
+        $validator = $this->validateRowData($specificationData, $rowNumber);
         
         if ($validator->fails()) {
             $this->importResults['failed']++;
@@ -86,19 +91,29 @@ class BrandImporter implements
             return;
         }
 
-        // Check if brand exists (by name since it should be unique)
-        $existingBrand = Brand::where('name', $brandData['name'])->first();
+        // Check if product exists
+        $product = Product::find($specificationData['product_id']);
+        if (!$product) {
+            $this->importResults['failed']++;
+            $this->importResults['errors'][] = "Baris {$rowNumber}: Product ID {$specificationData['product_id']} tidak ditemukan";
+            return;
+        }
+
+        // Check if specification exists for this product
+        $existingSpecification = ProductSpecification::where('product_id', $specificationData['product_id'])
+            ->where('name', $specificationData['name'])
+            ->first();
         
-        if ($existingBrand) {
+        if ($existingSpecification) {
             if ($this->updateExisting) {
-                $this->updateBrand($existingBrand, $brandData, $rowNumber);
+                $this->updateProductSpecification($existingSpecification, $specificationData, $rowNumber);
             } else {
                 $this->importResults['failed']++;
-                $this->importResults['errors'][] = "Baris {$rowNumber}: Brand '{$brandData['name']}' sudah ada";
+                $this->importResults['errors'][] = "Baris {$rowNumber}: Spesifikasi '{$specificationData['name']}' untuk produk '{$product->name}' sudah ada";
                 return;
             }
         } else {
-            $this->createBrand($brandData, $rowNumber);
+            $this->createProductSpecification($specificationData, $rowNumber);
         }
     }
 
@@ -108,8 +123,8 @@ class BrandImporter implements
     protected function normalizeRowData(array $row): array
     {
         return [
-            'name' => trim($row['nama_brand'] ?? $row['name'] ?? ''),
-            'logo' => trim($row['logo'] ?? ''),
+            'product_id' => (int) ($row['product_id'] ?? 0),
+            'name' => trim($row['name'] ?? ''),
         ];
     }
 
@@ -119,52 +134,51 @@ class BrandImporter implements
     protected function validateRowData(array $data, int $rowNumber)
     {
         return Validator::make($data, [
+            'product_id' => 'required|integer|exists:products,id',
             'name' => 'required|string|max:255',
-            'logo' => 'nullable|string|max:255',
         ], [
-            'name.required' => 'Nama brand wajib diisi',
-            'logo.string' => 'Logo harus berupa text/URL',
+            'product_id.required' => 'Product ID wajib diisi',
+            'product_id.exists' => 'Product ID tidak ditemukan di database',
+            'name.required' => 'Nama spesifikasi wajib diisi',
         ]);
     }
 
     /**
-     * Create new brand
+     * Create new product specification
      */
-    protected function createBrand(array $data, int $rowNumber): void
+    protected function createProductSpecification(array $data, int $rowNumber): void
     {
-        // Create brand
-        $brand = Brand::create([
+        $specification = ProductSpecification::create([
+            'product_id' => $data['product_id'],
             'name' => $data['name'],
-            'logo' => $data['logo'] ?? null,
         ]);
         
         $this->importResults['success']++;
-        Log::info("Brand imported successfully", [
+        Log::info("ProductSpecification imported successfully", [
             'row' => $rowNumber,
-            'brand_id' => $brand->id,
-            'name' => $brand->name
+            'specification_id' => $specification->id,
+            'product_id' => $specification->product_id,
+            'name' => $specification->name
         ]);
     }
 
     /**
-     * Update existing brand
+     * Update existing product specification
      */
-    protected function updateBrand(Brand $brand, array $data, int $rowNumber): void
+    protected function updateProductSpecification(ProductSpecification $specification, array $data, int $rowNumber): void
     {
-        // Update brand data
-        $brand->update([
+        $specification->update([
             'name' => $data['name'],
-            'logo' => $data['logo'] ?? null,
         ]);
         
         $this->importResults['updated']++;
-        Log::info("Brand updated successfully", [
+        Log::info("ProductSpecification updated successfully", [
             'row' => $rowNumber,
-            'brand_id' => $brand->id,
-            'name' => $brand->name
+            'specification_id' => $specification->id,
+            'product_id' => $specification->product_id,
+            'name' => $specification->name
         ]);
     }
-
 
     /**
      * Get import results
@@ -196,8 +210,8 @@ class BrandImporter implements
     public static function getExpectedHeaders(): array
     {
         return [
-            'nama_brand',
-            'logo'
+            'product_id',
+            'name'
         ];
     }
 }

@@ -2,20 +2,21 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Imports\RentalIncludeImporter;
-use App\Filament\Exports\RentalIncludeExporter;
 use App\Filament\Resources\RentalIncludeResource\Pages;
 use App\Filament\Resources\RentalIncludeResource\RelationManagers;
 use App\Models\RentalInclude;
+use App\Services\RentalIncludeImportExportService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Actions\ImportAction;
-use Filament\Tables\Actions\ExportAction;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Table;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 
 class RentalIncludeResource extends Resource
@@ -56,12 +57,98 @@ class RentalIncludeResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->headerActions([
-                ImportAction::make()
-                    ->importer(RentalIncludeImporter::class)
-                    ->label('Import Rental Include'),
-                ExportAction::make()
-                    ->exporter(RentalIncludeExporter::class)
-                    ->label('Export Rental Include'),
+                Action::make('import')
+                    ->label('Import Rental Includes')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('success')
+                    ->form([
+                        Forms\Components\FileUpload::make('file')
+                            ->label('Excel File')
+                            ->acceptedFileTypes(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv'])
+                            ->required(),
+                        Forms\Components\Checkbox::make('update_existing')
+                            ->label('Update existing records')
+                            ->helperText('If checked, existing rental includes will be updated. Otherwise, duplicates will be skipped.'),
+                    ])
+                    ->action(function (array $data) {
+                        try {
+                            $service = new RentalIncludeImportExportService();
+                            $request = new Request();
+                            $request->files->add(['file' => $data['file']]);
+                            $request->merge(['update_existing' => $data['update_existing'] ?? false]);
+                            
+                            $result = $service->importRentalIncludes($request);
+                            
+                            $message = "Import completed! ";
+                            $message .= "Success: {$result['results']['success']}, ";
+                            $message .= "Failed: {$result['results']['failed']}, ";
+                            $message .= "Updated: {$result['results']['updated']}";
+                            
+                            if (!empty($result['results']['errors'])) {
+                                $errorDetails = implode("\n", array_slice($result['results']['errors'], 0, 10));
+                                if (count($result['results']['errors']) > 10) {
+                                    $errorDetails .= "\n... and " . (count($result['results']['errors']) - 10) . " more errors";
+                                }
+                                
+                                Notification::make()
+                                    ->title('Import completed with errors')
+                                    ->body($message . "\n\nFirst few errors:\n" . $errorDetails)
+                                    ->warning()
+                                    ->persistent()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Import successful!')
+                                    ->body($message)
+                                    ->success()
+                                    ->send();
+                            }
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Import failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                    
+                Action::make('export')
+                    ->label('Export Rental Includes')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('primary')
+                    ->action(function () {
+                        try {
+                            $service = new RentalIncludeImportExportService();
+                            $result = $service->exportRentalIncludes();
+                            
+                            return response()->download(Storage::path($result['filepath']), $result['filename']);
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Export failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                    
+                Action::make('download_template')
+                    ->label('Download Template')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('gray')
+                    ->action(function () {
+                        try {
+                            $service = new RentalIncludeImportExportService();
+                            $result = $service->downloadTemplate();
+                            
+                            return response()->download(Storage::path($result['filepath']), $result['filename']);
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Template download failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
             ])
 
             ->columns([

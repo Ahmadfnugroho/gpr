@@ -2,15 +2,15 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Exports\BundlingExporter;
-use App\Filament\Imports\BundlingImporter;
 use App\Filament\Resources\BundlingResource\Pages;
 use App\Models\Bundling;
 use App\Models\Product;
+use App\Services\BundlingImportExportService;
 use Carbon\Carbon;
-use Filament\Tables\Actions\ExportAction;
-use Filament\Tables\Actions\ImportAction;
-use Filament\Actions\Exports\Enums\ExportFormat;
+use Filament\Tables\Actions\Action;
+use Filament\Notifications\Notification;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 use Filament\Forms;
 use Filament\Forms\Components\Builder;
@@ -203,14 +203,98 @@ class BundlingResource extends Resource
             ])
 
             ->headerActions([
-                ExportAction::make()
-                    ->exporter(BundlingExporter::class)
-                    ->formats([
-                        ExportFormat::Xlsx,
-                    ]),
-                ImportAction::make()
-                    ->importer(BundlingImporter::class)
-                    ->label('Import Bundling Product'),
+                Action::make('import')
+                    ->label('Import Bundlings')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('success')
+                    ->form([
+                        Forms\Components\FileUpload::make('file')
+                            ->label('Excel File')
+                            ->acceptedFileTypes(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv'])
+                            ->required(),
+                        Forms\Components\Checkbox::make('update_existing')
+                            ->label('Update existing records')
+                            ->helperText('If checked, existing bundlings will be updated. Otherwise, duplicates will be skipped.'),
+                    ])
+                    ->action(function (array $data) {
+                        try {
+                            $service = new BundlingImportExportService();
+                            $request = new Request();
+                            $request->files->add(['file' => $data['file']]);
+                            $request->merge(['update_existing' => $data['update_existing'] ?? false]);
+                            
+                            $result = $service->importBundlings($request);
+                            
+                            $message = "Import completed! ";
+                            $message .= "Success: {$result['results']['success']}, ";
+                            $message .= "Failed: {$result['results']['failed']}, ";
+                            $message .= "Updated: {$result['results']['updated']}";
+                            
+                            if (!empty($result['results']['errors'])) {
+                                $errorDetails = implode("\n", array_slice($result['results']['errors'], 0, 10));
+                                if (count($result['results']['errors']) > 10) {
+                                    $errorDetails .= "\n... and " . (count($result['results']['errors']) - 10) . " more errors";
+                                }
+                                
+                                Notification::make()
+                                    ->title('Import completed with errors')
+                                    ->body($message . "\n\nFirst few errors:\n" . $errorDetails)
+                                    ->warning()
+                                    ->persistent()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Import successful!')
+                                    ->body($message)
+                                    ->success()
+                                    ->send();
+                            }
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Import failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                    
+                Action::make('export')
+                    ->label('Export Bundlings')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('primary')
+                    ->action(function () {
+                        try {
+                            $service = new BundlingImportExportService();
+                            $result = $service->exportBundlings();
+                            
+                            return response()->download(Storage::path($result['filepath']), $result['filename']);
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Export failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                    
+                Action::make('download_template')
+                    ->label('Download Template')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('gray')
+                    ->action(function () {
+                        try {
+                            $service = new BundlingImportExportService();
+                            $result = $service->downloadTemplate();
+                            
+                            return response()->download(Storage::path($result['filepath']), $result['filename']);
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Template download failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
             ]);
     }
 
