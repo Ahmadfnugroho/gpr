@@ -2,6 +2,7 @@
 
 namespace App\Filament\Imports;
 
+use App\Models\Product;
 use App\Models\ProductPhoto;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
@@ -14,24 +15,29 @@ class ProductPhotoImporter extends Importer
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('product')
+            ImportColumn::make('product_name')
+                ->label('Product Name')
                 ->requiredMapping()
-                ->relationship()
                 ->rules(['required']),
             ImportColumn::make('photo')
+                ->label('Photo')
                 ->requiredMapping()
-                ->rules(['required', 'max:255']),
+                ->rules(['required', 'string', 'max:255']),
         ];
     }
 
     public function resolveRecord(): ?ProductPhoto
     {
-        // return ProductPhoto::firstOrNew([
-        //     // Update existing records, matching them by `$this->data['column_name']`
-        //     'email' => $this->data['email'],
-        // ]);
+        $product = Product::where('name', $this->data['product_name'])->first();
+        
+        if (!$product) {
+            return null;
+        }
 
-        return new ProductPhoto();
+        return ProductPhoto::firstOrNew([
+            'product_id' => $product->id,
+            'photo' => $this->data['photo'],
+        ]);
     }
 
     public static function getCompletedNotificationBody(Import $import): string

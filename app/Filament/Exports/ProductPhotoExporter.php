@@ -14,13 +14,10 @@ class ProductPhotoExporter extends Exporter
     public static function getColumns(): array
     {
         return [
-            ExportColumn::make('id')
-                ->label('ID'),
-            ExportColumn::make('product.name'),
-            ExportColumn::make('photo'),
-            ExportColumn::make('created_at'),
-            ExportColumn::make('updated_at'),
-            ExportColumn::make('deleted_at'),
+            ExportColumn::make('product.name')
+                ->label('Product Name'),
+            ExportColumn::make('photo')
+                ->label('Photo'),
         ];
     }
 

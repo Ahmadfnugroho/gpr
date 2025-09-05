@@ -14,13 +14,10 @@ class BundlingPhotoExporter extends Exporter
     public static function getColumns(): array
     {
         return [
-            ExportColumn::make('id')
-                ->label('ID'),
-            ExportColumn::make('bundling.name'),
-            ExportColumn::make('photo'),
-            ExportColumn::make('deleted_at'),
-            ExportColumn::make('created_at'),
-            ExportColumn::make('updated_at'),
+            ExportColumn::make('bundling.name')
+                ->label('Bundling Name'),
+            ExportColumn::make('photo')
+                ->label('Photo'),
         ];
     }
 

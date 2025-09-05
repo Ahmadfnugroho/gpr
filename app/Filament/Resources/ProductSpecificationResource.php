@@ -5,6 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ProductSpecificationResource\Pages;
 use App\Filament\Resources\ProductSpecificationResource\RelationManagers;
 use App\Services\ProductSpecificationImportExportService;
+use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\ExportAction;
+use App\Filament\Imports\ProductSpecificationImporter;
+use App\Filament\Exports\ProductSpecificationExporter;
 use App\Models\ProductSpecification;
 use App\Models\Product;
 use Filament\Forms;
@@ -62,85 +66,29 @@ class ProductSpecificationResource extends Resource
             ->defaultSort('updated_at', 'desc')
             ->striped()
             ->headerActions([
-                Action::make('downloadTemplate')
-                    ->label('Download Template')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('success')
-                    ->action(function () {
-                        $service = new ProductSpecificationImportExportService();
-                        $filePath = $service->generateTemplate();
-                        return response()->download($filePath, 'product_specification_import_template.xlsx')->deleteFileAfterSend();
-                    }),
-
-                Action::make('import')
-                    ->label('Import Excel')
+                ImportAction::make()
+                    ->importer(ProductSpecificationImporter::class)
+                    ->label('Import Product Specifications')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('primary')
-                    ->form([
-                        FileUpload::make('excel_file')
-                            ->label('Excel File')
-                            ->acceptedFileTypes(['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'])
-                            ->required()
-                            ->maxSize(2048)
-                            ->helperText('Upload Excel file (.xls, .xlsx, .csv). Maximum 2MB'),
-                        Checkbox::make('update_existing')
-                            ->label('Update existing specifications (based on product_id and name)')
-                            ->default(false)
-                            ->helperText('If unchecked, specifications with existing combinations will be skipped')
+                    ->options([
+                        'updateExisting' => false,
                     ])
-                    ->action(function (array $data) {
-                        try {
-                            $service = new ProductSpecificationImportExportService();
-                            $file = $data['excel_file'];
-                            $updateExisting = $data['update_existing'] ?? false;
-
-                            // Convert to UploadedFile if needed
-                            if (is_string($file)) {
-                                $filePath = storage_path('app/public/' . $file);
-                                $file = new \Illuminate\Http\UploadedFile(
-                                    $filePath,
-                                    basename($filePath),
-                                    mime_content_type($filePath),
-                                    null,
-                                    true
-                                );
-                            }
-
-                            $results = $service->importProductSpecifications($file, $updateExisting);
-
-                            $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
-
-                            if (!empty($results['errors'])) {
-                                Notification::make()
-                                    ->title('Import Completed with Errors')
-                                    ->body($message . "\n\nErrors: " . implode(', ', array_slice($results['errors'], 0, 3)))
-                                    ->warning()
-                                    ->send();
-                            } else {
-                                Notification::make()
-                                    ->title('Import Successful')
-                                    ->body($message)
-                                    ->success()
-                                    ->send();
-                            }
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Import Failed')
-                                ->body('Error: ' . $e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-
-                Action::make('export')
-                    ->label('Export All')
+                    ->modalHeading('Import Product Specifications')
+                    ->modalDescription('Upload an Excel file to import product specifications. Make sure your file has the correct format.')
+                    ->modalSubmitActionLabel('Import')
+                    ->successNotificationTitle('Product Specifications imported successfully'),
+                    
+                ExportAction::make()
+                    ->exporter(ProductSpecificationExporter::class)
+                    ->label('Export Product Specifications')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->color('info')
-                    ->action(function () {
-                        $service = new ProductSpecificationImportExportService();
-                        $filePath = $service->exportProductSpecifications();
-                        return response()->download($filePath, 'product_specifications_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
-                    }),
+                    ->color('success')
+                    ->modalHeading('Export Product Specifications')
+                    ->modalDescription('Export all product specifications to an Excel file.')
+                    ->modalSubmitActionLabel('Export')
+                    ->fileName(fn (): string => 'product-specifications-' . date('Y-m-d-H-i-s'))
+                    ->successNotificationTitle('Product Specifications exported successfully'),
             ])
             ->columns([
                 tables\Columns\TextColumn::make('product.name')

@@ -21,12 +21,11 @@ use Filament\Tables\Actions\HeaderActions;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use App\Services\CustomNotificationService;
-use Filament\Actions\ImportAction;
-use Filament\Actions\ExportAction;
 use App\Filament\Imports\ProductImporter;
 use App\Filament\Exports\ProductExporter;
 use Filament\Forms\Components\Checkbox;
-
+use Filament\Tables\Actions\ImportAction;
+use Filament\Tables\Actions\ExportAction;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Forms\Components\Select;
@@ -263,7 +262,7 @@ class ProductResource extends Resource
                     ->modalDescription('Upload an Excel file to import products. Make sure your file has the correct format.')
                     ->modalSubmitActionLabel('Import')
                     ->successNotificationTitle('Products imported successfully'),
-                    
+
                 ExportAction::make()
                     ->exporter(ProductExporter::class)
                     ->label('Export Products')
@@ -272,7 +271,7 @@ class ProductResource extends Resource
                     ->modalHeading('Export Products')
                     ->modalDescription('Export all products to an Excel file.')
                     ->modalSubmitActionLabel('Export')
-                    ->fileName(fn (): string => 'products-' . date('Y-m-d-H-i-s'))
+                    ->fileName(fn(): string => 'products-' . date('Y-m-d-H-i-s'))
                     ->successNotificationTitle('Products exported successfully'),
             ])
 

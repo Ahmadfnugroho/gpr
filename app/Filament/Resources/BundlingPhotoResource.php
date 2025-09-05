@@ -2,24 +2,23 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Exports\BundlingPhotoExporter;
+use App\Filament\Imports\BundlingPhotoImporter;
 use App\Filament\Resources\BundlingPhotoResource\Pages;
 use App\Filament\Resources\BundlingPhotoResource\RelationManagers;
 use App\Models\BundlingPhoto;
-use App\Services\BundlingPhotoImportExportService;
 use Filament\Forms;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\ExportAction;
+use Filament\Tables\Actions\ImportAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
-use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 
 class BundlingPhotoResource extends Resource
@@ -61,98 +60,10 @@ class BundlingPhotoResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->headerActions([
-                Action::make('import')
-                    ->label('Import Bundling Photos')
-                    ->icon('heroicon-o-arrow-up-tray')
-                    ->color('success')
-                    ->form([
-                        Forms\Components\FileUpload::make('file')
-                            ->label('Excel File')
-                            ->acceptedFileTypes(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv'])
-                            ->required(),
-                        Forms\Components\Checkbox::make('update_existing')
-                            ->label('Update existing records')
-                            ->helperText('If checked, existing photos will be updated. Otherwise, duplicates will be skipped.'),
-                    ])
-                    ->action(function (array $data) {
-                        try {
-                            $service = new BundlingPhotoImportExportService();
-                            $request = new Request();
-                            $request->files->add(['file' => $data['file']]);
-                            $request->merge(['update_existing' => $data['update_existing'] ?? false]);
-                            
-                            $result = $service->importBundlingPhotos($request);
-                            
-                            $message = "Import completed! ";
-                            $message .= "Success: {$result['results']['success']}, ";
-                            $message .= "Failed: {$result['results']['failed']}, ";
-                            $message .= "Updated: {$result['results']['updated']}";
-                            
-                            if (!empty($result['results']['errors'])) {
-                                $errorDetails = implode("\n", array_slice($result['results']['errors'], 0, 10));
-                                if (count($result['results']['errors']) > 10) {
-                                    $errorDetails .= "\n... and " . (count($result['results']['errors']) - 10) . " more errors";
-                                }
-                                
-                                Notification::make()
-                                    ->title('Import completed with errors')
-                                    ->body($message . "\n\nFirst few errors:\n" . $errorDetails)
-                                    ->warning()
-                                    ->persistent()
-                                    ->send();
-                            } else {
-                                Notification::make()
-                                    ->title('Import successful!')
-                                    ->body($message)
-                                    ->success()
-                                    ->send();
-                            }
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Import failed')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-                    
-                Action::make('export')
-                    ->label('Export Bundling Photos')
-                    ->icon('heroicon-o-arrow-down-tray')
-                    ->color('primary')
-                    ->action(function () {
-                        try {
-                            $service = new BundlingPhotoImportExportService();
-                            $result = $service->exportBundlingPhotos();
-                            
-                            return response()->download(Storage::path($result['filepath']), $result['filename']);
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Export failed')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-                    
-                Action::make('download_template')
-                    ->label('Download Template')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('gray')
-                    ->action(function () {
-                        try {
-                            $service = new BundlingPhotoImportExportService();
-                            $result = $service->downloadTemplate();
-                            
-                            return response()->download(Storage::path($result['filepath']), $result['filename']);
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Template download failed')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
+                ImportAction::make()
+                    ->importer(BundlingPhotoImporter::class),
+                ExportAction::make()
+                    ->exporter(BundlingPhotoExporter::class),
             ])
 
             ->columns([

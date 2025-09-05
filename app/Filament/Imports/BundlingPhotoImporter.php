@@ -2,6 +2,7 @@
 
 namespace App\Filament\Imports;
 
+use App\Models\Bundling;
 use App\Models\BundlingPhoto;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
@@ -14,29 +15,34 @@ class BundlingPhotoImporter extends Importer
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('bundling')
+            ImportColumn::make('bundling_name')
+                ->label('Bundling Name')
                 ->requiredMapping()
-                ->relationship()
                 ->rules(['required']),
             ImportColumn::make('photo')
+                ->label('Photo')
                 ->requiredMapping()
-                ->rules(['required', 'max:255']),
+                ->rules(['required', 'string', 'max:255']),
         ];
     }
 
     public function resolveRecord(): ?BundlingPhoto
     {
-        // return BundlingPhoto::firstOrNew([
-        //     // Update existing records, matching them by `$this->data['column_name']`
-        //     'email' => $this->data['email'],
-        // ]);
+        $bundling = Bundling::where('name', $this->data['bundling_name'])->first();
+        
+        if (!$bundling) {
+            return null;
+        }
 
-        return new BundlingPhoto();
+        return BundlingPhoto::firstOrNew([
+            'bundling_id' => $bundling->id,
+            'photo' => $this->data['photo'],
+        ]);
     }
 
     public static function getCompletedNotificationBody(Import $import): string
     {
-        $body = 'Your product photo import has completed and ' . number_format($import->successful_rows) . ' ' . str('row')->plural($import->successful_rows) . ' imported.';
+        $body = 'Your bundling photo import has completed and ' . number_format($import->successful_rows) . ' ' . str('row')->plural($import->successful_rows) . ' imported.';
 
         if ($failedRowsCount = $import->getFailedRowsCount()) {
             $body .= ' ' . number_format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to import.';
