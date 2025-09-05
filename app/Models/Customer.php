@@ -20,7 +20,7 @@ class Customer extends Authenticatable implements MustVerifyEmail
     public const STATUS_ACTIVE = 'active';
     public const STATUS_INACTIVE = 'inactive';
     public const STATUS_BLACKLIST = 'blacklist';
-    
+
     public const AVAILABLE_STATUSES = [
         self::STATUS_ACTIVE,
         self::STATUS_INACTIVE,

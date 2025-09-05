@@ -60,6 +60,15 @@ return new class extends Migration
         });
 
         // Customer phone numbers
+        Schema::create('customer_phone_numbers', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('customer_id')->constrained()->cascadeOnDelete();
+            $table->string('phone_number', 20);
+            $table->boolean('is_primary')->default(false);
+            $table->timestamps();
+
+            $table->index(['customer_id', 'phone_number']);
+        });
     }
 
     /**
