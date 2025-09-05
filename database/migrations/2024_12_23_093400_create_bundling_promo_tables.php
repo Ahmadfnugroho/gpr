@@ -14,23 +14,20 @@ return new class extends Migration
     {
 
         // Promos table
+
         Schema::create('promos', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('code')->unique();
-            $table->text('description')->nullable();
-            $table->enum('type', ['percentage', 'fixed']);
-            $table->unsignedInteger('value');
-            $table->unsignedInteger('min_transaction')->nullable();
-            $table->unsignedInteger('max_discount')->nullable();
-            $table->datetime('valid_from');
-            $table->datetime('valid_until');
+            $table->string('nominal')->nullable();
+            $table->string('type')->nullable(); // Contoh: 'day_based', 'percentage', dll.
+            $table->json('rules')->nullable();
             $table->boolean('active')->default(true);
             $table->timestamps();
-            
-            $table->index('code');
-            $table->index(['active', 'valid_from', 'valid_until']);
         });
+
+        /**
+         * Reverse the migrations.
+         */
 
         // Bundlings table
         Schema::create('bundlings', function (Blueprint $table) {
@@ -41,7 +38,7 @@ return new class extends Migration
             $table->unsignedInteger('price');
             $table->boolean('active')->default(true);
             $table->timestamps();
-            
+
             $table->index('slug');
             $table->index('active');
         });
@@ -53,7 +50,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->unsignedInteger('quantity')->default(1);
             $table->timestamps();
-            
+
             $table->index(['bundling_id', 'product_id']);
         });
 
@@ -64,7 +61,7 @@ return new class extends Migration
             $table->string('photo');
             $table->softDeletes();
             $table->timestamps();
-            
+
             $table->index('bundling_id');
         });
     }

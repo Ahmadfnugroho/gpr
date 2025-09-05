@@ -63,7 +63,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('transaction_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('bundling_id')->nullable()->constrained('bundlings')->cascadeOnDelete();
+            $table->unsignedBigInteger('bundling_id')->nullable(); // FK constraint added in later migration
             $table->unsignedInteger('quantity');
             $table->unsignedInteger('unit_price');
             $table->unsignedInteger('total_price');

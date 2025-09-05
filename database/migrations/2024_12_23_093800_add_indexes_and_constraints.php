@@ -48,6 +48,10 @@ return new class extends Migration
             $table->foreign('customer_id')->references('id')->on('customers')->onDelete('cascade');
             $table->foreign('promo_id')->references('id')->on('promos')->onDelete('cascade');
         });
+        
+        Schema::table('detail_transactions', function (Blueprint $table) {
+            $table->foreign('bundling_id')->references('id')->on('bundlings')->onDelete('cascade');
+        });
     }
 
     /**
