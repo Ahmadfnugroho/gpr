@@ -6,6 +6,7 @@ use App\Models\Customer;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
+use Illuminate\Database\Eloquent\Model;
 
 class CustomerImporter extends Importer
 {
@@ -104,6 +105,15 @@ class CustomerImporter extends Importer
         }
 
         return $body;
+    }
+
+    public function fillRecord(): void
+    {
+        // Get data but exclude phone numbers from mass assignment
+        $fillableData = collect($this->data)->except(['phone_number_1', 'phone_number_2'])->toArray();
+        
+        // Fill the record with safe data only
+        $this->record->fill($fillableData);
     }
 
     protected function beforeSave(): void
