@@ -219,7 +219,7 @@ class BundlingResource extends Resource
                     ->modalDescription('Upload an Excel file to import bundlings. Make sure your file has the correct format.')
                     ->modalSubmitActionLabel('Import')
                     ->successNotificationTitle('Bundlings imported successfully'),
-                    
+
                 ExportAction::make()
                     ->exporter(BundlingExporter::class)
                     ->label('Export Bundlings')
@@ -228,10 +228,11 @@ class BundlingResource extends Resource
                     ->modalHeading('Export Bundlings')
                     ->modalDescription('Export all bundlings to an Excel file.')
                     ->modalSubmitActionLabel('Export')
-                    ->fileName(fn (): string => 'bundlings-' . date('Y-m-d-H-i-s'))
+                    ->fileName(fn(): string => 'bundlings-' . date('Y-m-d-H-i-s'))
                     ->successNotificationTitle('Bundlings exported successfully'),
-            ])
+            ]);
     }
+
 
     public static function getRelations(): array
     {
