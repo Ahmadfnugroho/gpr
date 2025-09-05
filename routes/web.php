@@ -104,3 +104,6 @@ Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
         Route::get('/logs', [App\Http\Controllers\Admin\WhatsAppController::class, 'getSessionLogs'])->name('logs');
     });
 });
+
+// Include import error handling routes
+require __DIR__.'/import.php';
