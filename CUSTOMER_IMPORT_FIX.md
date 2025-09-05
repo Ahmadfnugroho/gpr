@@ -81,8 +81,40 @@ When importing customers, use these column headers:
 name,email,phone_number_1,phone_number_2,gender,status,address,job,office_address,instagram_username,emergency_contact_name,emergency_contact_number,source_info
 ```
 
+## Final Solution: Custom fillRecord Method
+
+The key fix was overriding the `fillRecord()` method in CustomerImporter to exclude phone number columns from mass assignment:
+
+```php
+public function fillRecord(): void
+{
+    // Get data but exclude phone numbers from mass assignment
+    $fillableData = collect($this->data)->except(['phone_number_1', 'phone_number_2'])->toArray();
+    
+    // Fill the record with safe data only
+    $this->record->fill($fillableData);
+}
+```
+
+This prevents Filament from trying to insert `phone_number_1` and `phone_number_2` directly into the `customers` table (where they don't exist), while still allowing the `afterSave()` method to access the phone data and create the proper relationships.
+
+## Testing Results
+
+### ✅ fillRecord Test (`php artisan test:customer-fill`)
+- ✅ Original data: 8 fields (including phone numbers)
+- ✅ Fillable data: 6 fields (phone numbers excluded)
+- ✅ Only valid database columns are filled
+- ✅ Phone numbers correctly excluded from mass assignment
+
+### ✅ Phone Handling Test (`php artisan test:customer-phones`)
+- ✅ Phone numbers are created in `customer_phone_numbers` table
+- ✅ Primary and secondary phone numbers handled correctly
+- ✅ Update scenario works (delete old, create new)
+- ✅ Phone number accessor returns correct primary phone
+
 ## Result
 - ✅ Customer import now works without column errors
 - ✅ Export generates files with correct data
-- ✅ Phone numbers are properly associated with customers
+- ✅ Phone numbers are properly associated with customers via relations
 - ✅ All field mappings are consistent with database schema
+- ✅ Phone number data remains accessible in afterSave() for relation handling

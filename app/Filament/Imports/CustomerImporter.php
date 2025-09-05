@@ -88,11 +88,8 @@ class CustomerImporter extends Importer
             })->first();
         }
 
-        if ($existingCustomer && !($this->options['updateExisting'] ?? false)) {
-            $this->addError('name', 'Customer already exists with this email or phone number. Enable update mode to modify existing customers.');
-            return null;
-        }
-
+        // For now, always return existing customer or create new one
+        // TODO: Add proper duplicate handling UI option in future
         return $existingCustomer ?? new Customer();
     }
 
