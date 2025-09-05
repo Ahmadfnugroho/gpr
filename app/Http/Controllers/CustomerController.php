@@ -246,7 +246,7 @@ class CustomerController extends Controller
     public function import(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'excel_file' => 'required|file|mimes:xlsx,xls,csv|max:2048',
+            'excel_file' => 'required|file|mimes:xlsx,xls,csv|max:15360', // 15MB max
             'update_existing' => 'nullable|boolean'
         ]);
 
@@ -269,21 +269,80 @@ class CustomerController extends Controller
                                ->withInput();
             }
 
-            // Import customers
+            // Use SYNC-ONLY import with extreme optimization (NO QUEUE NEEDED)
+            
+            // Set PROGRESSIVE limits based on file size for optimal performance
+            $fileSize = $file->getSize();
+            $estimatedRows = intval($fileSize / 250); // Rough estimate: 250 bytes per row
+            
+            \Log::info('Starting customer import', [
+                'file_name' => $file->getClientOriginalName(),
+                'file_size' => round($fileSize / 1024 / 1024, 2) . 'MB',
+                'estimated_rows' => $estimatedRows,
+                'user_id' => auth()->id()
+            ]);
+            
+            // Set AGGRESSIVE limits based on file size
+            if ($fileSize > 10 * 1024 * 1024) { // > 10MB
+                ini_set('memory_limit', '3G');
+                ini_set('max_execution_time', '1800'); // 30 minutes
+                set_time_limit(1800);
+            } elseif ($fileSize > 5 * 1024 * 1024) { // > 5MB
+                ini_set('memory_limit', '2G');
+                ini_set('max_execution_time', '900'); // 15 minutes
+                set_time_limit(900);
+            } elseif ($fileSize > 2 * 1024 * 1024) { // > 2MB
+                ini_set('memory_limit', '1G');
+                ini_set('max_execution_time', '600'); // 10 minutes
+                set_time_limit(600);
+            } elseif ($fileSize > 1024 * 1024) { // > 1MB
+                ini_set('memory_limit', '512M');
+                ini_set('max_execution_time', '300'); // 5 minutes
+                set_time_limit(300);
+            } else {
+                ini_set('memory_limit', '256M');
+                ini_set('max_execution_time', '120'); // 2 minutes
+                set_time_limit(120);
+            }
+            
+            // Ignore user abort and connection issues
+            ignore_user_abort(true);
+            
+            // Track performance
+            $startTime = microtime(true);
+            $startMemory = memory_get_usage(true);
+            
+            // Import with optimized sync method
             $results = $this->importExportService->importCustomers($file, $updateExisting);
-
-            $message = "Import selesai. ";
+            
+            // Calculate performance metrics
+            $endTime = microtime(true);
+            $endMemory = memory_get_peak_usage(true);
+            $executionTime = $endTime - $startTime;
+            
+            \Log::info('Customer import completed', [
+                'execution_time' => round($executionTime, 2) . 's',
+                'memory_peak' => round($endMemory / 1024 / 1024, 2) . 'MB',
+                'result' => $results
+            ]);
+            
+            $message = "Import selesai! ";
             $message .= "Total: {$results['total']}, ";
             $message .= "Berhasil: {$results['success']}, ";
             $message .= "Diperbarui: {$results['updated']}, ";
             $message .= "Gagal: {$results['failed']}";
-
+            $message .= " (Waktu: " . round($executionTime, 1) . "s, Memory: " . round($endMemory / 1024 / 1024, 2) . "MB)";
+            
+            if (isset($results['processing_time'])) {
+                $message .= " - Detail: {$results['processing_time']}";
+            }
+            
             if (!empty($results['errors'])) {
                 return redirect()->route('customers.index')
                                ->with('warning', $message)
                                ->with('import_errors', $results['errors']);
             }
-
+            
             return redirect()->route('customers.index')
                            ->with('success', $message);
 

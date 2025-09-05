@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\ImportStatusController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\SubCategoryController;
@@ -59,4 +60,11 @@ Route::middleware(['api_key', 'throttle:60,1'])->group(function () {
     Route::apiResource('/transactions-check', TransactionCheckController::class);
     Route::post('/transaction', [TransactionController::class, 'store']);
     Route::post('/check-transaction', [TransactionController::class, 'DetailTransaction']);
+});
+
+// Import Status API Routes (for checking async import progress)
+Route::prefix('import')->group(function () {
+    Route::get('status/{importId}', [ImportStatusController::class, 'getStatus']);
+    Route::get('results/{importId}', [ImportStatusController::class, 'getResults']);
+    Route::get('queue-status', [ImportStatusController::class, 'checkQueueStatus']);
 });

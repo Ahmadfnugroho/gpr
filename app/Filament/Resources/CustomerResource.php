@@ -242,22 +242,48 @@ class CustomerResource extends Resource
                                 );
                             }
 
-                            $results = $service->importCustomers($file, $updateExisting);
-
-                            $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
-
-                            if (!empty($results['errors'])) {
-                                Notification::make()
-                                    ->title('Import Completed with Errors')
-                                    ->body($message . "\n\nErrors: " . implode(', ', array_slice($results['errors'], 0, 3)))
-                                    ->warning()
-                                    ->send();
+                            // Check file size for import strategy
+                            if ($file instanceof \Illuminate\Http\UploadedFile && $file->getSize() > 1024 * 1024) {
+                                // Use async import for large files (> 1MB)
+                                $result = $service->importCustomersAsync(
+                                    $file, 
+                                    $updateExisting, 
+                                    auth()->id()
+                                );
+                                
+                                if ($result['queued']) {
+                                    Notification::make()
+                                        ->title('Import Started')
+                                        ->body('Large file import is being processed in background. Import ID: ' . $result['import_id'])
+                                        ->info()
+                                        ->duration(8000)
+                                        ->send();
+                                } else {
+                                    Notification::make()
+                                        ->title('Import Failed to Start')
+                                        ->body($result['message'] ?? 'Failed to queue import job')
+                                        ->danger()
+                                        ->send();
+                                }
                             } else {
-                                Notification::make()
-                                    ->title('Import Successful')
-                                    ->body($message)
-                                    ->success()
-                                    ->send();
+                                // Use sync import for small files
+                                $results = $service->importCustomers($file, $updateExisting);
+                                
+                                $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
+                                
+                                if (!empty($results['errors'])) {
+                                    Notification::make()
+                                        ->title('Import Completed with Errors')
+                                        ->body($message . "\n\nErrors: " . implode(', ', array_slice($results['errors'], 0, 3)))
+                                        ->warning()
+                                        ->send();
+                                } else {
+                                    Notification::make()
+                                        ->title('Import Successful')
+                                        ->body($message)
+                                        ->success()
+                                        ->send();
+                                }
                             }
                         } catch (\Exception $e) {
                             Notification::make()
