@@ -63,7 +63,7 @@ class ApiKeyPolicy
      */
     public function forceDelete(User $user, ApiKey $apiKey): bool
     {
-        return $user->can('{{ ForceDelete }}');
+        return $user->can('force_delete_api::key');
     }
 
     /**
@@ -79,7 +79,7 @@ class ApiKeyPolicy
      */
     public function restore(User $user, ApiKey $apiKey): bool
     {
-        return $user->can('{{ Restore }}');
+        return $user->can('restore_api::key');
     }
 
     /**
@@ -87,7 +87,7 @@ class ApiKeyPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('{{ RestoreAny }}');
+        return $user->can('restore_any_api::key');
     }
 
     /**
@@ -95,7 +95,7 @@ class ApiKeyPolicy
      */
     public function replicate(User $user, ApiKey $apiKey): bool
     {
-        return $user->can('{{ Replicate }}');
+        return $user->can('replicate_api::key');
     }
 
     /**
@@ -103,6 +103,6 @@ class ApiKeyPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('{{ Reorder }}');
+        return $user->can('reorder_api::key');
     }
 }

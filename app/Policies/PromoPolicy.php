@@ -63,7 +63,7 @@ class PromoPolicy
      */
     public function forceDelete(User $user, Promo $promo): bool
     {
-        return $user->can('{{ ForceDelete }}');
+        return $user->can('force_delete_promo');
     }
 
     /**
@@ -79,7 +79,7 @@ class PromoPolicy
      */
     public function restore(User $user, Promo $promo): bool
     {
-        return $user->can('{{ Restore }}');
+        return $user->can('restore_promo');
     }
 
     /**
@@ -87,7 +87,7 @@ class PromoPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('{{ RestoreAny }}');
+        return $user->can('restore_any_promo');
     }
 
     /**
@@ -95,7 +95,7 @@ class PromoPolicy
      */
     public function replicate(User $user, Promo $promo): bool
     {
-        return $user->can('{{ Replicate }}');
+        return $user->can('replicate_promo');
     }
 
     /**
@@ -103,6 +103,6 @@ class PromoPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('{{ Reorder }}');
+        return $user->can('reorder_promo');
     }
 }

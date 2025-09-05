@@ -63,7 +63,7 @@ class CustomerPhotoPolicy
      */
     public function forceDelete(User $user, CustomerPhoto $customerPhoto): bool
     {
-        return $user->can('{{ ForceDelete }}');
+        return $user->can('force_delete_customer::photo');
     }
 
     /**
@@ -79,7 +79,7 @@ class CustomerPhotoPolicy
      */
     public function restore(User $user, CustomerPhoto $customerPhoto): bool
     {
-        return $user->can('{{ Restore }}');
+        return $user->can('restore_customer::photo');
     }
 
     /**
@@ -87,7 +87,7 @@ class CustomerPhotoPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('{{ RestoreAny }}');
+        return $user->can('restore_any_customer::photo');
     }
 
     /**
@@ -95,7 +95,7 @@ class CustomerPhotoPolicy
      */
     public function replicate(User $user, CustomerPhoto $customerPhoto): bool
     {
-        return $user->can('{{ Replicate }}');
+        return $user->can('replicate_customer::photo');
     }
 
     /**
@@ -103,6 +103,6 @@ class CustomerPhotoPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('{{ Reorder }}');
+        return $user->can('reorder_customer::photo');
     }
 }

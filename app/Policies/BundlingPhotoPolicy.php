@@ -63,7 +63,7 @@ class BundlingPhotoPolicy
      */
     public function forceDelete(User $user, BundlingPhoto $bundlingPhoto): bool
     {
-        return $user->can('{{ ForceDelete }}');
+        return $user->can('force_delete_bundling::photo');
     }
 
     /**
@@ -79,7 +79,7 @@ class BundlingPhotoPolicy
      */
     public function restore(User $user, BundlingPhoto $bundlingPhoto): bool
     {
-        return $user->can('{{ Restore }}');
+        return $user->can('restore_bundling::photo');
     }
 
     /**
@@ -87,7 +87,7 @@ class BundlingPhotoPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('{{ RestoreAny }}');
+        return $user->can('restore_any_bundling::photo');
     }
 
     /**
@@ -95,7 +95,7 @@ class BundlingPhotoPolicy
      */
     public function replicate(User $user, BundlingPhoto $bundlingPhoto): bool
     {
-        return $user->can('{{ Replicate }}');
+        return $user->can('replicate_bundling::photo');
     }
 
     /**
@@ -103,6 +103,6 @@ class BundlingPhotoPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('{{ Reorder }}');
+        return $user->can('reorder_bundling::photo');
     }
 }

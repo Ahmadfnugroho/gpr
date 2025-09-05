@@ -63,7 +63,7 @@ class SubCategoryPolicy
      */
     public function forceDelete(User $user, SubCategory $subCategory): bool
     {
-        return $user->can('{{ ForceDelete }}');
+        return $user->can('force_delete_sub::category');
     }
 
     /**
@@ -79,7 +79,7 @@ class SubCategoryPolicy
      */
     public function restore(User $user, SubCategory $subCategory): bool
     {
-        return $user->can('{{ Restore }}');
+        return $user->can('restore_sub::category');
     }
 
     /**
@@ -87,7 +87,7 @@ class SubCategoryPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('{{ RestoreAny }}');
+        return $user->can('restore_any_sub::category');
     }
 
     /**
@@ -95,7 +95,7 @@ class SubCategoryPolicy
      */
     public function replicate(User $user, SubCategory $subCategory): bool
     {
-        return $user->can('{{ Replicate }}');
+        return $user->can('replicate_sub::category');
     }
 
     /**
@@ -103,6 +103,6 @@ class SubCategoryPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('{{ Reorder }}');
+        return $user->can('reorder_sub::category');
     }
 }

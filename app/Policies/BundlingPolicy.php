@@ -63,7 +63,7 @@ class BundlingPolicy
      */
     public function forceDelete(User $user, Bundling $bundling): bool
     {
-        return $user->can('{{ ForceDelete }}');
+        return $user->can('force_delete_bundling');
     }
 
     /**
@@ -79,7 +79,7 @@ class BundlingPolicy
      */
     public function restore(User $user, Bundling $bundling): bool
     {
-        return $user->can('{{ Restore }}');
+        return $user->can('restore_bundling');
     }
 
     /**
@@ -87,7 +87,7 @@ class BundlingPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('{{ RestoreAny }}');
+        return $user->can('restore_any_bundling');
     }
 
     /**
@@ -95,7 +95,7 @@ class BundlingPolicy
      */
     public function replicate(User $user, Bundling $bundling): bool
     {
-        return $user->can('{{ Replicate }}');
+        return $user->can('replicate_bundling');
     }
 
     /**
@@ -103,6 +103,6 @@ class BundlingPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('{{ Reorder }}');
+        return $user->can('reorder_bundling');
     }
 }

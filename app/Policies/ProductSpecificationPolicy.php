@@ -63,7 +63,7 @@ class ProductSpecificationPolicy
      */
     public function forceDelete(User $user, ProductSpecification $productSpecification): bool
     {
-        return $user->can('{{ ForceDelete }}');
+        return $user->can('force_delete_product::specification');
     }
 
     /**
@@ -79,7 +79,7 @@ class ProductSpecificationPolicy
      */
     public function restore(User $user, ProductSpecification $productSpecification): bool
     {
-        return $user->can('{{ Restore }}');
+        return $user->can('restore_product::specification');
     }
 
     /**
@@ -87,7 +87,7 @@ class ProductSpecificationPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('{{ RestoreAny }}');
+        return $user->can('restore_any_product::specification');
     }
 
     /**
@@ -95,7 +95,7 @@ class ProductSpecificationPolicy
      */
     public function replicate(User $user, ProductSpecification $productSpecification): bool
     {
-        return $user->can('{{ Replicate }}');
+        return $user->can('replicate_product::specification');
     }
 
     /**
@@ -103,6 +103,6 @@ class ProductSpecificationPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('{{ Reorder }}');
+        return $user->can('reorder_product::specification');
     }
 }
