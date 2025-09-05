@@ -15,8 +15,8 @@ class ProductPhotoImporter extends Importer
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('product_name')
-                ->label('Product Name')
+            ImportColumn::make('product_id')
+                ->label('Product ID')
                 ->requiredMapping()
                 ->rules(['required']),
             ImportColumn::make('photo')
@@ -28,8 +28,8 @@ class ProductPhotoImporter extends Importer
 
     public function resolveRecord(): ?ProductPhoto
     {
-        $product = Product::where('name', $this->data['product_name'])->first();
-        
+        $product = Product::where('id', $this->data['product_id'])->first();
+
         if (!$product) {
             return null;
         }

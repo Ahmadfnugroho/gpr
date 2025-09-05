@@ -15,8 +15,8 @@ class BundlingPhotoImporter extends Importer
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('bundling_name')
-                ->label('Bundling Name')
+            ImportColumn::make('bundling_id')
+                ->label('Bundling Id')
                 ->requiredMapping()
                 ->rules(['required']),
             ImportColumn::make('photo')
@@ -28,8 +28,8 @@ class BundlingPhotoImporter extends Importer
 
     public function resolveRecord(): ?BundlingPhoto
     {
-        $bundling = Bundling::where('name', $this->data['bundling_name'])->first();
-        
+        $bundling = Bundling::where('id', $this->data['bundling_id'])->first();
+
         if (!$bundling) {
             return null;
         }

@@ -65,7 +65,7 @@ class ProductAvailabilityResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->modifyQueryUsing(function (Builder $query) {
-                return $query->with(['productItems']);
+                return $query->with(['items']);
             })
             ->columns([
                 TextColumn::make('name')
@@ -78,7 +78,7 @@ class ProductAvailabilityResource extends Resource
                 TextColumn::make('total_items')
                     ->label('Total Items')
                     ->getStateUsing(function ($record) {
-                        return $record->productItems()->count();
+                        return $record->items()->count();
                     })
                     ->alignCenter()
                     ->sortable(false),
@@ -98,7 +98,7 @@ class ProductAvailabilityResource extends Resource
                     })
                     ->alignCenter()
                     ->color(function ($state, $record) {
-                        $total = $record->productItems()->count();
+                        $total = $record->items()->count();
                         if ($total == 0) return 'gray';
                         $percentage = ($state / $total) * 100;
                         if ($percentage >= 70) return 'success';
@@ -194,7 +194,7 @@ class ProductAvailabilityResource extends Resource
                         $startDate = request('tableFilters.date_range.start_date', now()->format('Y-m-d'));
                         $endDate = request('tableFilters.date_range.end_date', now()->addDays(7)->format('Y-m-d'));
 
-                        return $query->whereHas('productItems', function ($q) use ($startDate, $endDate) {
+                        return $query->whereHas('items', function ($q) use ($startDate, $endDate) {
                             $q->whereNotExists(function ($subQuery) use ($startDate, $endDate) {
                                 $subQuery->select('*')
                                     ->from('detail_transaction_product_items as dtpi')

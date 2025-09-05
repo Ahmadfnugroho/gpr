@@ -33,6 +33,8 @@ return new class extends Migration
         Schema::create('bundlings', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('custom_id')->unique()->nullable();
+
             $table->string('slug')->unique();
             $table->text('description')->nullable();
             $table->unsignedInteger('price');
