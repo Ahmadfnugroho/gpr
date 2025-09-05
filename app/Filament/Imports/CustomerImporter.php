@@ -14,7 +14,7 @@ class CustomerImporter extends Importer
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('nama_lengkap')
+            ImportColumn::make('name')
                 ->label('Nama Lengkap')
                 ->requiredMapping()
                 ->rules(['required', 'string', 'max:255']),
@@ -23,16 +23,16 @@ class CustomerImporter extends Importer
                 ->label('Email')
                 ->rules(['nullable', 'email', 'max:255']),
 
-            ImportColumn::make('nomor_hp_1')
+            ImportColumn::make('phone_number_1')
                 ->label('Nomor HP 1')
                 ->requiredMapping()
                 ->rules(['required', 'string', 'max:20']),
 
-            ImportColumn::make('nomor_hp_2')
+            ImportColumn::make('phone_number_2')
                 ->label('Nomor HP 2')
                 ->rules(['nullable', 'string', 'max:20']),
 
-            ImportColumn::make('jenis_kelamin')
+            ImportColumn::make('gender')
                 ->label('Jenis Kelamin')
                 ->rules(['nullable', 'in:male,female,laki-laki,perempuan,l,p'])
                 ->example('male'),
@@ -42,31 +42,31 @@ class CustomerImporter extends Importer
                 ->rules(['nullable', 'in:active,inactive,blacklist'])
                 ->example('active'),
 
-            ImportColumn::make('alamat')
+            ImportColumn::make('address')
                 ->label('Alamat')
                 ->rules(['nullable', 'string']),
 
-            ImportColumn::make('pekerjaan')
+            ImportColumn::make('job')
                 ->label('Pekerjaan')
                 ->rules(['nullable', 'string', 'max:255']),
 
-            ImportColumn::make('alamat_kantor')
+            ImportColumn::make('office_address')
                 ->label('Alamat Kantor')
                 ->rules(['nullable', 'string']),
 
-            ImportColumn::make('instagram')
+            ImportColumn::make('instagram_username')
                 ->label('Instagram')
                 ->rules(['nullable', 'string', 'max:255']),
 
-            ImportColumn::make('kontak_emergency')
+            ImportColumn::make('emergency_contact_name')
                 ->label('Kontak Emergency')
                 ->rules(['nullable', 'string', 'max:255']),
 
-            ImportColumn::make('hp_emergency')
+            ImportColumn::make('emergency_contact_number')
                 ->label('HP Emergency')
                 ->rules(['nullable', 'string', 'max:20']),
 
-            ImportColumn::make('sumber_info')
+            ImportColumn::make('source_info')
                 ->label('Sumber Info')
                 ->rules(['nullable', 'string', 'max:255']),
         ];
@@ -81,14 +81,14 @@ class CustomerImporter extends Importer
             $existingCustomer = Customer::where('email', $this->data['email'])->first();
         }
         
-        if (!$existingCustomer && !empty($this->data['nomor_hp_1'])) {
+        if (!$existingCustomer && !empty($this->data['phone_number_1'])) {
             $existingCustomer = Customer::whereHas('customerPhoneNumbers', function($query) {
-                $query->where('phone_number', $this->data['nomor_hp_1']);
+                $query->where('phone_number', $this->data['phone_number_1']);
             })->first();
         }
 
         if ($existingCustomer && !($this->options['updateExisting'] ?? false)) {
-            $this->addError('nama_lengkap', 'Customer already exists with this email or phone number. Enable update mode to modify existing customers.');
+            $this->addError('name', 'Customer already exists with this email or phone number. Enable update mode to modify existing customers.');
             return null;
         }
 
@@ -108,20 +108,9 @@ class CustomerImporter extends Importer
 
     protected function beforeSave(): void
     {
-        // Map imported columns to database fields
-        $this->record->name = $this->data['nama_lengkap'];
-        $this->record->email = $this->data['email'] ?? null;
-        $this->record->address = $this->data['alamat'] ?? null;
-        $this->record->job = $this->data['pekerjaan'] ?? null;
-        $this->record->office_address = $this->data['alamat_kantor'] ?? null;
-        $this->record->instagram_username = $this->data['instagram'] ?? null;
-        $this->record->emergency_contact_name = $this->data['kontak_emergency'] ?? null;
-        $this->record->emergency_contact_number = $this->data['hp_emergency'] ?? null;
-        $this->record->source_info = $this->data['sumber_info'] ?? null;
-        
         // Convert gender if needed
-        if (!empty($this->data['jenis_kelamin'])) {
-            $gender = strtolower(trim($this->data['jenis_kelamin']));
+        if (!empty($this->data['gender'])) {
+            $gender = strtolower(trim($this->data['gender']));
             if (in_array($gender, ['l', 'laki-laki', 'male', 'pria'])) {
                 $this->record->gender = 'male';
             } elseif (in_array($gender, ['p', 'perempuan', 'female', 'wanita'])) {
@@ -130,9 +119,7 @@ class CustomerImporter extends Importer
         }
         
         // Set status
-        if (!empty($this->data['status'])) {
-            $this->record->status = $this->data['status'];
-        } else {
+        if (empty($this->data['status'])) {
             $this->record->status = Customer::STATUS_ACTIVE;
         }
     }
@@ -151,16 +138,16 @@ class CustomerImporter extends Importer
         }
 
         // Add primary phone number
-        if (!empty($this->data['nomor_hp_1'])) {
+        if (!empty($this->data['phone_number_1'])) {
             $this->record->customerPhoneNumbers()->create([
-                'phone_number' => $this->data['nomor_hp_1']
+                'phone_number' => $this->data['phone_number_1']
             ]);
         }
 
         // Add secondary phone number if provided
-        if (!empty($this->data['nomor_hp_2'])) {
+        if (!empty($this->data['phone_number_2'])) {
             $this->record->customerPhoneNumbers()->create([
-                'phone_number' => $this->data['nomor_hp_2']
+                'phone_number' => $this->data['phone_number_2']
             ]);
         }
     }
