@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Models\Customer;
+use App\Models\User;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -15,7 +16,7 @@ class UserDataChanged
     /**
      * Create a new event instance.
      */
-    public function __construct(public Customer $customer) {}
+    public function __construct(public User $user) {}
 
 
     /**
