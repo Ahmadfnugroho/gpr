@@ -21,9 +21,9 @@ use Maatwebsite\Excel\Validators\Failure;
 use Carbon\Carbon;
 use Exception;
 
-class CategoryImporter implements 
-    ToCollection, 
-    WithHeadingRow, 
+class CategoryImporter implements
+    ToCollection,
+    WithHeadingRow,
     WithBatchInserts,
     WithChunkReading,
     SkipsOnError,
@@ -74,10 +74,10 @@ class CategoryImporter implements
     {
         // Normalize and validate row data
         $categoryData = $this->normalizeRowData($row);
-        
+
         // Validate the data
         $validator = $this->validateRowData($categoryData, $rowNumber);
-        
+
         if ($validator->fails()) {
             $this->importResults['failed']++;
             foreach ($validator->errors()->all() as $error) {
@@ -88,7 +88,7 @@ class CategoryImporter implements
 
         // Check if category exists (by name since it should be unique)
         $existingCategory = Category::where('name', $categoryData['name'])->first();
-        
+
         if ($existingCategory) {
             if ($this->updateExisting) {
                 $this->updateCategory($existingCategory, $categoryData, $rowNumber);
@@ -110,6 +110,7 @@ class CategoryImporter implements
         return [
             'name' => trim($row['nama_kategori'] ?? $row['name'] ?? ''),
             'photo' => trim($row['photo'] ?? ''),
+
         ];
     }
 
@@ -121,9 +122,11 @@ class CategoryImporter implements
         return Validator::make($data, [
             'name' => 'required|string|max:255',
             'photo' => 'nullable|string|max:255',
+
         ], [
             'name.required' => 'Nama kategori wajib diisi',
             'photo.string' => 'Photo harus berupa text/URL',
+
         ]);
     }
 
@@ -136,8 +139,9 @@ class CategoryImporter implements
         $category = Category::create([
             'name' => $data['name'],
             'photo' => $data['photo'] ?? null,
+
         ]);
-        
+
         $this->importResults['success']++;
         Log::info("Category imported successfully", [
             'row' => $rowNumber,
@@ -155,8 +159,9 @@ class CategoryImporter implements
         $category->update([
             'name' => $data['name'],
             'photo' => $data['photo'] ?? null,
+
         ]);
-        
+
         $this->importResults['updated']++;
         Log::info("Category updated successfully", [
             'row' => $rowNumber,
@@ -197,6 +202,7 @@ class CategoryImporter implements
         return [
             'nama_kategori',
             'photo'
+
         ];
     }
 }

@@ -40,7 +40,6 @@ class CategoryImportExportService
 
             // Get import results
             return $importer->getImportResults();
-
         } catch (\Exception $e) {
             return [
                 'total' => 0,
@@ -59,9 +58,9 @@ class CategoryImportExportService
     {
         $export = new CategoryExport($categoryIds);
         $filename = 'categories_export_' . date('Y-m-d_H-i-s') . '.xlsx';
-        
+
         Excel::store($export, $filename, 'public');
-        
+
         return Storage::disk('public')->path($filename);
     }
 
@@ -72,9 +71,9 @@ class CategoryImportExportService
     {
         $template = new CategoryImportTemplate();
         $filename = 'category_import_template.xlsx';
-        
+
         Excel::store($template, $filename, 'public');
-        
+
         return Storage::disk('public')->path($filename);
     }
 
@@ -85,7 +84,7 @@ class CategoryImportExportService
     {
         try {
             $data = Excel::toArray(new CategoryImporter(), $file);
-            
+
             if (empty($data) || empty($data[0])) {
                 return [
                     'valid' => false,
@@ -112,7 +111,6 @@ class CategoryImportExportService
                 'total_rows' => count($data[0]) - 1, // -1 for header
                 'headers' => $headers
             ];
-
         } catch (\Exception $e) {
             return [
                 'valid' => false,
@@ -137,11 +135,11 @@ class CategoryExport implements FromCollection, WithHeadings, WithMapping, WithS
     public function collection()
     {
         $query = Category::withCount('products');
-        
+
         if ($this->categoryIds) {
             $query->whereIn('id', $this->categoryIds);
         }
-        
+
         return $query->get();
     }
 
@@ -150,7 +148,7 @@ class CategoryExport implements FromCollection, WithHeadings, WithMapping, WithS
         return [
             'ID',
             'Nama Kategori',
-            'Photo',
+            'photo',
             'Slug',
             'Jumlah Produk',
             'Tanggal Dibuat',
@@ -163,7 +161,7 @@ class CategoryExport implements FromCollection, WithHeadings, WithMapping, WithS
         return [
             $category->id,
             $category->name,
-            $category->photo ?? '',
+            $category->photo,
             $category->slug,
             $category->products_count,
             $category->created_at?->format('Y-m-d H:i:s'),
@@ -176,9 +174,9 @@ class CategoryExport implements FromCollection, WithHeadings, WithMapping, WithS
         return [
             // Style the first row as bold text
             1 => ['font' => ['bold' => true]],
-            
+
             // Set auto width for all columns
-            'A:G' => ['alignment' => ['wrapText' => true]]
+            'A:F' => ['alignment' => ['wrapText' => true]]
         ];
     }
 }
@@ -195,6 +193,7 @@ class CategoryImportTemplate implements FromCollection, WithHeadings, WithStyles
             [
                 'Kamera Digital',
                 'https://example.com/photo.jpg',
+
             ]
         ]);
     }
@@ -207,7 +206,7 @@ class CategoryImportTemplate implements FromCollection, WithHeadings, WithStyles
     public function styles(Worksheet $sheet)
     {
         // Set header row style
-        $sheet->getStyle('A1:B1')->applyFromArray([
+        $sheet->getStyle('A1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF']
@@ -217,19 +216,18 @@ class CategoryImportTemplate implements FromCollection, WithHeadings, WithStyles
                 'startColor' => ['rgb' => '4CAF50']
             ]
         ]);
-     
+
         // Set sample data row style
-        $sheet->getStyle('A2:B2')->applyFromArray([
+        $sheet->getStyle('A2')->applyFromArray([
             'fill' => [
                 'fillType' => 'solid',
                 'startColor' => ['rgb' => 'E8F5E8']
             ]
         ]);
-     
+
         // Auto-size columns
         $sheet->getColumnDimension('A')->setAutoSize(true);
-        $sheet->getColumnDimension('B')->setAutoSize(true);
-     
+
         return [];
     }
 }

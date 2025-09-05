@@ -19,23 +19,12 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password', 255)->default('123456789');
-            $table->text('address')->nullable();
-            $table->string('job')->nullable();
-            $table->text('office_address')->nullable();
-            $table->string('instagram_username')->nullable();
-            $table->string('facebook_username')->nullable();
-            $table->string('emergency_contact_name')->nullable();
-            $table->string('emergency_contact_number')->nullable();
-            $table->enum('gender', ['male', 'female'])->nullable();
-            $table->string('source_info')->nullable();
-            $table->enum('status', ['active', 'blacklist'])->default('blacklist');
             $table->rememberToken();
             $table->timestamps();
 
             // Indexes for performance
             $table->index('name');
             $table->index('email');
-            $table->index('status');
         });
 
         // Password reset tokens table
@@ -59,9 +48,12 @@ return new class extends Migration
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+
             $table->string('slug')->unique();
+            $table->string('photo')->nullable();
+
             $table->timestamps();
-            
+
             $table->index('slug');
         });
 
@@ -73,7 +65,7 @@ return new class extends Migration
             $table->string('logo')->nullable();
             $table->boolean('premiere')->default(false);
             $table->timestamps();
-            
+
             $table->index('slug');
             $table->index('premiere');
         });
@@ -83,11 +75,11 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
-            $table->foreignId('category_id')->constrained()->cascadeOnDelete();
+            $table->string('photo')->nullable();
+
             $table->timestamps();
-            
+
             $table->index('slug');
-            $table->index('category_id');
         });
 
         // API Keys table - For API authentication
@@ -98,8 +90,8 @@ return new class extends Migration
             $table->boolean('active')->default(true);
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();
-            
-            $table->index(['key', 'active']);
+
+            $table->index(['name', 'key', 'active']);
         });
     }
 

@@ -305,23 +305,22 @@
 @endsection
 
 @push('scripts')
-<script>
-    let phoneFieldCount = {
-        {
-            count(old('phone_numbers', $customer - > customerPhoneNumbers - > pluck('phone_number') - > toArray())) ? : 1
-        }
-    };
+@php
+    $phoneCount = count(old('phone_numbers', $customer->customerPhoneNumbers->pluck('phone_number')->toArray())) ?: 1;
+@endphp
+<script data-phone-count="{{ $phoneCount }}">
+    let phoneFieldCount = parseInt(document.currentScript.getAttribute('data-phone-count'));
 
-    function addPhoneField() {
-        if (phoneFieldCount >= 10) {
-            alert('Maksimal 10 nomor HP');
-            return;
-        }
+            function addPhoneField() {
+                if (phoneFieldCount >= 10) {
+                    alert('Maksimal 10 nomor HP');
+                    return;
+                }
 
-        const container = document.getElementById('phone-container');
-        const newField = document.createElement('div');
-        newField.className = 'input-group mb-2';
-        newField.innerHTML = `
+                const container = document.getElementById('phone-container');
+                const newField = document.createElement('div');
+                newField.className = 'input-group mb-2';
+                newField.innerHTML = `
         <input type="text" 
                class="form-control" 
                name="phone_numbers[]" 
@@ -334,44 +333,44 @@
         </button>
     `;
 
-        container.appendChild(newField);
-        phoneFieldCount++;
-    }
-
-    function removePhoneField(button) {
-        button.closest('.input-group').remove();
-        phoneFieldCount--;
-    }
-
-    // Show large photo
-    function showLargePhoto(photoUrl, customerName) {
-        document.getElementById('largePhoto').src = photoUrl;
-        document.querySelector('#photoModal .modal-title').textContent = `Foto ${customerName}`;
-        new bootstrap.Modal(document.getElementById('photoModal')).show();
-    }
-
-    // Phone number formatting
-    document.addEventListener('DOMContentLoaded', function() {
-        function formatPhoneNumber(input) {
-            let value = input.value.replace(/\D/g, '');
-
-            if (value.startsWith('62')) {
-                value = '+' + value;
-            } else if (value.startsWith('0')) {
-                value = '+62' + value.substr(1);
-            } else if (value && !value.startsWith('+')) {
-                value = '+62' + value;
+                container.appendChild(newField);
+                phoneFieldCount++;
             }
 
-            input.value = value;
-        }
-
-        // Apply formatting to existing phone fields
-        document.addEventListener('input', function(e) {
-            if (e.target.name === 'phone_numbers[]' || e.target.name === 'emergency_contact_number') {
-                formatPhoneNumber(e.target);
+            function removePhoneField(button) {
+                button.closest('.input-group').remove();
+                phoneFieldCount--;
             }
-        });
-    });
+
+            // Show large photo
+            function showLargePhoto(photoUrl, customerName) {
+                document.getElementById('largePhoto').src = photoUrl;
+                document.querySelector('#photoModal .modal-title').textContent = `Foto ${customerName}`;
+                new bootstrap.Modal(document.getElementById('photoModal')).show();
+            }
+
+            // Phone number formatting
+            document.addEventListener('DOMContentLoaded', function() {
+                function formatPhoneNumber(input) {
+                    let value = input.value.replace(/\D/g, '');
+
+                    if (value.startsWith('62')) {
+                        value = '+' + value;
+                    } else if (value.startsWith('0')) {
+                        value = '+62' + value.substr(1);
+                    } else if (value && !value.startsWith('+')) {
+                        value = '+62' + value;
+                    }
+
+                    input.value = value;
+                }
+
+                // Apply formatting to existing phone fields
+                document.addEventListener('input', function(e) {
+                    if (e.target.name === 'phone_numbers[]' || e.target.name === 'emergency_contact_number') {
+                        formatPhoneNumber(e.target);
+                    }
+                });
+            });
 </script>
 @endpush
