@@ -6,6 +6,10 @@ use App\Filament\Resources\BrandResource\Pages;
 use App\Filament\Resources\BrandResource\RelationManagers;
 use App\Models\Brand;
 use App\Services\BrandImportExportService;
+use Filament\Actions\ImportAction;
+use Filament\Actions\ExportAction;
+use App\Filament\Imports\BrandImporter;
+use App\Filament\Exports\BrandExporter;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -58,86 +62,29 @@ class BrandResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->headerActions([
-                Action::make('downloadTemplate')
-                    ->label('Download Template')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('success')
-                    ->action(function () {
-                        $service = new BrandImportExportService();
-                        $filePath = $service->generateTemplate();
-                        return response()->download($filePath, 'brand_import_template.xlsx')->deleteFileAfterSend();
-                    }),
-                    
-                Action::make('import')
-                    ->label('Import Excel')
+                ImportAction::make()
+                    ->importer(BrandImporter::class)
+                    ->label('Import Brands')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('primary')
-                    ->form([
-                        FileUpload::make('excel_file')
-                            ->label('Excel File')
-                            ->acceptedFileTypes(['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'])
-                            ->required()
-                            ->maxSize(2048)
-                            ->helperText('Upload Excel file (.xls, .xlsx, .csv). Maximum 2MB'),
-                        Checkbox::make('update_existing')
-                            ->label('Update existing brands (based on name)')
-                            ->default(false)
-                            ->helperText('If unchecked, brands with existing names will be skipped')
+                    ->options([
+                        'updateExisting' => false,
                     ])
-                    ->action(function (array $data) {
-                        try {
-                            $service = new BrandImportExportService();
-                            $file = $data['excel_file'];
-                            $updateExisting = $data['update_existing'] ?? false;
-                            
-                            // Convert to UploadedFile if needed
-                            if (is_string($file)) {
-                                $filePath = storage_path('app/public/' . $file);
-                                $file = new \Illuminate\Http\UploadedFile(
-                                    $filePath,
-                                    basename($filePath),
-                                    mime_content_type($filePath),
-                                    null,
-                                    true
-                                );
-                            }
-                            
-                            $results = $service->importBrands($file, $updateExisting);
-                            
-                            $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
-                            
-                            if (!empty($results['errors'])) {
-                                Notification::make()
-                                    ->title('Import Completed with Errors')
-                                    ->body($message . "\n\nErrors: " . implode(', ', array_slice($results['errors'], 0, 3)))
-                                    ->warning()
-                                    ->send();
-                            } else {
-                                Notification::make()
-                                    ->title('Import Successful')
-                                    ->body($message)
-                                    ->success()
-                                    ->send();
-                            }
-                            
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Import Failed')
-                                ->body('Error: ' . $e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
+                    ->modalHeading('Import Brands')
+                    ->modalDescription('Upload an Excel file to import brands. Make sure your file has the correct format.')
+                    ->modalSubmitActionLabel('Import')
+                    ->successNotificationTitle('Brands imported successfully'),
                     
-                Action::make('export')
-                    ->label('Export All')
+                ExportAction::make()
+                    ->exporter(BrandExporter::class)
+                    ->label('Export Brands')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->color('info')
-                    ->action(function () {
-                        $service = new BrandImportExportService();
-                        $filePath = $service->exportBrands();
-                        return response()->download($filePath, 'brands_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
-                    }),
+                    ->color('success')
+                    ->modalHeading('Export Brands')
+                    ->modalDescription('Export all brands to an Excel file.')
+                    ->modalSubmitActionLabel('Export')
+                    ->fileName(fn (): string => 'brands-' . date('Y-m-d-H-i-s'))
+                    ->successNotificationTitle('Brands exported successfully'),
             ])
 
             ->columns([

@@ -6,6 +6,10 @@ use App\Filament\Resources\CategoryResource\Pages;
 use Filament\Tables\Table;
 use App\Models\Category;
 use App\Services\CategoryImportExportService;
+use Filament\Actions\ImportAction;
+use Filament\Actions\ExportAction;
+use App\Filament\Imports\CategoryImporter;
+use App\Filament\Exports\CategoryExporter;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -59,86 +63,29 @@ class CategoryResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->headerActions([
-                Action::make('downloadTemplate')
-                    ->label('Download Template')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('success')
-                    ->action(function () {
-                        $service = new CategoryImportExportService();
-                        $filePath = $service->generateTemplate();
-                        return response()->download($filePath, 'category_import_template.xlsx')->deleteFileAfterSend();
-                    }),
-                    
-                Action::make('import')
-                    ->label('Import Excel')
+                ImportAction::make()
+                    ->importer(CategoryImporter::class)
+                    ->label('Import Categories')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('primary')
-                    ->form([
-                        FileUpload::make('excel_file')
-                            ->label('Excel File')
-                            ->acceptedFileTypes(['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'])
-                            ->required()
-                            ->maxSize(2048)
-                            ->helperText('Upload Excel file (.xls, .xlsx, .csv). Maximum 2MB'),
-                        Checkbox::make('update_existing')
-                            ->label('Update existing categories (based on name)')
-                            ->default(false)
-                            ->helperText('If unchecked, categories with existing names will be skipped')
+                    ->options([
+                        'updateExisting' => false,
                     ])
-                    ->action(function (array $data) {
-                        try {
-                            $service = new CategoryImportExportService();
-                            $file = $data['excel_file'];
-                            $updateExisting = $data['update_existing'] ?? false;
-                            
-                            // Convert to UploadedFile if needed
-                            if (is_string($file)) {
-                                $filePath = storage_path('app/public/' . $file);
-                                $file = new \Illuminate\Http\UploadedFile(
-                                    $filePath,
-                                    basename($filePath),
-                                    mime_content_type($filePath),
-                                    null,
-                                    true
-                                );
-                            }
-                            
-                            $results = $service->importCategories($file, $updateExisting);
-                            
-                            $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
-                            
-                            if (!empty($results['errors'])) {
-                                Notification::make()
-                                    ->title('Import Completed with Errors')
-                                    ->body($message . "\n\nErrors: " . implode(', ', array_slice($results['errors'], 0, 3)))
-                                    ->warning()
-                                    ->send();
-                            } else {
-                                Notification::make()
-                                    ->title('Import Successful')
-                                    ->body($message)
-                                    ->success()
-                                    ->send();
-                            }
-                            
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Import Failed')
-                                ->body('Error: ' . $e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
+                    ->modalHeading('Import Categories')
+                    ->modalDescription('Upload an Excel file to import categories. Make sure your file has the correct format.')
+                    ->modalSubmitActionLabel('Import')
+                    ->successNotificationTitle('Categories imported successfully'),
                     
-                Action::make('export')
-                    ->label('Export All')
+                ExportAction::make()
+                    ->exporter(CategoryExporter::class)
+                    ->label('Export Categories')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->color('info')
-                    ->action(function () {
-                        $service = new CategoryImportExportService();
-                        $filePath = $service->exportCategories();
-                        return response()->download($filePath, 'categories_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
-                    }),
+                    ->color('success')
+                    ->modalHeading('Export Categories')
+                    ->modalDescription('Export all categories to an Excel file.')
+                    ->modalSubmitActionLabel('Export')
+                    ->fileName(fn (): string => 'categories-' . date('Y-m-d-H-i-s'))
+                    ->successNotificationTitle('Categories exported successfully'),
             ])
             ->columns([
                 Tables\Columns\TextColumn::make('name')

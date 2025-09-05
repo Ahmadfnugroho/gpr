@@ -21,6 +21,10 @@ use Filament\Tables\Actions\HeaderActions;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use App\Services\CustomNotificationService;
+use Filament\Actions\ImportAction;
+use Filament\Actions\ExportAction;
+use App\Filament\Imports\ProductImporter;
+use App\Filament\Exports\ProductExporter;
 use Filament\Forms\Components\Checkbox;
 
 use Illuminate\Database\Eloquent\Builder;
@@ -247,68 +251,29 @@ class ProductResource extends Resource
             ->deferLoading()
             ->poll('30s')
             ->headerActions([
-                Action::make('downloadTemplate')
-                    ->label('Download Template')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('success')
-                    ->action(function () {
-                        $service = new ProductImportExportService();
-                        $filePath = $service->generateTemplate();
-                        return response()->download($filePath, 'product_import_template.xlsx')->deleteFileAfterSend();
-                    }),
-
-                Action::make('import')
-                    ->label('Import Excel')
+                ImportAction::make()
+                    ->importer(ProductImporter::class)
+                    ->label('Import Products')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('primary')
-                    ->form([
-                        FileUpload::make('excel_file')
-                            ->label('Excel File')
-                            ->acceptedFileTypes(['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'])
-                            ->required()
-                            ->maxSize(2048)
-                            ->helperText('Upload Excel file (.xls, .xlsx, .csv). Maximum 2MB'),
-                        Checkbox::make('update_existing')
-                            ->label('Update existing products (based on name)')
-                            ->default(false)
-                            ->helperText('If unchecked, products with existing names will be skipped')
+                    ->options([
+                        'updateExisting' => false,
                     ])
-                    ->action(function (array $data) {
-                        try {
-                            $service = new ProductImportExportService();
-                            $file = $data['excel_file'];
-                            $updateExisting = $data['update_existing'] ?? false;
-
-                            // Convert to UploadedFile if needed
-                            if (is_string($file)) {
-                                $filePath = storage_path('app/public/' . $file);
-                                $file = new \Illuminate\Http\UploadedFile(
-                                    $filePath,
-                                    basename($filePath),
-                                    mime_content_type($filePath),
-                                    null,
-                                    true
-                                );
-                            }
-
-                            $results = $service->importProducts($file, $updateExisting);
-
-                            // Use custom notification service
-                            CustomNotificationService::showImportResults($results, 'product');
-                        } catch (\Exception $e) {
-                            CustomNotificationService::showError('Import Failed', 'Error: ' . $e->getMessage());
-                        }
-                    }),
-
-                Action::make('export')
-                    ->label('Export All')
+                    ->modalHeading('Import Products')
+                    ->modalDescription('Upload an Excel file to import products. Make sure your file has the correct format.')
+                    ->modalSubmitActionLabel('Import')
+                    ->successNotificationTitle('Products imported successfully'),
+                    
+                ExportAction::make()
+                    ->exporter(ProductExporter::class)
+                    ->label('Export Products')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->color('info')
-                    ->action(function () {
-                        $service = new ProductImportExportService();
-                        $filePath = $service->exportProducts();
-                        return response()->download($filePath, 'products_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
-                    }),
+                    ->color('success')
+                    ->modalHeading('Export Products')
+                    ->modalDescription('Export all products to an Excel file.')
+                    ->modalSubmitActionLabel('Export')
+                    ->fileName(fn (): string => 'products-' . date('Y-m-d-H-i-s'))
+                    ->successNotificationTitle('Products exported successfully'),
             ])
 
             ->columns([

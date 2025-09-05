@@ -28,6 +28,10 @@ use Filament\Tables\Actions\HeaderActions;
 use Illuminate\Support\HtmlString;
 use Illuminate\Http\Response;
 use App\Services\CustomerImportExportService;
+use Filament\Actions\ImportAction;
+use Filament\Actions\ExportAction;
+use App\Filament\Imports\CustomerImporter;
+use App\Filament\Exports\CustomerExporter;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use Filament\Forms\Components\Checkbox;
@@ -198,111 +202,29 @@ class CustomerResource extends Resource
                 Tables\Actions\EditAction::make(),
             ])
             ->headerActions([
-                Action::make('downloadTemplate')
-                    ->label('Download Template')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('success')
-                    ->action(function () {
-                        $service = new CustomerImportExportService();
-                        $filePath = $service->generateTemplate();
-                        return response()->download($filePath, 'customer_import_template.xlsx')->deleteFileAfterSend();
-                    }),
-
-                Action::make('import')
-                    ->label('Import Excel')
+                ImportAction::make()
+                    ->importer(CustomerImporter::class)
+                    ->label('Import Customers')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('primary')
-                    ->form([
-                        FileUpload::make('excel_file')
-                            ->label('Excel File')
-                            ->acceptedFileTypes(['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv'])
-                            ->required()
-                            ->maxSize(2048)
-                            ->helperText('Upload Excel file (.xls, .xlsx, .csv). Maximum 2MB'),
-                        Checkbox::make('update_existing')
-                            ->label('Update existing customers (based on email)')
-                            ->default(false)
-                            ->helperText('If unchecked, customers with existing emails will be skipped')
+                    ->options([
+                        'updateExisting' => false,
                     ])
-                    ->action(function (array $data) {
-                        try {
-                            $service = new CustomerImportExportService();
-                            $file = $data['excel_file'];
-                            $updateExisting = $data['update_existing'] ?? false;
-
-                            // Convert to UploadedFile if needed
-                            if (is_string($file)) {
-                                $filePath = storage_path('app/public/' . $file);
-                                $file = new \Illuminate\Http\UploadedFile(
-                                    $filePath,
-                                    basename($filePath),
-                                    mime_content_type($filePath),
-                                    null,
-                                    true
-                                );
-                            }
-
-                            // Check file size for import strategy
-                            if ($file instanceof \Illuminate\Http\UploadedFile && $file->getSize() > 1024 * 1024) {
-                                // Use async import for large files (> 1MB)
-                                $result = $service->importCustomersAsync(
-                                    $file, 
-                                    $updateExisting, 
-                                    auth()->id()
-                                );
-                                
-                                if ($result['queued']) {
-                                    Notification::make()
-                                        ->title('Import Started')
-                                        ->body('Large file import is being processed in background. Import ID: ' . $result['import_id'])
-                                        ->info()
-                                        ->duration(8000)
-                                        ->send();
-                                } else {
-                                    Notification::make()
-                                        ->title('Import Failed to Start')
-                                        ->body($result['message'] ?? 'Failed to queue import job')
-                                        ->danger()
-                                        ->send();
-                                }
-                            } else {
-                                // Use sync import for small files
-                                $results = $service->importCustomers($file, $updateExisting);
-                                
-                                $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
-                                
-                                if (!empty($results['errors'])) {
-                                    Notification::make()
-                                        ->title('Import Completed with Errors')
-                                        ->body($message . "\n\nErrors: " . implode(', ', array_slice($results['errors'], 0, 3)))
-                                        ->warning()
-                                        ->send();
-                                } else {
-                                    Notification::make()
-                                        ->title('Import Successful')
-                                        ->body($message)
-                                        ->success()
-                                        ->send();
-                                }
-                            }
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Import Failed')
-                                ->body('Error: ' . $e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-
-                Action::make('export')
-                    ->label('Export All')
+                    ->modalHeading('Import Customers')
+                    ->modalDescription('Upload an Excel file to import customers. Make sure your file has the correct format.')
+                    ->modalSubmitActionLabel('Import')
+                    ->successNotificationTitle('Customers imported successfully'),
+                    
+                ExportAction::make()
+                    ->exporter(CustomerExporter::class)
+                    ->label('Export Customers')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->color('info')
-                    ->action(function () {
-                        $service = new CustomerImportExportService();
-                        $filePath = $service->exportCustomers();
-                        return response()->download($filePath, 'customers_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
-                    }),
+                    ->color('success')
+                    ->modalHeading('Export Customers')
+                    ->modalDescription('Export all customers to an Excel file.')
+                    ->modalSubmitActionLabel('Export')
+                    ->fileName(fn (): string => 'customers-' . date('Y-m-d-H-i-s'))
+                    ->successNotificationTitle('Customers exported successfully'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

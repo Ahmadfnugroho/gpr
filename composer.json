@@ -13,6 +13,7 @@
         "barryvdh/laravel-dompdf": "^3.0",
         "bezhansalleh/filament-shield": "^3.3",
         "doctrine/dbal": "^4.2",
+        "filament/actions": "^3.3",
         "filament/filament": "^3.2",
         "filament/infolists": "^3.2",
         "filament/notifications": "^3.2",
