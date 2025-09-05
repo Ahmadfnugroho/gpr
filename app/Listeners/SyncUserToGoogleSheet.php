@@ -16,7 +16,7 @@ class SyncUserToGoogleSheet
 
     public function handle(UserDataChanged $event)
     {
-        $customer = $event->customer->load('userPhoneNumbers');
+        $customer = $event->user->load('userPhoneNumbers');
 
         $payload = [
             'email' => $customer->email,
