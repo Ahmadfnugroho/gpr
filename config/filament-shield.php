@@ -9,7 +9,7 @@ return [
         'navigation_group' => true,
         'is_globally_searchable' => false,
         'show_model_path' => true,
-        'is_scoped_to_tenant' => false,
+        'is_scoped_to_tenant' => true,
         'cluster' => null,
     ],
 
@@ -37,13 +37,13 @@ return [
             'view_any',
             'create',
             'update',
-            // 'restore',
-            // 'restore_any',
-            // 'replicate',
-            // 'reorder',
+            'restore',
+            'restore_any',
+            'replicate',
+            'reorder',
             'delete',
             'delete_any',
-            // 'force_delete',
+            'force_delete',
             'force_delete_any',
         ],
 
@@ -65,22 +65,21 @@ return [
     ],
 
     'exclude' => [
-        'enabled' => false,
+        'enabled' => true,
 
         'pages' => [
             'Dashboard',
         ],
 
         'widgets' => [
-            'AccountWidget',
-            'FilamentInfoWidget',
+            'AccountWidget', 'FilamentInfoWidget',
         ],
 
         'resources' => [],
     ],
 
     'discovery' => [
-        'discover_all_resources' => true,
+        'discover_all_resources' => false,
         'discover_all_widgets' => false,
         'discover_all_pages' => false,
     ],
