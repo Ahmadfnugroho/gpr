@@ -14,9 +14,9 @@ class UserPhoneNumberResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-return[
-    'id' => $this->id,
-    'phone_number' => $this->phone_number,
-    'user' => new UserResource($this->whenLoaded('user')),
-];    }
+        return [
+            'id' => $this->id,
+            'phone_number' => $this->phone_number,
+        ];
+    }
 }

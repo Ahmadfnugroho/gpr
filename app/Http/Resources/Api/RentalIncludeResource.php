@@ -16,8 +16,14 @@ class RentalIncludeResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'includedProduct' => new ProductResource($this->whenLoaded('includedProduct')),
             'quantity' => $this->quantity,
+            'included_product' => $this->whenLoaded('includedProduct', function () {
+                return $this->includedProduct ? [
+                    'id' => $this->includedProduct->id,
+                    'name' => $this->includedProduct->name,
+                    'slug' => $this->includedProduct->slug,
+                ] : null;
+            }),
         ];
     }
 }
