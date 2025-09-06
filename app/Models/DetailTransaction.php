@@ -27,6 +27,7 @@ class DetailTransaction extends Model
         'available_quantity',
         'price',
         'total_price',
+        'productItems', // For auto-assigned serial numbers
     ];
     protected $casts = [
         'price' => 'float',
@@ -123,11 +124,25 @@ class DetailTransaction extends Model
         parent::boot();
 
         static::saved(function ($detail) {
-            // Simpan relasi ke pivot table jika productItems ada
-            if (isset($detail->productItems) && is_array($detail->productItems)) {
-                $detail->productItems()->sync($detail->productItems);
-            } elseif (isset($detail->product_item_ids) && is_array($detail->product_item_ids)) {
-                $detail->productItems()->sync($detail->product_item_ids);
+            // Handle productItems from form data (array of IDs)
+            $productItemIds = null;
+            
+            // Check if productItems is set in attributes (from form)
+            if (isset($detail->attributes['productItems'])) {
+                $productItemIds = $detail->attributes['productItems'];
+            }
+            // Legacy support
+            elseif (isset($detail->product_item_ids) && is_array($detail->product_item_ids)) {
+                $productItemIds = $detail->product_item_ids;
+            }
+            // Check if productItems relationship is loaded and has data
+            elseif ($detail->relationLoaded('productItems') && is_array($detail->productItems)) {
+                $productItemIds = $detail->productItems;
+            }
+            
+            // Sync the relationship if we have product item IDs
+            if (is_array($productItemIds) && !empty($productItemIds)) {
+                $detail->productItems()->sync($productItemIds);
             }
         });
     }

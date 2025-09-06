@@ -107,6 +107,7 @@ class TransactionResource extends Resource
         $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
         $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
         $allDetailTransactions = $get('../../detailTransactions') ?? [];
+        $currentTransactionId = $get('../../id'); // Get current transaction ID when editing
 
         if (!$productId || !$currentUuid) {
             return [];
@@ -121,8 +122,8 @@ class TransactionResource extends Resource
             ->all();
 
 
-        // Ambil product_item_id dari transaksi lain yang aktif
-        $usedInOtherTransactions = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
+        // Ambil product_item_id dari transaksi lain yang aktif (EXCLUDE current transaction when editing)
+        $usedInOtherTransactions = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate, $currentTransactionId) {
             $query->where(function ($q) use ($startDate, $endDate) {
                 // Periksa apakah rentang tanggal tumpang tindih
                 $q->whereBetween('start_date', [$startDate, $endDate]) // Rentang mulai di dalam rentang target
@@ -132,6 +133,10 @@ class TransactionResource extends Resource
                         $q2->where('start_date', '<=', $startDate)
                             ->where('end_date', '>=', $endDate);
                     });
+            })
+            // EXCLUDE current transaction when editing to avoid false "unavailable" status
+            ->when($currentTransactionId, function ($q) use ($currentTransactionId) {
+                $q->where('id', '!=', $currentTransactionId);
             });
         })
             ->pluck('product_item_id')
@@ -142,15 +147,29 @@ class TransactionResource extends Resource
         $excludedIds = array_unique(array_merge($usedInCurrentRepeater, $usedInOtherTransactions));
 
 
-        // Ambil serial number yang tersedia
+        // Get currently assigned items to this detail transaction (for editing)
+        $currentlyAssignedIds = [];
+        $currentDetailTransactionId = $get('id');
+        if ($currentDetailTransactionId) {
+            $currentlyAssignedIds = DetailTransactionProductItem::where('detail_transaction_id', $currentDetailTransactionId)
+                ->whereHas('productItem', function ($q) use ($productId) {
+                    $q->where('product_id', $productId);
+                })
+                ->pluck('product_item_id')
+                ->toArray();
+        }
+
+        // Ambil serial number yang tersedia (including currently assigned ones for editing)
         $availableIds = ProductItem::query()
             ->where('product_id', $productId)
-            ->whereNotIn('id', $excludedIds)
-            ->limit($quantity)
+            ->where(function ($query) use ($excludedIds, $currentlyAssignedIds) {
+                // Include items that are not excluded OR currently assigned to this transaction
+                $query->whereNotIn('id', $excludedIds)
+                    ->orWhereIn('id', $currentlyAssignedIds);
+            })
+            ->limit($quantity + count($currentlyAssignedIds)) // Allow more to include currently assigned
             ->pluck('id')
             ->toArray();
-
-
 
         return $availableIds;
     }
@@ -160,7 +179,9 @@ class TransactionResource extends Resource
         Carbon $startDate,
         Carbon $endDate,
         ?string $currentUuid,
-        array $allDetailTransactions
+        array $allDetailTransactions,
+        ?int $currentTransactionId = null,
+        ?int $currentDetailTransactionId = null
     ): array {
 
         $bundling = Bundling::with('products')->find($bundlingId);
@@ -182,8 +203,8 @@ class TransactionResource extends Resource
             ->all();
 
 
-        // Ambil product_item_id dari transaksi lain yang aktif
-        $usedInOtherTransactions = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
+        // Ambil product_item_id dari transaksi lain yang aktif (EXCLUDE current transaction when editing)
+        $usedInOtherTransactions = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate, $currentTransactionId) {
             $query->where(function ($q) use ($startDate, $endDate) {
                 // Periksa apakah rentang tanggal tumpang tindih
                 $q->whereBetween('start_date', [$startDate, $endDate]) // Rentang mulai di dalam rentang target
@@ -193,6 +214,10 @@ class TransactionResource extends Resource
                         $q2->where('start_date', '<=', $startDate)
                             ->where('end_date', '>=', $endDate);
                     });
+            })
+            // EXCLUDE current transaction when editing to avoid false "unavailable" status
+            ->when($currentTransactionId, function ($q) use ($currentTransactionId) {
+                $q->where('id', '!=', $currentTransactionId);
             });
         })
             ->pluck('product_item_id')
@@ -210,17 +235,30 @@ class TransactionResource extends Resource
         foreach ($bundling->products as $product) {
             $requiredQty = $quantity * ($product->pivot->quantity ?? 1);
 
+            // Get currently assigned items for this product in this detail transaction
+            $currentlyAssignedIds = [];
+            if ($currentDetailTransactionId) {
+                $currentlyAssignedIds = DetailTransactionProductItem::where('detail_transaction_id', $currentDetailTransactionId)
+                    ->whereHas('productItem', function ($q) use ($product) {
+                        $q->where('product_id', $product->id);
+                    })
+                    ->pluck('product_item_id')
+                    ->toArray();
+            }
 
-            // Ambil serial number yang tersedia untuk produk ini
+            // Ambil serial number yang tersedia untuk produk ini (including currently assigned ones)
             $items = ProductItem::query()
                 ->where('product_id', $product->id)
-                ->whereNotIn('id', $excludedIds)
-                ->limit($requiredQty)
+                ->where(function ($query) use ($excludedIds, $currentlyAssignedIds) {
+                    // Include items that are not excluded OR currently assigned to this transaction
+                    $query->whereNotIn('id', $excludedIds)
+                        ->orWhereIn('id', $currentlyAssignedIds);
+                })
+                ->limit($requiredQty + count($currentlyAssignedIds))
                 ->get(['id', 'serial_number']);
 
             $ids = $items->pluck('id')->toArray();
             $serials = $items->pluck('serial_number')->toArray();
-
 
             if (!empty($serials)) {
                 $displayParts[] = "{$product->name} (" . implode(', ', $serials) . ")";
@@ -273,6 +311,8 @@ class TransactionResource extends Resource
 
         $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
         $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
+        $currentTransactionId = $get('../../id'); // Get current transaction ID when editing
+        $currentDetailTransactionId = $get('id'); // Get current detail transaction ID when editing
 
         if ($isBundling) {
             // Jika bundling dipilih
@@ -286,19 +326,27 @@ class TransactionResource extends Resource
                 $startDate,
                 $endDate,
                 $uuid,
-                $allDetailTransactions ?? []
+                $allDetailTransactions ?? [],
+                $currentTransactionId,
+                $currentDetailTransactionId
             );
 
-            $set('productItems', $result['ids'] ?? []);
+            // Auto-assign first available items based on quantity
+            $resultIds = $result['ids'] ?? [];
+            $quantity = $get('quantity') ?? 1;
+            $assignedIds = array_slice($resultIds, 0, $quantity);
+            $set('productItems', $assignedIds);
         } else {
             // Jika produk tunggal dipilih
             $set('product_id', (int) $id);
             $set('bundling_id', null);
 
-            // Resolve serial numbers untuk produk tunggal
+            // Resolve serial numbers untuk produk tunggal dan auto-assign
             $serials = \App\Filament\Resources\TransactionResource::resolveAvailableProductSerials($get, $set);
+            $quantity = $get('quantity') ?? 1;
+            $assignedSerials = array_slice($serials ?? [], 0, $quantity);
 
-            $set('productItems', $serials ?? []); // Perbarui nilai productItems
+            $set('productItems', $assignedSerials); // Auto-assign based on quantity
         }
     }
 
@@ -723,7 +771,7 @@ class TransactionResource extends Resource
                                     // Ensure is_bundling is set correctly based on existing data
                                     $productId = $get('product_id');
                                     $bundlingId = $get('bundling_id');
-                                    
+
                                     if ($bundlingId && !$productId) {
                                         $set('is_bundling', true);
                                     } elseif ($productId && !$bundlingId) {
@@ -787,7 +835,7 @@ class TransactionResource extends Resource
                                             // Check if we have product_id (individual product)
                                             if ($productId && !$bundlingId) {
                                                 return "produk-{$productId}";
-                                            } 
+                                            }
                                             // Check if we have bundling_id (bundling)
                                             elseif ($bundlingId && !$productId) {
                                                 return "bundling-{$bundlingId}";
@@ -808,7 +856,7 @@ class TransactionResource extends Resource
                                             if (!$state) {
                                                 $productId = $get('product_id');
                                                 $bundlingId = $get('bundling_id');
-                                                
+
                                                 if ($productId && !$bundlingId) {
                                                     $state = "produk-{$productId}";
                                                     $set('selection_key', $state);
@@ -837,6 +885,7 @@ class TransactionResource extends Resource
                                             $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
                                             $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
                                             $all = $get('../../detailTransactions') ?? [];
+                                            $currentTransactionId = $get('../../id'); // Get current transaction ID when editing
 
                                             if ($isBundling) {
                                                 $set('bundling_id', (int) $id);
@@ -849,7 +898,8 @@ class TransactionResource extends Resource
                                                     $startDate,
                                                     $endDate,
                                                     $uuid,
-                                                    $all
+                                                    $all,
+                                                    $currentTransactionId
                                                 );
 
                                                 // Use dispatch after state hydrated to set productItems
@@ -904,7 +954,7 @@ class TransactionResource extends Resource
                                         })
                                         ->columnSpan(1),
 
-                                    CheckboxList::make('productItems')
+                                    Placeholder::make('serial_numbers_display')
                                         ->label(function (Get $get) {
                                             $startDate = $get('../../start_date') ? \Carbon\Carbon::parse($get('../../start_date')) : now();
                                             $endDate = $get('../../end_date') ? \Carbon\Carbon::parse($get('../../end_date')) : now();
@@ -917,135 +967,121 @@ class TransactionResource extends Resource
                                                 $available = \App\Filament\Resources\TransactionResource::resolveAvailableProductSerials($get);
                                                 $availableCount = count($available);
                                             } elseif ($bundlingId) {
+                                                $currentTransactionId = $get('../../id');
+                                                $currentDetailTransactionId = $get('id');
                                                 $result = \App\Filament\Resources\TransactionResource::resolveBundlingProductSerialsDisplay(
                                                     (int) $bundlingId,
                                                     $quantity,
                                                     $startDate,
                                                     $endDate,
                                                     $get('uuid'),
-                                                    $get('../../detailTransactions') ?? []
+                                                    $get('../../detailTransactions') ?? [],
+                                                    $currentTransactionId,
+                                                    $currentDetailTransactionId
                                                 );
                                                 $availableCount = count($result['ids']);
                                             }
 
                                             $status = $availableCount >= $quantity ? '✅ Tersedia' : '⚠️ Tidak Tersedia';
 
-                                            return "Jumlah Produk/Serial Number ({$availableCount} tersedia) - {$status}";
+                                            return "Serial Numbers Auto-Assigned ({$availableCount} tersedia) - {$status}";
                                         })
-                                        ->visible(function (Get $get) {
-                                            return !is_null($get('selection_key'));
-                                        })
-                                        ->relationship(
-                                            'productItems',
-                                            'serial_number',
-                                            function (Builder $query, callable $get, CheckboxList $component) {
-                                                $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
-                                                $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
-                                                $productId = $get('product_id');
-                                                $bundlingId = $get('bundling_id');
-                                                $quantity = (int) ($get('quantity') ?? 1);
-                                                $uuid = $get('uuid');
-                                                $detailTransactions = $get('../../detailTransactions') ?? [];
-
-                                                // Ambil semua product_item_id yang sudah digunakan dalam repeater saat ini
-                                                $usedInCurrentRepeater = collect($detailTransactions)
-                                                    ->filter(fn($row) => is_array($row) && isset($row['uuid']) && $row['uuid'] !== $uuid)
-                                                    ->flatMap(fn($row) => is_array($row['productItems'] ?? null) ? $row['productItems'] : [])
-                                                    ->unique()
-                                                    ->values()
-                                                    ->all();
-
-
-                                                // Ambil semua product_item_id yang sudah digunakan di transaksi lain
-                                                $usedInOtherTransactions = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($q) use ($startDate, $endDate) {
-                                                    $q->where(function ($q) use ($startDate, $endDate) {
-                                                        $q->whereBetween('start_date', [$startDate, $endDate])
-                                                            ->orWhereBetween('end_date', [$startDate, $endDate]);
-                                                    });
-                                                })
-                                                    ->pluck('product_item_id')
-                                                    ->toArray();
-
-
-                                                // Gabungkan semua ID yang harus dikeluarkan
-                                                $excludedIds = array_unique(array_merge($usedInCurrentRepeater, $usedInOtherTransactions));
-
-
-
-                                                if ($productId) {
-                                                    // Untuk produk tunggal
-                                                    $availableIds = \App\Filament\Resources\TransactionResource::resolveAvailableProductSerials($get, fn() => null);
-                                                    $query->whereIn('product_items.id', $availableIds);
-                                                } elseif ($bundlingId) {
-                                                    // Untuk bundling
-                                                    $result = \App\Filament\Resources\TransactionResource::resolveBundlingProductSerialsDisplay(
-                                                        (int) $bundlingId,
-                                                        $quantity,
-                                                        $startDate,
-                                                        $endDate,
-                                                        $uuid,
-                                                        $detailTransactions
-                                                    );
-                                                    $query->whereIn('product_items.id', $result['ids']);
-                                                }
-
-                                                // When editing, we need to include currently selected items even if they're "excluded"
-                                                $currentlySelectedItems = $get('productItems') ?? [];
-                                                if (is_array($currentlySelectedItems) && !empty($currentlySelectedItems)) {
-                                                    // Include currently selected items OR available items, but exclude other used ones
-                                                    $finalExcludedIds = array_diff($excludedIds, $currentlySelectedItems);
-                                                    $query->where(function ($q) use ($finalExcludedIds, $currentlySelectedItems) {
-                                                        $q->whereNotIn('product_items.id', $finalExcludedIds)
-                                                            ->orWhereIn('product_items.id', $currentlySelectedItems);
-                                                    });
-                                                } else {
-                                                    // New transaction - just exclude used items
-                                                    $query->whereNotIn('product_items.id', $excludedIds);
-                                                }
-                                            }
-                                        )->saveRelationshipsUsing(function (CheckboxList $component, ?array $state, callable $get) {
-                                            $detailTransaction = $component->getModelInstance();
-                                            if (!empty($state)) {
-                                                $detailTransaction->productItems()->sync($state);
-                                            } else {
-                                                $detailTransaction->productItems()->detach();
-                                            }
-                                        })
-                                        ->default(function (Get $get) {
-                                            // If we're editing and there are existing productItems, return those IDs
-                                            $existingProductItems = $get('productItems');
-                                            if (is_array($existingProductItems) && !empty($existingProductItems)) {
-                                                return $existingProductItems;
-                                            }
-
-                                            $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
-                                            $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
+                                        ->content(function (Get $get) {
                                             $productId = $get('product_id');
                                             $bundlingId = $get('bundling_id');
                                             $quantity = (int) ($get('quantity') ?? 1);
-                                            $uuid = $get('uuid');
-                                            $detailTransactions = $get('../../detailTransactions') ?? [];
-
+                                            
+                                            if (!$productId && !$bundlingId) {
+                                                return 'Pilih produk atau bundling terlebih dahulu';
+                                            }
+                                            
+                                            // Get assigned serial numbers display
+                                            $detailTransactionId = $get('id');
+                                            if ($detailTransactionId) {
+                                                // Edit mode - show currently assigned serial numbers
+                                                $detailTransaction = \App\Models\DetailTransaction::with('productItems.product')->find($detailTransactionId);
+                                                if ($detailTransaction && $detailTransaction->productItems->isNotEmpty()) {
+                                                    $serialNumbers = $detailTransaction->productItems->pluck('serial_number')->toArray();
+                                                    return '<strong>Assigned:</strong> ' . implode(', ', $serialNumbers);
+                                                }
+                                            }
+                                            
+                                            // New transaction - show what will be assigned
                                             if ($productId) {
-                                                return \App\Filament\Resources\TransactionResource::resolveAvailableProductSerials($get);
+                                                $available = \App\Filament\Resources\TransactionResource::resolveAvailableProductSerials($get);
+                                                if (!empty($available)) {
+                                                    $items = \App\Models\ProductItem::whereIn('id', array_slice($available, 0, $quantity))->pluck('serial_number')->toArray();
+                                                    return '<strong>Will be assigned:</strong> ' . (empty($items) ? 'None available' : implode(', ', $items));
+                                                }
                                             } elseif ($bundlingId) {
+                                                $currentTransactionId = $get('../../id');
+                                                $currentDetailTransactionId = $get('id');
+                                                $startDate = $get('../../start_date') ? \Carbon\Carbon::parse($get('../../start_date')) : now();
+                                                $endDate = $get('../../end_date') ? \Carbon\Carbon::parse($get('../../end_date')) : now();
                                                 $result = \App\Filament\Resources\TransactionResource::resolveBundlingProductSerialsDisplay(
                                                     (int) $bundlingId,
                                                     $quantity,
                                                     $startDate,
                                                     $endDate,
-                                                    $uuid,
-                                                    $detailTransactions
+                                                    $get('uuid'),
+                                                    $get('../../detailTransactions') ?? [],
+                                                    $currentTransactionId,
+                                                    $currentDetailTransactionId
+                                                );
+                                                return '<strong>Will be assigned:</strong> ' . ($result['display'] ?: 'None available');
+                                            }
+                                            
+                                            return 'No items available';
+                                        })
+                                        ->visible(function (Get $get) {
+                                            return !is_null($get('selection_key'));
+                                        })
+                                        ->html(),
+
+                                    // Hidden field to store auto-assigned productItems
+                                    Hidden::make('productItems')
+                                        ->default(function (Get $get) {
+                                            // For edit mode, load existing productItems from database relationship
+                                            $detailTransactionId = $get('id');
+                                            if ($detailTransactionId) {
+                                                $detailTransaction = \App\Models\DetailTransaction::with('productItems')->find($detailTransactionId);
+                                                if ($detailTransaction && $detailTransaction->productItems->isNotEmpty()) {
+                                                    return $detailTransaction->productItems->pluck('id')->toArray();
+                                                }
+                                            }
+
+                                            // For new records, auto-assign available items
+                                            $productId = $get('product_id');
+                                            $bundlingId = $get('bundling_id');
+                                            $quantity = (int) ($get('quantity') ?? 1);
+
+                                            if ($productId) {
+                                                $available = \App\Filament\Resources\TransactionResource::resolveAvailableProductSerials($get);
+                                                return array_slice($available, 0, $quantity); // Take only needed quantity
+                                            } elseif ($bundlingId) {
+                                                $currentTransactionId = $get('../../id');
+                                                $currentDetailTransactionId = $get('id');
+                                                $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
+                                                $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
+                                                $result = \App\Filament\Resources\TransactionResource::resolveBundlingProductSerialsDisplay(
+                                                    (int) $bundlingId,
+                                                    $quantity,
+                                                    $startDate,
+                                                    $endDate,
+                                                    $get('uuid'),
+                                                    $get('../../detailTransactions') ?? [],
+                                                    $currentTransactionId,
+                                                    $currentDetailTransactionId
                                                 );
                                                 return $result['ids'] ?? [];
                                             }
 
                                             return [];
                                         })
-                                        ->columns(2)
-                                        ->reactive()
-                                        ->bulkToggleable()
-                                        ->columnSpan(3),
+                                        ->dehydrateStateUsing(function ($state) {
+                                            // Ensure we return an array
+                                            return is_array($state) ? $state : [];
+                                        }),
 
                                 ]),
                         ])
@@ -1570,6 +1606,7 @@ class TransactionResource extends Resource
                     'detailTransactions:id,transaction_id,product_id,bundling_id,quantity',
                     'detailTransactions.product:id,name',
                     'detailTransactions.bundling:id,name',
+                    'detailTransactions.bundling.products:id,name',
                     'detailTransactions.productItems:id,serial_number,product_id',
                     'promo:id,name'
                 ]);
@@ -1624,9 +1661,10 @@ class TransactionResource extends Resource
 
                     ->copyable(),
                 TextColumn::make('product_info')
-                    ->label('Product')
-                    ->limit(20)
+                    ->label('Product + Serial Numbers')
                     ->size(TextColumnSize::ExtraSmall)
+                    ->html()
+                    ->wrap()
                     ->getStateUsing(function ($record) {
                         $products = [];
                         $searchTerm = request('tableSearch');
@@ -1634,21 +1672,86 @@ class TransactionResource extends Resource
                         // Use already eager-loaded relationships to avoid N+1 queries
                         if ($record->relationLoaded('detailTransactions')) {
                             foreach ($record->detailTransactions as $detail) {
+                                $productInfo = '';
+                                $quantity = $detail->quantity ?? 1;
+                                
                                 if ($detail->bundling_id && $detail->relationLoaded('bundling') && $detail->bundling) {
-                                    $bundleName = $detail->bundling->name . ' (Bundle)';
-                                    $products[] = static::highlightSearchTerm($bundleName, $searchTerm);
+                                    // BUNDLING: Show bundling name + products inside + serial numbers
+                                    $bundleName = static::highlightSearchTerm($detail->bundling->name, $searchTerm);
+                                    $productInfo = "<strong>{$bundleName} (Bundle)";
+                                    if ($quantity > 1) {
+                                        $productInfo .= " x{$quantity}";
+                                    }
+                                    $productInfo .= ":</strong><br>";
+                                    
+                                    // Get bundling products and their serial numbers
+                                    if ($detail->bundling->relationLoaded('products')) {
+                                        $bundlingDetails = [];
+                                        foreach ($detail->bundling->products as $bundlingProduct) {
+                                            $requiredQty = $quantity * ($bundlingProduct->pivot->quantity ?? 1);
+                                            
+                                            // Get serial numbers for this product in this detail transaction
+                                            $serialNumbers = [];
+                                            if ($detail->relationLoaded('productItems')) {
+                                                foreach ($detail->productItems as $item) {
+                                                    if ($item->product_id == $bundlingProduct->id) {
+                                                        $serialNumbers[] = static::highlightSearchTerm($item->serial_number, $searchTerm);
+                                                    }
+                                                }
+                                            }
+                                            
+                                            $productDetail = "&nbsp;&nbsp;• {$bundlingProduct->name}";
+                                            if ($requiredQty > 1) {
+                                                $productDetail .= " x{$requiredQty}";
+                                            }
+                                            
+                                            if (!empty($serialNumbers)) {
+                                                $productDetail .= ": " . implode(', ', $serialNumbers);
+                                            } else {
+                                                $productDetail .= ": <em>No serial numbers</em>";
+                                            }
+                                            
+                                            $bundlingDetails[] = $productDetail;
+                                        }
+                                        $productInfo .= implode('<br>', $bundlingDetails);
+                                    }
+                                    
                                 } elseif ($detail->product_id && $detail->relationLoaded('product') && $detail->product) {
-                                    $productName = $detail->product->name;
-                                    $products[] = static::highlightSearchTerm($productName, $searchTerm);
+                                    // SINGLE PRODUCT: Show product name + serial numbers
+                                    $productName = static::highlightSearchTerm($detail->product->name, $searchTerm);
+                                    $productInfo = "<strong>{$productName}";
+                                    if ($quantity > 1) {
+                                        $productInfo .= " x{$quantity}";
+                                    }
+                                    $productInfo .= ":</strong> ";
+                                    
+                                    // Get serial numbers for this product
+                                    $serialNumbers = [];
+                                    if ($detail->relationLoaded('productItems')) {
+                                        foreach ($detail->productItems as $item) {
+                                            $serialNumbers[] = static::highlightSearchTerm($item->serial_number, $searchTerm);
+                                        }
+                                    }
+                                    
+                                    if (!empty($serialNumbers)) {
+                                        $productInfo .= implode(', ', $serialNumbers);
+                                    } else {
+                                        $productInfo .= "<em>No serial numbers</em>";
+                                    }
+                                }
+                                
+                                if ($productInfo) {
+                                    $products[] = $productInfo;
                                 }
                             }
                         }
 
-                        return implode(', ', array_unique($products)) ?: 'N/A';
+                        return !empty($products) ? implode('<br><br>', $products) : 'N/A';
                     })
                     ->html()
                     ->searchable()
-                    ->wrap(),
+                    ->wrap()
+                    ->lineClamp(null), // Remove line clamp to show all content
                 TextColumn::make('detailTransactions.productItems.serial_number')
                     ->label('S/N')
                     ->size(TextColumnSize::ExtraSmall)
@@ -1932,6 +2035,14 @@ class TransactionResource extends Resource
                 ])
                     ->label('status')
                     ->size(ActionSize::ExtraSmall),
+                Action::make('Invoice')
+                    ->color('success')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->label('invoice')
+                    ->url(fn(Transaction $record) => route('pdf', $record))
+                    ->openUrlInNewTab()
+                    ->size(ActionSize::ExtraSmall),
+
                 BulkActionGroup::make([
                     ViewAction::make()
                         ->icon('heroicon-o-eye')
@@ -1949,14 +2060,7 @@ class TransactionResource extends Resource
                         ->label('delete')
 
                         ->size(ActionSize::ExtraSmall),
-                    Action::make('Invoice')
-                        ->color('success')
-                        ->icon('heroicon-o-arrow-down-tray')
-                        ->label('invoice')
 
-                        ->url(fn(Transaction $record) => route('pdf', $record))
-                        ->openUrlInNewTab()
-                        ->size(ActionSize::ExtraSmall),
 
                     ActivityLogTimelineTableAction::make('Activities')
                         ->label('log')
