@@ -53,7 +53,7 @@
     }
 
     .col-3 {
-      width: 25%;
+      width: 50px;
     }
 
     .col-9 {
