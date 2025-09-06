@@ -717,9 +717,33 @@ class TransactionResource extends Resource
                             Hidden::make('uuid')
                                 ->label('UUID')
                                 ->default(fn() => (string) Str::uuid()),
-                            Hidden::make('is_bundling')->default(false),
-                            Hidden::make('bundling_id'),
-                            Hidden::make('product_id'),
+                            Hidden::make('is_bundling')
+                                ->default(false)
+                                ->afterStateHydrated(function ($state, $set, $get) {
+                                    // Ensure is_bundling is set correctly based on existing data
+                                    $productId = $get('product_id');
+                                    $bundlingId = $get('bundling_id');
+                                    
+                                    if ($bundlingId && !$productId) {
+                                        $set('is_bundling', true);
+                                    } elseif ($productId && !$bundlingId) {
+                                        $set('is_bundling', false);
+                                    }
+                                }),
+                            Hidden::make('bundling_id')
+                                ->afterStateHydrated(function ($state, $set, $get) {
+                                    // Ensure bundling_id is preserved during edit
+                                    if ($state) {
+                                        $set('is_bundling', true);
+                                    }
+                                }),
+                            Hidden::make('product_id')
+                                ->afterStateHydrated(function ($state, $set, $get) {
+                                    // Ensure product_id is preserved during edit
+                                    if ($state && !$get('bundling_id')) {
+                                        $set('is_bundling', false);
+                                    }
+                                }),
                             Grid::make()
                                 ->columns([
                                     'sm' => 1,
@@ -760,7 +784,16 @@ class TransactionResource extends Resource
                                             $bundlingId = $get('bundling_id');
                                             $isBundling = $get('is_bundling');
 
-                                            if ($productId && !$isBundling) {
+                                            // Check if we have product_id (individual product)
+                                            if ($productId && !$bundlingId) {
+                                                return "produk-{$productId}";
+                                            } 
+                                            // Check if we have bundling_id (bundling)
+                                            elseif ($bundlingId && !$productId) {
+                                                return "bundling-{$bundlingId}";
+                                            }
+                                            // Legacy support for is_bundling field
+                                            elseif ($productId && !$isBundling) {
                                                 return "produk-{$productId}";
                                             } elseif ($bundlingId && $isBundling) {
                                                 return "bundling-{$bundlingId}";
@@ -771,9 +804,32 @@ class TransactionResource extends Resource
 
                                         // Trigger saat awal data dimuat
                                         ->afterStateHydrated(function ($state, Set $set, Get $get) {
-                                            if (!$state) return;
+                                            // If no state but we have product_id or bundling_id, construct the state
+                                            if (!$state) {
+                                                $productId = $get('product_id');
+                                                $bundlingId = $get('bundling_id');
+                                                
+                                                if ($productId && !$bundlingId) {
+                                                    $state = "produk-{$productId}";
+                                                    $set('selection_key', $state);
+                                                } elseif ($bundlingId && !$productId) {
+                                                    $state = "bundling-{$bundlingId}";
+                                                    $set('selection_key', $state);
+                                                } else {
+                                                    return; // No valid state to work with
+                                                }
+                                            }
 
-                                            [$type, $id] = explode('-', $state);
+                                            // Parse the state
+                                            if (!str_contains($state, '-')) {
+                                                return; // Invalid format
+                                            }
+
+                                            [$type, $id] = explode('-', $state, 2);
+                                            if (!$type || !$id) {
+                                                return; // Invalid parts
+                                            }
+
                                             $isBundling = $type === 'bundling';
                                             $set('is_bundling', $isBundling);
 
@@ -827,6 +883,8 @@ class TransactionResource extends Resource
                                             $allDetailTransactions = $get('../../detailTransactions') ?? [];
                                             \App\Filament\Resources\TransactionResource::resolveProductOrBundlingSelection($state, $set, $get, $allDetailTransactions);
                                         })
+                                        // Prevent selection_key from being saved to database
+                                        ->dehydrated(false)
                                         ->columnSpan(2),
                                     TextInput::make('quantity')
                                         ->label('Jumlah')

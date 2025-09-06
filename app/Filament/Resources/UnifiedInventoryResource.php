@@ -284,7 +284,7 @@ class UnifiedInventoryResource extends Resource
                     ->label('View Details')
                     ->icon('heroicon-o-eye')
                     ->color('primary')
-                    ->url(fn ($record) => route('filament.admin.resources.products.view', ['record' => $record->id]))
+                    ->url(fn ($record) => route('filament.admin.resources.products.edit', ['record' => $record->id]))
                     ->openUrlInNewTab(),
             ])
             ->headerActions([
