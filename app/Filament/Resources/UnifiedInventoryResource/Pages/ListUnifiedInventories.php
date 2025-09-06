@@ -55,67 +55,40 @@ class ListUnifiedInventories extends ListRecords
                 ->color('primary')
                 ->size('lg')
                 ->form([
-                    Section::make('🔍 Pencarian Ketersediaan Produk & Bundling')
-                        ->description('Pilih produk atau bundling yang ingin Anda periksa ketersediaannya, lalu tentukan periode tanggal.')
-                        ->schema([
-                            Grid::make(2)
-                                ->schema([
-                                    Select::make('selected_products')
-                                        ->label('🛍️ Pilih Produk')
-                                        ->multiple()
-                                        ->searchable()
-                                        ->preload()
-                                        ->options(function () {
-                                            return Product::select('id', 'name')
-                                                ->where('status', '!=', 'deleted')
-                                                ->orderBy('name')
-                                                ->pluck('name', 'id');
-                                        })
-                                        ->placeholder('Ketik untuk mencari produk...')
-                                        ->helperText('💡 Anda bisa memilih beberapa produk sekaligus')
-                                        ->columnSpan(1),
-                                        
-                                    Select::make('selected_bundlings')
-                                        ->label('📦 Pilih Bundling')
-                                        ->multiple()
-                                        ->searchable()
-                                        ->preload()
-                                        ->options(function () {
-                                            return Bundling::select('id', 'name')
-                                                ->orderBy('name')
-                                                ->pluck('name', 'id');
-                                        })
-                                        ->placeholder('Ketik untuk mencari bundling...')
-                                        ->helperText('💡 Anda bisa memilih beberapa bundling sekaligus')
-                                        ->columnSpan(1),
-                                ]),
-                                
-                            Grid::make(2)
-                                ->schema([
-                                    DateTimePicker::make('start_date')
-                                        ->label('📅 Tanggal & Waktu Mulai')
-                                        ->default(now())
-                                        ->maxDate(now()->addYear())
-                                        ->native(false)
-                                        ->displayFormat('d M Y H:i')
-                                        ->helperText('Tanggal mulai periode pengecekan')
-                                        ->required()
-                                        ->columnSpan(1),
-                                        
-                                    DateTimePicker::make('end_date')
-                                        ->label('📅 Tanggal & Waktu Selesai')
-                                        ->default(now()->addDays(7)->endOfDay())
-                                        ->after('start_date')
-                                        ->maxDate(now()->addYear())
-                                        ->native(false)
-                                        ->displayFormat('d M Y H:i')
-                                        ->helperText('Default: 7 hari kedepan jam 24:00')
-                                        ->required()
-                                        ->columnSpan(1),
-                                ]),
-                        ])
-                        ->collapsible()
-                        ->persistCollapsed(false),
+                    Select::make('selected_products')
+                        ->label('🛍️ Pilih Produk')
+                        ->multiple()
+                        ->searchable()
+                        ->options(\App\Models\Product::where('status', '!=', 'deleted')->orderBy('name')->pluck('name', 'id')->toArray())
+                        ->placeholder('Ketik untuk mencari produk...')
+                        ->helperText('💡 Anda bisa memilih beberapa produk sekaligus'),
+                        
+                    Select::make('selected_bundlings')
+                        ->label('📦 Pilih Bundling')
+                        ->multiple()
+                        ->searchable()
+                        ->options(\App\Models\Bundling::orderBy('name')->pluck('name', 'id')->toArray())
+                        ->placeholder('Ketik untuk mencari bundling...')
+                        ->helperText('💡 Anda bisa memilih beberapa bundling sekaligus'),
+                        
+                    DateTimePicker::make('start_date')
+                        ->label('📅 Tanggal & Waktu Mulai')
+                        ->default(now())
+                        ->maxDate(now()->addYear())
+                        ->native(false)
+                        ->displayFormat('d M Y H:i')
+                        ->helperText('Tanggal mulai periode pengecekan')
+                        ->required(),
+                        
+                    DateTimePicker::make('end_date')
+                        ->label('📅 Tanggal & Waktu Selesai')
+                        ->default(now()->addDays(7)->endOfDay())
+                        ->after('start_date')
+                        ->maxDate(now()->addYear())
+                        ->native(false)
+                        ->displayFormat('d M Y H:i')
+                        ->helperText('Default: 7 hari kedepan jam 24:00')
+                        ->required(),
                 ])
                 ->action(function (array $data) {
                     if (empty($data['selected_products']) && empty($data['selected_bundlings'])) {

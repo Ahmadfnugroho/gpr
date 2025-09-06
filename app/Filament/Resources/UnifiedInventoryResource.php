@@ -291,8 +291,8 @@ class UnifiedInventoryResource extends Resource
                     ->modalCancelActionLabel('Close'),
             ])
             ->emptyStateHeading('🔍 Pilih Produk/Bundling untuk Melihat Ketersediaan')
-            ->emptyStateDescription('📝 Langkah-langkah:\n1. Klik tombol "Filter" di atas\n2. Pilih produk atau bundling yang ingin dicek\n3. Atur tanggal periode pengecekan\n4. Klik "Apply" untuk melihat hasil')
-            ->emptyStateIcon('heroicon-o-funnel')
+            ->emptyStateDescription('📝 Langkah-langkah:\n1. Klik tombol "🔍 Cari Ketersediaan" di header\n2. Pilih produk atau bundling yang ingin dicek\n3. Atur tanggal periode pengecekan\n4. Klik "🔍 Cari Sekarang" untuk melihat hasil')
+            ->emptyStateIcon('heroicon-o-magnifying-glass')
             ->striped()
             ->poll('30s'); // Auto-refresh every 30 seconds
     }

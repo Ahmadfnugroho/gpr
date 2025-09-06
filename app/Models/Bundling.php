@@ -32,7 +32,9 @@ class Bundling extends Model
         parent::boot();
 
         static::creating(function ($bundling) {
-            $bundling->custom_id = 'bundling-' . (self::max('id') + 1);
+            if (empty($bundling->custom_id)) {
+                $bundling->custom_id = 'bundling-' . (self::max('id') + 1);
+            }
         });
     }
 
