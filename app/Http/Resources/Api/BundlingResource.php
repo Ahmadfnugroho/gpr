@@ -23,6 +23,16 @@ class BundlingResource extends JsonResource
             'slug' => $this->slug,
             'premiere' => (bool)$this->premiere,
             
+            // Bundling photos
+            'bundlingPhotos' => $this->whenLoaded('bundlingPhotos', function () {
+                return $this->bundlingPhotos->map(function ($photo) {
+                    return [
+                        'id' => $photo->id,
+                        'photo' => $photo->photo,
+                    ];
+                });
+            }),
+            
             // Products dalam bundling dengan rental includes
             'products' => $this->whenLoaded('products', function () {
                 return $this->products->map(function ($product) {

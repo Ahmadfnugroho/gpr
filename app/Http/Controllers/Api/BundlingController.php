@@ -18,6 +18,7 @@ class BundlingController extends Controller
     public function index(Request $request)
     {
         $query = Bundling::query()->with([
+            'bundlingPhotos',
             'products',
             'products.category',
             'products.brand',
@@ -57,6 +58,7 @@ class BundlingController extends Controller
     public function show($slug)
     {
         $bundling = Bundling::with([
+            'bundlingPhotos',
             'products',
             'products.category',
             'products.brand',
@@ -90,8 +92,8 @@ class BundlingController extends Controller
         foreach ($request->products as $product) {
             $bundling->products()->attach($product['id'], ['quantity' => $product['quantity']]);
         }
-        $bundling->load(['products']);
-        return response()->json($bundling, 201);
+        $bundling->load(['bundlingPhotos', 'products']);
+        return new BundlingResource($bundling);
     }
 
     // Update a bundling
@@ -117,8 +119,8 @@ class BundlingController extends Controller
             }
             $bundling->products()->sync($syncData);
         }
-        $bundling->load(['products']);
-        return response()->json($bundling);
+        $bundling->load(['bundlingPhotos', 'products']);
+        return new BundlingResource($bundling);
     }
 
     // Delete a bundling
