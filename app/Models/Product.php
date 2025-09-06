@@ -210,21 +210,39 @@ class Product extends Model
 
     public function getIsAvailableAttribute(): bool
     {
-        $today = Carbon::today();
-        $endOfDay = Carbon::today()->endOfDay();
+        // Cache availability status for 10 minutes
+        $cacheKey = "product_availability_{$this->id}_" . now()->format('Y-m-d_H');
+        
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () {
+            $today = Carbon::today();
+            $endOfDay = Carbon::today()->endOfDay();
 
-        // Cek apakah ada item yang tersedia hari ini
-        return $this->items()
-            ->actuallyAvailableForPeriod($today, $endOfDay)
-            ->exists();
+            // Optimized query with exists() for better performance
+            return $this->items()
+                ->where('is_available', true)
+                ->whereDoesntHave('detailTransactions.transaction', function ($query) use ($today, $endOfDay) {
+                    $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                        ->where('start_date', '<=', $endOfDay)
+                        ->where('end_date', '>=', $today);
+                })
+                ->exists();
+        });
     }
 
     public function getStatusAttribute($value): string
     {
-        // Jika kamu ingin tetap bisa override via DB, atau biarkan otomatis
-        // Kita overwrite berdasarkan ketersediaan
-        return $this->is_available
-            ? self::STATUS_AVAILABLE
-            : self::STATUS_UNAVAILABLE;
+        // Cache status calculation for better performance
+        $cacheKey = "product_status_{$this->id}_" . now()->format('Y-m-d_H');
+        
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($value) {
+            // Use database value if explicitly set, otherwise calculate from availability
+            if ($value && in_array($value, [self::STATUS_AVAILABLE, self::STATUS_UNAVAILABLE, 'maintenance'])) {
+                return $value;
+            }
+            
+            return $this->is_available
+                ? self::STATUS_AVAILABLE
+                : self::STATUS_UNAVAILABLE;
+        });
     }
 }

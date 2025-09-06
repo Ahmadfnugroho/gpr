@@ -59,8 +59,9 @@ class ProductResource extends Resource
     {
         return parent::getGlobalSearchEloquentQuery()
             ->select(['id', 'name', 'status', 'price'])
+            ->with(['category:id,name', 'brand:id,name'])
             ->where('status', '!=', 'deleted')
-            ->limit(100);
+            ->limit(50); // Reduce limit for better performance
     }
 
     public static function modifyGlobalSearchQuery(Builder $query, string $search): void
@@ -80,41 +81,37 @@ class ProductResource extends Resource
     }
     public static function getGlobalSearchResultDetails(\Illuminate\Database\Eloquent\Model $record): array
     {
-        $today = Carbon::now();
+        // Use cached availability status instead of complex queries
+        $cacheKey = "product_search_details_{$record->id}";
+        
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addMinutes(5), function () use ($record) {
+            $today = Carbon::now();
 
-        // Get latest transaction dates
-        $latestTransaction = $record->detailTransactions()
-            ->with('transaction')
-            ->whereHas('transaction', function ($query) {
-                $query->where('booking_status', '!=', 'cancel');
-            })
-            ->latest('created_at')
-            ->first();
+            // Simplified query with select to reduce data transfer
+            $latestTransaction = $record->detailTransactions()
+                ->select(['id', 'transaction_id', 'created_at'])
+                ->with('transaction:id,start_date,end_date,booking_status')
+                ->whereHas('transaction', function ($query) {
+                    $query->where('booking_status', '!=', 'cancel');
+                })
+                ->latest('created_at')
+                ->first();
 
-        $transactionInfo = '-';
-        if ($latestTransaction && $latestTransaction->transaction) {
-            $startDate = $latestTransaction->transaction->start_date ? $latestTransaction->transaction->start_date->format('d M Y') : '-';
-            $endDate = $latestTransaction->transaction->end_date ? $latestTransaction->transaction->end_date->format('d M Y') : '-';
-            $transactionInfo = "{$startDate} - {$endDate}";
-        }
+            $transactionInfo = '-';
+            if ($latestTransaction && $latestTransaction->transaction) {
+                $startDate = $latestTransaction->transaction->start_date ? $latestTransaction->transaction->start_date->format('d M Y') : '-';
+                $endDate = $latestTransaction->transaction->end_date ? $latestTransaction->transaction->end_date->format('d M Y') : '-';
+                $transactionInfo = "{$startDate} - {$endDate}";
+            }
 
-        // Check availability based on current active transactions
-        $hasActiveTransaction = $record->detailTransactions()
-            ->whereHas('transaction', function ($query) use ($today) {
-                $query->where('booking_status', '!=', 'cancel')
-                    ->where('start_date', '<=', $today)
-                    ->where('end_date', '>=', $today);
-            })
-            ->exists();
+            // Use model attribute instead of complex query
+            $availabilityStatus = $record->is_available ? '🟢 Tersedia' : '🔴 Tidak Tersedia';
 
-        // If has active transaction today, then not available, otherwise available
-        $isAvailable = !$hasActiveTransaction;
-        $availabilityStatus = $isAvailable ? '🟢 Tersedia' : '🔴 Tidak Tersedia';
-
-        return [
-            'Latest Rental' => $transactionInfo,
-            'Available' => $availabilityStatus,
-        ];
+            return [
+                'Latest Rental' => $transactionInfo,
+                'Available' => $availabilityStatus,
+            ];
+        });
     }
 
     protected static ?string $navigationIcon = 'heroicon-o-cube-transparent';
@@ -283,12 +280,15 @@ class ProductResource extends Resource
                             ->searchable()
                             ->wrap()
                             ->alignCenter()
-                            ->sortable(),
+                            ->sortable()
+                            ->limit(50),
                         Tables\Columns\TextColumn::make('items_count')
                             ->label('Qty')
-                            ->counts('items')
                             ->alignCenter()
-                            ->sortable(),
+                            ->sortable()
+                            ->getStateUsing(function ($record) {
+                                return $record->items_count ?? 0;
+                            }),
 
 
                         // Tables\Columns\TextColumn::make('items.serial_number')
@@ -339,7 +339,25 @@ class ProductResource extends Resource
                     ->wrapHeader()
 
             ])
-            ->modifyQueryUsing(fn(Builder $query) => $query->withCount('items')->limit(500))
+            ->modifyQueryUsing(function (Builder $query) {
+                return $query
+                    ->select([
+                        'products.id',
+                        'products.name', 
+                        'products.status',
+                        'products.premiere',
+                        'products.category_id',
+                        'products.brand_id',
+                        'products.sub_category_id'
+                    ])
+                    ->withCount('items')
+                    ->with([
+                        'category:id,name',
+                        'brand:id,name',
+                        'subCategory:id,name'
+                    ])
+                    ->limit(500);
+            })
 
 
 
@@ -355,19 +373,19 @@ class ProductResource extends Resource
                     ->preload(),
                 Tables\Filters\SelectFilter::make('category_id')
                     ->label('Kategori')
-                    ->options(Category::all()->pluck('name', 'id')->toArray())
+                    ->relationship('category', 'name')
                     ->searchable()
                     ->multiple()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('brand_id')
                     ->label('Brand')
-                    ->options(Brand::all()->pluck('name', 'id')->toArray())
+                    ->relationship('brand', 'name')
                     ->searchable()
                     ->multiple()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('sub_category_id')
                     ->label('Sub Kategori')
-                    ->options(SubCategory::all()->pluck('name', 'id')->toArray())
+                    ->relationship('subCategory', 'name')
                     ->searchable()
                     ->multiple()
                     ->preload(),
