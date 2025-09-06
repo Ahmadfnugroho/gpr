@@ -990,11 +990,11 @@ class TransactionResource extends Resource
                                             $productId = $get('product_id');
                                             $bundlingId = $get('bundling_id');
                                             $quantity = (int) ($get('quantity') ?? 1);
-                                            
+
                                             if (!$productId && !$bundlingId) {
                                                 return new HtmlString('Pilih produk atau bundling terlebih dahulu');
                                             }
-                                            
+
                                             // Get assigned serial numbers display
                                             $detailTransactionId = $get('id');
                                             if ($detailTransactionId) {
@@ -1005,7 +1005,7 @@ class TransactionResource extends Resource
                                                     return new HtmlString('<strong>Assigned:</strong> ' . implode(', ', $serialNumbers));
                                                 }
                                             }
-                                            
+
                                             // New transaction - show what will be assigned
                                             if ($productId) {
                                                 $available = \App\Filament\Resources\TransactionResource::resolveAvailableProductSerials($get);
@@ -1030,7 +1030,7 @@ class TransactionResource extends Resource
                                                 );
                                                 return new HtmlString('<strong>Will be assigned:</strong> ' . ($result['display'] ?: 'None available'));
                                             }
-                                            
+
                                             return new HtmlString('No items available');
                                         })
                                         ->visible(function (Get $get) {

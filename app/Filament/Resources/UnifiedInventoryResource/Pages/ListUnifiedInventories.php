@@ -12,15 +12,18 @@ use Filament\Resources\Components\Tab;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Filament\Forms\Components\Grid;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Section;
-use Filament\Notifications\Notification;
+use App\Filament\Widgets\InventorySelectionFormWidget;
 
 class ListUnifiedInventories extends ListRecords
 {
     protected static string $resource = UnifiedInventoryResource::class;
+    
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            InventorySelectionFormWidget::class,
+        ];
+    }
     
     public function getTitle(): string
     {
@@ -49,103 +52,6 @@ class ListUnifiedInventories extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('search_inventory')
-                ->label('🔍 Cari Ketersediaan')
-                ->icon('heroicon-o-magnifying-glass')
-                ->color('primary')
-                ->size('lg')
-                ->form([
-                    Select::make('selected_products')
-                        ->label('🛍️ Pilih Produk')
-                        ->multiple()
-                        ->searchable()
-                        ->options(\App\Models\Product::where('status', '!=', 'deleted')->orderBy('name')->pluck('name', 'id')->toArray())
-                        ->placeholder('Ketik untuk mencari produk...')
-                        ->helperText('💡 Anda bisa memilih beberapa produk sekaligus'),
-                        
-                    Select::make('selected_bundlings')
-                        ->label('📦 Pilih Bundling')
-                        ->multiple()
-                        ->searchable()
-                        ->options(\App\Models\Bundling::orderBy('name')->pluck('name', 'id')->toArray())
-                        ->placeholder('Ketik untuk mencari bundling...')
-                        ->helperText('💡 Anda bisa memilih beberapa bundling sekaligus'),
-                        
-                    DateTimePicker::make('start_date')
-                        ->label('📅 Tanggal & Waktu Mulai')
-                        ->default(now())
-                        ->maxDate(now()->addYear())
-                        ->native(false)
-                        ->displayFormat('d M Y H:i')
-                        ->helperText('Tanggal mulai periode pengecekan')
-                        ->required(),
-                        
-                    DateTimePicker::make('end_date')
-                        ->label('📅 Tanggal & Waktu Selesai')
-                        ->default(now()->addDays(7)->endOfDay())
-                        ->after('start_date')
-                        ->maxDate(now()->addYear())
-                        ->native(false)
-                        ->displayFormat('d M Y H:i')
-                        ->helperText('Default: 7 hari kedepan jam 24:00')
-                        ->required(),
-                ])
-                ->action(function (array $data) {
-                    if (empty($data['selected_products']) && empty($data['selected_bundlings'])) {
-                        Notification::make()
-                            ->title('⚠️ Pilihan Kosong')
-                            ->body('Silakan pilih minimal satu produk atau bundling.')
-                            ->warning()
-                            ->send();
-                        return;
-                    }
-                    
-                    // Build query parameters
-                    $params = [];
-                    
-                    // Handle products array
-                    if (!empty($data['selected_products'])) {
-                        foreach ($data['selected_products'] as $productId) {
-                            $params['selected_products[]'] = $productId;
-                        }
-                    }
-                    
-                    // Handle bundlings array  
-                    if (!empty($data['selected_bundlings'])) {
-                        foreach ($data['selected_bundlings'] as $bundlingId) {
-                            $params['selected_bundlings[]'] = $bundlingId;
-                        }
-                    }
-                    
-                    // Add date parameters
-                    $params['start_date'] = $data['start_date'];
-                    $params['end_date'] = $data['end_date'];
-                    
-                    // Show success notification
-                    $productCount = count($data['selected_products'] ?? []);
-                    $bundlingCount = count($data['selected_bundlings'] ?? []);
-                    
-                    Notification::make()
-                        ->title('✅ Pencarian Berhasil')
-                        ->body("Menampilkan {$productCount} produk dan {$bundlingCount} bundling.")
-                        ->success()
-                        ->send();
-                    
-                    // Redirect with parameters
-                    return redirect()->to('/admin/unified-inventory?' . http_build_query($params));
-                })
-                ->modalSubmitActionLabel('🔍 Cari Sekarang')
-                ->modalWidth('4xl'),
-                
-            Actions\Action::make('reset_search')
-                ->label('Reset')
-                ->icon('heroicon-o-arrow-path')
-                ->color('gray')
-                ->url('/admin/unified-inventory')
-                ->visible(function () {
-                    return !empty(request('selected_products')) || !empty(request('selected_bundlings'));
-                }),
-                
             Actions\Action::make('help')
                 ->label('Help')
                 ->icon('heroicon-o-question-mark-circle')
