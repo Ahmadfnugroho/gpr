@@ -28,10 +28,17 @@ class ProductAvailabilityResource extends Resource
     // Use a custom model collection that combines Products and Bundlings
     protected static ?string $model = Product::class;
 
+    // This resource is now deprecated - use InventoryAvailabilityResource instead
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
-    protected static ?string $navigationGroup = 'Inventory Management';
-    protected static ?string $navigationLabel = 'Product Availability';
+    protected static ?string $navigationGroup = null; // Hidden from navigation
+    protected static ?string $navigationLabel = 'Product Availability (Deprecated)';
     protected static ?int $navigationSort = 25;
+    
+    // Hide from navigation
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
     protected static ?string $slug = 'product-availability';
 
     /**

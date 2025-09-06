@@ -23,10 +23,17 @@ class BundlingAvailabilityResource extends Resource
 {
     protected static ?string $model = Bundling::class;
 
+    // This resource is now deprecated - use InventoryAvailabilityResource instead
     protected static ?string $navigationIcon = 'heroicon-o-cube';
-    protected static ?string $navigationGroup = 'Inventory Management';
-    protected static ?string $navigationLabel = 'Bundling Availability';
+    protected static ?string $navigationGroup = null; // Hidden from navigation
+    protected static ?string $navigationLabel = 'Bundling Availability (Deprecated)';
     protected static ?int $navigationSort = 26;
+    
+    // Hide from navigation
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
     protected static ?string $slug = 'bundling-availability';
 
     // Disable create, edit, delete since this is read-only
