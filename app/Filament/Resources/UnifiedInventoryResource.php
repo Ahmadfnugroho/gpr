@@ -98,19 +98,27 @@ class UnifiedInventoryResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->modifyQueryUsing(function (Builder $query) {
-                $searchTerm = request('tableSearch');
+                // Only apply this query modification for products tab
+                // Bundlings tab is handled separately in getTableRecords()
+                $activeTab = request('activeTab') ?? 'products';
                 
-                if ($searchTerm && strlen(trim($searchTerm)) >= 2) {
-                    // Clean and normalize search term (match global search behavior)
-                    $searchTerm = trim(strtolower($searchTerm));
+                if ($activeTab === 'products' || $activeTab === 'all') {
+                    $searchTerm = request('tableSearch');
                     
-                    // Use exact phrase search like global search
-                    $query->where(function ($q) use ($searchTerm) {
-                        $q->whereRaw('LOWER(name) LIKE ?', ["%{$searchTerm}%"]);
-                    });
+                    if ($searchTerm && strlen(trim($searchTerm)) >= 2) {
+                        // Clean and normalize search term (match global search behavior)
+                        $searchTerm = trim(strtolower($searchTerm));
+                        
+                        // Use exact phrase search like global search
+                        $query->where(function ($q) use ($searchTerm) {
+                            $q->whereRaw('LOWER(name) LIKE ?', ["%{$searchTerm}%"]);
+                        });
+                    }
+                    
+                    return $query->with(['items', 'bundlings']);
                 }
                 
-                return $query->with(['items', 'bundlings']);
+                return $query;
             })
             ->columns([
                 TextColumn::make('item_type')
@@ -141,7 +149,15 @@ class UnifiedInventoryResource extends Resource
                 TextColumn::make('total_items')
                     ->label('Total Items')
                     ->getStateUsing(function ($record) {
-                        return $record->items()->count();
+                        // Check if this is a Product or Bundling
+                        if ($record instanceof \App\Models\Product) {
+                            return $record->items()->count();
+                        }
+                        // For bundlings, show total items across all products
+                        if ($record instanceof \App\Models\Bundling) {
+                            return $record->products()->withSum('items as total_items', 'id')->get()->sum('total_items');
+                        }
+                        return 0;
                     })
                     ->alignCenter()
                     ->sortable(false),
@@ -161,7 +177,14 @@ class UnifiedInventoryResource extends Resource
                     })
                     ->alignCenter()
                     ->color(function ($state, $record) {
-                        $total = $record->items()->count();
+                        // Handle both Product and Bundling models
+                        $total = 0;
+                        if ($record instanceof \App\Models\Product) {
+                            $total = $record->items()->count();
+                        } elseif ($record instanceof \App\Models\Bundling) {
+                            $total = $record->products()->withSum('items as total_items', 'id')->get()->sum('total_items');
+                        }
+                        
                         if ($total == 0) return 'gray';
                         $percentage = ($state / $total) * 100;
                         if ($percentage >= 70) return 'success';
@@ -181,8 +204,14 @@ class UnifiedInventoryResource extends Resource
                             $endDate = now()->addDays(7)->format('Y-m-d');
                         }
 
-                        $available = static::getAvailableItemsCount($record->id, $startDate, $endDate);
-                        $total = $record->items()->count();
+                        if ($record instanceof \App\Models\Product) {
+                            $available = static::getAvailableItemsCount($record->id, $startDate, $endDate);
+                            $total = $record->items()->count();
+                        } else {
+                            // For bundlings, calculate differently
+                            $total = $record->products()->withSum('items as total_items', 'id')->get()->sum('total_items');
+                            $available = $total; // Simplified for now
+                        }
 
                         if ($total == 0) return '0%';
                         $percentage = round(($available / $total) * 100);

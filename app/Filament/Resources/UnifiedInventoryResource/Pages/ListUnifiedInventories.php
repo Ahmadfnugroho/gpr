@@ -74,12 +74,16 @@ class ListUnifiedInventories extends ListRecords
             // Get bundlings and transform them to look like products for display
             $bundlings = Bundling::with(['products.items'])
                 ->when(request('tableSearch'), function ($query, $search) {
-                    $keywords = array_filter(array_map('trim', explode(' ', strtolower($search))));
-                    if (!empty($keywords)) {
-                        $query->where(function ($q) use ($keywords) {
-                            foreach ($keywords as $keyword) {
-                                $q->whereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
-                            }
+                    // Clean and normalize search term to match global search behavior
+                    $searchTerm = trim(strtolower($search));
+                    
+                    if (!empty($searchTerm) && strlen($searchTerm) >= 2) {
+                        // Use exact phrase search like global search
+                        $query->where(function ($q) use ($searchTerm) {
+                            $q->whereRaw('LOWER(name) LIKE ?', ["%{$searchTerm}%"])
+                                ->orWhereHas('products', function ($productQuery) use ($searchTerm) {
+                                    $productQuery->whereRaw('LOWER(name) LIKE ?', ["%{$searchTerm}%"]);
+                                });
                         });
                     }
                 })

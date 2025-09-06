@@ -82,6 +82,17 @@ class Bundling extends Model
     }
 
     /**
+     * Get all items from products in this bundling
+     * This is a compatibility method for UnifiedInventoryResource
+     */
+    public function items()
+    {
+        // Return a query that gets all product items for products in this bundling
+        $productIds = $this->products()->pluck('products.id');
+        return \App\Models\ProductItem::whereIn('product_id', $productIds);
+    }
+
+    /**
      * Cek apakah bundling tersedia untuk disewa di periode tertentu
      */
     public function isAvailableForRental($startDate, $endDate, $bundlingQty = 1)
