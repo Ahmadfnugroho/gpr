@@ -83,7 +83,7 @@ class ProductResource extends Resource
     {
         // Use cached availability status instead of complex queries
         $cacheKey = "product_search_details_{$record->id}";
-        
+
         return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addMinutes(5), function () use ($record) {
             $today = Carbon::now();
 
@@ -142,6 +142,7 @@ class ProductResource extends Resource
                 \Filament\Forms\Components\FileUpload::make('thumbnail')
                     ->label('Foto Produk')
                     ->image()
+                    ->multiple()
                     ->nullable(),
                 Select::make('status')
                     ->label('Status')
@@ -343,7 +344,7 @@ class ProductResource extends Resource
                 return $query
                     ->select([
                         'products.id',
-                        'products.name', 
+                        'products.name',
                         'products.status',
                         'products.premiere',
                         'products.category_id',

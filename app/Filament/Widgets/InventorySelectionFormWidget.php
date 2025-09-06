@@ -37,7 +37,7 @@ class InventorySelectionFormWidget extends Widget implements HasForms
         
         // Handle products from URL
         $selectedProducts = request('selected_products', []);
-        if (!empty($selectedProducts)) {
+        if (is_array($selectedProducts) && !empty($selectedProducts)) {
             foreach ($selectedProducts as $productId) {
                 $selectedItems[] = "produk-{$productId}";
             }
@@ -45,17 +45,20 @@ class InventorySelectionFormWidget extends Widget implements HasForms
         
         // Handle bundlings from URL
         $selectedBundlings = request('selected_bundlings', []);
-        if (!empty($selectedBundlings)) {
+        if (is_array($selectedBundlings) && !empty($selectedBundlings)) {
             foreach ($selectedBundlings as $bundlingId) {
                 $selectedItems[] = "bundling-{$bundlingId}";
             }
         }
         
-        $this->form->fill([
+        // Initialize data property for statePath
+        $this->data = [
             'selected_items' => $selectedItems,
             'start_date' => request('start_date', now()->format('Y-m-d H:i:s')),
             'end_date' => request('end_date', now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s')),
-        ]);
+        ];
+        
+        $this->form->fill($this->data);
     }
 
     public function form(Form $form): Form
@@ -90,7 +93,7 @@ class InventorySelectionFormWidget extends Widget implements HasForms
                                     ->placeholder('Ketik untuk mencari produk atau bundling...')
                                     ->helperText('💡 Pilih kombinasi produk dan bundling sesuai kebutuhan')
                                     ->required()
-                                    ->rules(['required', 'array', 'min:1'])
+                                    ->minItems(1)
                                     ->live()
                                     ->columnSpanFull(),
                             ]),
@@ -124,24 +127,13 @@ class InventorySelectionFormWidget extends Widget implements HasForms
                                 ->color('primary')
                                 ->size('lg')
                                 ->requiresConfirmation(false)
-                                ->action(function (array $data) {
-                                    // Validate the form first
-                                    $this->form->validate();
-                                    $this->searchInventory($data);
-                                }),
+                                ->action('searchAction'),
                                 
                             Action::make('reset')
                                 ->label('🔄 Reset')
                                 ->icon('heroicon-o-arrow-path')
                                 ->color('gray')
-                                ->action(function () {
-                                    $this->form->fill([
-                                        'selected_items' => [],
-                                        'start_date' => now()->format('Y-m-d H:i:s'),
-                                        'end_date' => now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s'),
-                                    ]);
-                                    $this->redirect('/admin/unified-inventory');
-                                }),
+                                ->action('resetAction'),
                         ])
                         ->alignment('center')
                         ->columnSpanFull(),
@@ -152,8 +144,43 @@ class InventorySelectionFormWidget extends Widget implements HasForms
             ->statePath('data');
     }
 
+    public function searchAction(): void
+    {
+        try {
+            // Get validated form data
+            $data = $this->form->getState();
+            $this->searchInventory($data);
+        } catch (\Exception $e) {
+            Notification::make()
+                ->title('❌ Terjadi Kesalahan')
+                ->body('Silakan coba lagi. Error: ' . $e->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+    
+    public function resetAction(): void
+    {
+        $this->form->fill([
+            'selected_items' => [],
+            'start_date' => now()->format('Y-m-d H:i:s'),
+            'end_date' => now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s'),
+        ]);
+        $this->redirect('/admin/unified-inventory');
+    }
+    
     public function searchInventory(array $data): void
     {
+        // Check if selected_items exists and is not empty
+        if (empty($data['selected_items']) || !is_array($data['selected_items'])) {
+            Notification::make()
+                ->title('⚠️ Pilihan Kosong')
+                ->body('Silakan pilih minimal satu produk atau bundling.')
+                ->warning()
+                ->send();
+            return;
+        }
+
         // Separate products and bundlings
         $selectedProducts = [];
         $selectedBundlings = [];
@@ -179,9 +206,15 @@ class InventorySelectionFormWidget extends Widget implements HasForms
             $params['selected_bundlings'] = $selectedBundlings;
         }
 
-        // Add date parameters
-        $params['start_date'] = $data['start_date'];
-        $params['end_date'] = $data['end_date'];
+        // Add date parameters (with validation)
+        if (isset($data['start_date']) && isset($data['end_date'])) {
+            $params['start_date'] = $data['start_date'];
+            $params['end_date'] = $data['end_date'];
+        } else {
+            // Fallback to default dates
+            $params['start_date'] = now()->format('Y-m-d H:i:s');
+            $params['end_date'] = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
+        }
 
         // Show success notification
         $productCount = count($selectedProducts);
