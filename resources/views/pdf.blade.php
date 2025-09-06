@@ -369,7 +369,7 @@
           <div class="text-small font-normal" style="margin-bottom: 1px;">Alamat: Jln Kepu Selatan No. 11A RT 03</div>
           <div class="text-small font-normal">RW 03, Kec. Kemayoran, Jakarta Pusat</div>
         </div>
-        <div class="col col-3 invoice-info text-right">
+        <div class="col signature-table invoice-info text-right">
           <div class="h4">Invoice #: {{ $record->booking_transaction_id ?? 'N/A' }}</div>
           <div class="text-medium font-normal">Tanggal: {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y H:mm') }}</div>
           <div class="text-small font-normal">Dicetak oleh: {{ $currentUser?->name ?? 'Admin' }}</div>
