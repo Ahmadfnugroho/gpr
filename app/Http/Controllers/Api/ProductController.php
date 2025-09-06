@@ -150,7 +150,7 @@ class ProductController extends Controller
         }
 
         // Use single optimized query with UNION for better performance
-        $suggestions = \DB::select("
+        $suggestions = DB::select("
             (SELECT 'product' as type, name, slug, thumbnail, 
                     CONCAT('/product/', slug) as url, 
                     name as display

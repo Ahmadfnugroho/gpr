@@ -22,7 +22,7 @@ class ProductResource extends JsonResource
             'premiere' => $this->premiere,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
-            
+
             // Relationships
             'category' => $this->whenLoaded('category', function () {
                 return [
@@ -31,7 +31,7 @@ class ProductResource extends JsonResource
                     'slug' => $this->category->slug,
                 ];
             }),
-            
+
             'brand' => $this->whenLoaded('brand', function () {
                 return [
                     'id' => $this->brand->id,
@@ -40,7 +40,7 @@ class ProductResource extends JsonResource
                     'logo' => $this->brand->logo,
                 ];
             }),
-            
+
             'sub_category' => $this->whenLoaded('subCategory', function () {
                 return $this->subCategory ? [
                     'id' => $this->subCategory->id,
@@ -48,7 +48,7 @@ class ProductResource extends JsonResource
                     'slug' => $this->subCategory->slug,
                 ] : null;
             }),
-            
+
             'rental_includes' => $this->whenLoaded('rentalIncludes', function () {
                 return $this->rentalIncludes->map(function ($rentalInclude) {
                     return [
@@ -64,7 +64,7 @@ class ProductResource extends JsonResource
                     ];
                 });
             }),
-            
+
             'product_specifications' => $this->whenLoaded('productSpecifications', function () {
                 return $this->productSpecifications->map(function ($spec) {
                     return [
@@ -73,17 +73,16 @@ class ProductResource extends JsonResource
                     ];
                 });
             }),
-            
+
             'product_photos' => $this->whenLoaded('productPhotos', function () {
                 return $this->productPhotos->map(function ($photo) {
                     return [
                         'id' => $photo->id,
-                        'filename' => $photo->filename,
-                        'url' => $photo->url ?? asset('storage/' . $photo->filename),
+                        'photo' => $photo->photo,
                     ];
                 });
             }),
-            
+
             // Count relationships
             'items_count' => $this->whenCounted('items'),
             'available_items_count' => $this->when(

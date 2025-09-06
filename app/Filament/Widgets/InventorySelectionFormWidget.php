@@ -89,6 +89,8 @@ class InventorySelectionFormWidget extends Widget implements HasForms
                                     })
                                     ->placeholder('Ketik untuk mencari produk atau bundling...')
                                     ->helperText('💡 Pilih kombinasi produk dan bundling sesuai kebutuhan')
+                                    ->required()
+                                    ->rules(['required', 'array', 'min:1'])
                                     ->live()
                                     ->columnSpanFull(),
                             ]),
@@ -121,7 +123,10 @@ class InventorySelectionFormWidget extends Widget implements HasForms
                                 ->icon('heroicon-o-magnifying-glass')
                                 ->color('primary')
                                 ->size('lg')
+                                ->requiresConfirmation(false)
                                 ->action(function (array $data) {
+                                    // Validate the form first
+                                    $this->form->validate();
                                     $this->searchInventory($data);
                                 }),
                                 
@@ -135,7 +140,7 @@ class InventorySelectionFormWidget extends Widget implements HasForms
                                         'start_date' => now()->format('Y-m-d H:i:s'),
                                         'end_date' => now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s'),
                                     ]);
-                                    return redirect()->to('/admin/unified-inventory');
+                                    $this->redirect('/admin/unified-inventory');
                                 }),
                         ])
                         ->alignment('center')
@@ -149,15 +154,6 @@ class InventorySelectionFormWidget extends Widget implements HasForms
 
     public function searchInventory(array $data): void
     {
-        if (empty($data['selected_items'])) {
-            Notification::make()
-                ->title('⚠️ Pilihan Kosong')
-                ->body('Silakan pilih minimal satu produk atau bundling.')
-                ->warning()
-                ->send();
-            return;
-        }
-
         // Separate products and bundlings
         $selectedProducts = [];
         $selectedBundlings = [];
@@ -175,16 +171,12 @@ class InventorySelectionFormWidget extends Widget implements HasForms
 
         // Handle products array
         if (!empty($selectedProducts)) {
-            foreach ($selectedProducts as $productId) {
-                $params['selected_products[]'] = $productId;
-            }
+            $params['selected_products'] = $selectedProducts;
         }
 
         // Handle bundlings array  
         if (!empty($selectedBundlings)) {
-            foreach ($selectedBundlings as $bundlingId) {
-                $params['selected_bundlings[]'] = $bundlingId;
-            }
+            $params['selected_bundlings'] = $selectedBundlings;
         }
 
         // Add date parameters
@@ -201,7 +193,13 @@ class InventorySelectionFormWidget extends Widget implements HasForms
             ->success()
             ->send();
 
-        // Redirect with parameters
-        redirect('/admin/unified-inventory?' . http_build_query($params));
+        // Build the URL with proper array parameters
+        $url = '/admin/unified-inventory';
+        if (!empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+        
+        // Redirect with parameters using Livewire method
+        $this->redirect($url);
     }
 }
