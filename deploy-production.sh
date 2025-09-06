@@ -96,7 +96,7 @@ check_root() {
 check_dependencies() {
     log_info "Checking dependencies..."
     
-    local deps=("mysql" "php" "composer" "supervisor" "nginx")
+    local deps=("mysql" "php" "composer" "supervisorctl" "nginx")
     local missing=()
     
     for dep in "${deps[@]}"; do
