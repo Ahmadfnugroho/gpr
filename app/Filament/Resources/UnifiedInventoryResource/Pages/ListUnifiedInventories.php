@@ -12,10 +12,18 @@ use Filament\Resources\Components\Tab;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Pagination\LengthAwarePaginator;
+use App\Filament\Widgets\InventorySelectionWidget;
 
 class ListUnifiedInventories extends ListRecords
 {
     protected static string $resource = UnifiedInventoryResource::class;
+    
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            InventorySelectionWidget::class,
+        ];
+    }
 
     protected function getHeaderActions(): array
     {
@@ -69,8 +77,8 @@ class ListUnifiedInventories extends ListRecords
     public function getTableRecords(): Paginator
     {
         $activeTab = $this->activeTab ?? 'products';
-        $selectedProducts = request('tableFilters.inventory_selection.product_ids', []);
-        $selectedBundlings = request('tableFilters.inventory_selection.bundling_ids', []);
+        $selectedProducts = request('selected_products', []);
+        $selectedBundlings = request('selected_bundlings', []);
         
         // If bundlings tab is active and bundlings are selected
         if ($activeTab === 'bundlings' && !empty($selectedBundlings)) {
@@ -110,7 +118,7 @@ class ListUnifiedInventories extends ListRecords
     public function getTableColumns(): array
     {
         $activeTab = $this->activeTab ?? 'products';
-        $selectedBundlings = request('tableFilters.inventory_selection.bundling_ids', []);
+        $selectedBundlings = request('selected_bundlings', []);
         
         if ($activeTab === 'bundlings' && !empty($selectedBundlings)) {
             return $this->getBundlingTableColumns();
@@ -163,8 +171,8 @@ class ListUnifiedInventories extends ListRecords
             \Filament\Tables\Columns\TextColumn::make('available_bundles')
                 ->label('Available Bundles')
                 ->getStateUsing(function ($record) {
-                    $startDate = request('tableFilters.inventory_selection.start_date');
-                    $endDate = request('tableFilters.inventory_selection.end_date');
+                    $startDate = request('start_date');
+                    $endDate = request('end_date');
 
                     if (!$startDate || !$endDate) {
                         $startDate = now()->format('Y-m-d H:i:s');
@@ -202,8 +210,8 @@ class ListUnifiedInventories extends ListRecords
             \Filament\Tables\Columns\TextColumn::make('current_bundle_rentals')
                 ->label('Current Rentals')
                 ->getStateUsing(function ($record) {
-                    $startDate = request('tableFilters.inventory_selection.start_date');
-                    $endDate = request('tableFilters.inventory_selection.end_date');
+                    $startDate = request('start_date');
+                    $endDate = request('end_date');
 
                     if (!$startDate || !$endDate) {
                         $startDate = now()->format('Y-m-d H:i:s');
