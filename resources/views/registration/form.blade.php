@@ -262,28 +262,28 @@
                         <div class="invalid-feedback d-block">
                             {{ $message }}
                             @if(str_contains($message, 'sudah terdaftar'))
-                                <div class="mt-2 p-3 bg-info bg-opacity-10 border border-info border-opacity-25 rounded">
-                                    <div class="d-flex align-items-center mb-2">
-                                        <i class="fas fa-info-circle text-info me-2"></i>
-                                        <strong class="text-info">Bantuan Customer Service</strong>
+                            <div class="mt-2 p-3 bg-info bg-opacity-10 border border-info border-opacity-25 rounded">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fas fa-info-circle text-info me-2"></i>
+                                    <strong class="text-info">Bantuan Customer Service</strong>
+                                </div>
+                                <div class="small">
+                                    <div class="mb-1">
+                                        <i class="fab fa-whatsapp text-success me-2"></i>
+                                        <strong>WhatsApp:</strong>
+                                        <a href="https://wa.me/6281212349564" target="_blank" class="text-decoration-none">
+                                            +62 812-1234-9564
+                                        </a>
                                     </div>
-                                    <div class="small">
-                                        <div class="mb-1">
-                                            <i class="fab fa-whatsapp text-success me-2"></i>
-                                            <strong>WhatsApp:</strong> 
-                                            <a href="https://wa.me/6281212349564" target="_blank" class="text-decoration-none">
-                                                +62 812-1234-9564
-                                            </a>
-                                        </div>
-                                        <div>
-                                            <i class="fas fa-envelope text-primary me-2"></i>
-                                            <strong>Email:</strong> 
-                                            <a href="mailto:global.photorental@gmail.com" class="text-decoration-none">
-                                                global.photorental@gmail.com
-                                            </a>
-                                        </div>
+                                    <div>
+                                        <i class="fas fa-envelope text-primary me-2"></i>
+                                        <strong>Email:</strong>
+                                        <a href="mailto:global.photorental@gmail.com" class="text-decoration-none">
+                                            global.photorental@gmail.com
+                                        </a>
                                     </div>
                                 </div>
+                            </div>
                             @endif
                         </div>
                         @enderror
@@ -673,7 +673,6 @@
                 const sizeInfo = `${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB (${compressionPercent}% lebih kecil${formatInfo})`;
 
                 if (notificationElement) {
-                    notificationElement.textContent = `File dioptimalkan: ${sizeInfo}`;
                     notificationElement.style.display = 'block';
                     notificationElement.className = 'alert alert-success mt-2';
                 }
@@ -797,13 +796,13 @@
         document.getElementById('emergency_contact_number').addEventListener('blur', function() {
             formatPhoneNumber(this);
         });
-        
+
         // Email availability checking
         let emailCheckTimeout;
         document.getElementById('email').addEventListener('input', function() {
             clearTimeout(emailCheckTimeout);
             const email = this.value.trim();
-            
+
             if (email && email.includes('@') && email.includes('.')) {
                 emailCheckTimeout = setTimeout(() => {
                     checkEmailAvailability(email);
@@ -812,25 +811,27 @@
                 hideEmailAvailability();
             }
         });
-        
+
         function checkEmailAvailability(email) {
             const availabilityDiv = document.getElementById('email-availability');
             availabilityDiv.innerHTML = '<div class="small text-muted"><i class="fas fa-spinner fa-spin me-1"></i>Mengecek ketersediaan email...</div>';
             availabilityDiv.style.display = 'block';
-            
+
             // Create a simple check by making a request to see if email exists
             fetch('/api/check-email', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || document.querySelector('[name="_token"]').value
-                },
-                body: JSON.stringify({ email: email })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.exists) {
-                    availabilityDiv.innerHTML = `
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || document.querySelector('[name="_token"]').value
+                    },
+                    body: JSON.stringify({
+                        email: email
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.exists) {
+                        availabilityDiv.innerHTML = `
                         <div class="alert alert-warning small py-2 mb-0">
                             <i class="fas fa-exclamation-triangle me-1"></i>
                             <strong>Email sudah terdaftar!</strong> 
@@ -845,16 +846,16 @@
                             </div>
                         </div>
                     `;
-                } else {
-                    availabilityDiv.innerHTML = '<div class="small text-success"><i class="fas fa-check me-1"></i>Email tersedia</div>';
-                }
-            })
-            .catch(error => {
-                console.error('Error checking email:', error);
-                hideEmailAvailability();
-            });
+                    } else {
+                        availabilityDiv.innerHTML = '<div class="small text-success"><i class="fas fa-check me-1"></i>Email tersedia</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking email:', error);
+                    hideEmailAvailability();
+                });
         }
-        
+
         function hideEmailAvailability() {
             document.getElementById('email-availability').style.display = 'none';
         }
@@ -864,7 +865,7 @@
             const progressContainer = document.getElementById(`${inputId}-progress`);
             const progressBar = document.getElementById(`${inputId}-progress-bar`);
             const progressText = document.getElementById(`${inputId}-progress-text`);
-            
+
             if (progressContainer) {
                 if (show) {
                     progressContainer.style.display = 'block';
@@ -874,15 +875,15 @@
                 }
             }
         }
-        
+
         function updateUploadProgress(inputId, percentage) {
             const progressBar = document.getElementById(`${inputId}-progress-bar`);
             const progressText = document.getElementById(`${inputId}-progress-text`);
-            
+
             if (progressBar && progressText) {
                 progressBar.style.width = percentage + '%';
                 progressText.textContent = percentage + '%';
-                
+
                 if (percentage >= 100) {
                     progressBar.classList.remove('progress-bar-animated');
                     setTimeout(() => {
@@ -902,18 +903,18 @@
                     input.addEventListener('change', async function(event) {
                         if (this.files && this.files[0]) {
                             const inputId = this.id;
-                            
+
                             // Show progress bar
                             showUploadProgress(inputId, true);
                             updateUploadProgress(inputId, 20);
-                            
+
                             // Simulate upload progress
                             setTimeout(() => updateUploadProgress(inputId, 40), 200);
                             setTimeout(() => updateUploadProgress(inputId, 60), 400);
-                            
+
                             // Validate and compress the file
                             const isValid = await validateFile(this.files[0], this);
-                            
+
                             if (isValid) {
                                 updateUploadProgress(inputId, 80);
                                 setTimeout(() => updateUploadProgress(inputId, 100), 300);
@@ -1007,7 +1008,7 @@
                     .then(data => {
                         console.log('Province data received:', data);
                         provinceSelect.empty().append('<option value="">Pilih Provinsi</option>');
-                        
+
                         if (Array.isArray(data) && data.length > 0) {
                             data.forEach(province => {
                                 provinceSelect.append(`<option value="${province.id}|${province.name}">${province.name}</option>`);
@@ -1016,7 +1017,7 @@
                             console.warn('No province data or invalid format:', data);
                             provinceSelect.append('<option value="">Tidak ada data provinsi</option>');
                         }
-                        
+
                         provinceSelect.select2();
                         console.log('Provinces loaded successfully');
                     })
@@ -1041,7 +1042,7 @@
                     .then(data => {
                         console.log('Regency data received:', data);
                         citySelect.empty().append('<option value="">Pilih Kab/Kota</option>');
-                        
+
                         if (Array.isArray(data) && data.length > 0) {
                             data.forEach(regency => {
                                 citySelect.append(`<option value="${regency.id}|${regency.name}">${regency.name}</option>`);
@@ -1050,7 +1051,7 @@
                             console.warn('No regency data or invalid format:', data);
                             citySelect.append('<option value="">Tidak ada data kab/kota</option>');
                         }
-                        
+
                         citySelect.prop('disabled', false).select2();
                         console.log('Regencies loaded successfully');
                     })
