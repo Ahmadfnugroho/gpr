@@ -12,29 +12,164 @@ use Filament\Resources\Components\Tab;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Pagination\LengthAwarePaginator;
-use App\Filament\Widgets\InventorySelectionWidget;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 
-class ListUnifiedInventories extends ListRecords
+class ListUnifiedInventories extends ListRecords implements HasForms
 {
+    use InteractsWithForms;
+    
     protected static string $resource = UnifiedInventoryResource::class;
     
-    protected function getHeaderWidgets(): array
+    public ?array $inventoryData = [];
+    
+    public function mount(): void
     {
-        return [
-            InventorySelectionWidget::class,
-        ];
+        parent::mount();
+        $this->inventoryForm->fill([
+            'selected_products' => request('selected_products', []),
+            'selected_bundlings' => request('selected_bundlings', []),
+            'start_date' => request('start_date', now()->format('Y-m-d H:i:s')),
+            'end_date' => request('end_date', now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s')),
+        ]);
     }
 
+    public function inventoryForm(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Section::make('🔍 Pencarian Ketersediaan Produk & Bundling')
+                    ->description('Pilih produk atau bundling yang ingin Anda periksa ketersediaannya, lalu tentukan periode tanggal.')
+                    ->schema([
+                        Grid::make(2)
+                            ->schema([
+                                Select::make('selected_products')
+                                    ->label('🛍️ Pilih Produk')
+                                    ->multiple()
+                                    ->searchable()
+                                    ->preload()
+                                    ->options(function () {
+                                        return Product::select('id', 'name')
+                                            ->where('status', '!=', 'deleted')
+                                            ->orderBy('name')
+                                            ->pluck('name', 'id');
+                                    })
+                                    ->placeholder('Ketik untuk mencari produk...')
+                                    ->helperText('💡 Anda bisa memilih beberapa produk sekaligus')
+                                    ->columnSpan(1),
+                                    
+                                Select::make('selected_bundlings')
+                                    ->label('📦 Pilih Bundling')
+                                    ->multiple()
+                                    ->searchable()
+                                    ->preload()
+                                    ->options(function () {
+                                        return Bundling::select('id', 'name')
+                                            ->orderBy('name')
+                                            ->pluck('name', 'id');
+                                    })
+                                    ->placeholder('Ketik untuk mencari bundling...')
+                                    ->helperText('💡 Anda bisa memilih beberapa bundling sekaligus')
+                                    ->columnSpan(1),
+                            ]),
+                            
+                        Grid::make(2)
+                            ->schema([
+                                DateTimePicker::make('start_date')
+                                    ->label('📅 Tanggal & Waktu Mulai')
+                                    ->default(now())
+                                    ->maxDate(now()->addYear())
+                                    ->native(false)
+                                    ->displayFormat('d M Y H:i')
+                                    ->helperText('Tanggal mulai periode pengecekan')
+                                    ->required()
+                                    ->columnSpan(1),
+                                    
+                                DateTimePicker::make('end_date')
+                                    ->label('📅 Tanggal & Waktu Selesai')
+                                    ->default(now()->addDays(7)->endOfDay())
+                                    ->after('start_date')
+                                    ->maxDate(now()->addYear())
+                                    ->native(false)
+                                    ->displayFormat('d M Y H:i')
+                                    ->helperText('Default: 7 hari kedepan jam 24:00')
+                                    ->required()
+                                    ->columnSpan(1),
+                            ]),
+                    ])
+                    ->collapsible()
+                    ->persistCollapsed(false),
+            ])
+            ->statePath('inventoryData');
+    }
+    
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('switch_to_bundlings')
-                ->label('Show Bundlings')
-                ->icon('heroicon-o-cube')
-                ->color('success')
-                ->url(function () {
-                    return '/admin/unified-inventory?tab=bundlings';
-                }),
+            Actions\Action::make('search_inventory')
+                ->label('🔍 Cari Ketersediaan')
+                ->icon('heroicon-o-magnifying-glass')
+                ->color('primary')
+                ->size('lg')
+                ->form($this->inventoryForm)
+                ->action(function (array $data) {
+                    if (empty($data['selected_products']) && empty($data['selected_bundlings'])) {
+                        Notification::make()
+                            ->title('⚠️ Pilihan Kosong')
+                            ->body('Silakan pilih minimal satu produk atau bundling.')
+                            ->warning()
+                            ->send();
+                        return;
+                    }
+                    
+                    // Build query parameters
+                    $params = [];
+                    
+                    // Handle products array
+                    if (!empty($data['selected_products'])) {
+                        foreach ($data['selected_products'] as $productId) {
+                            $params['selected_products[]'] = $productId;
+                        }
+                    }
+                    
+                    // Handle bundlings array  
+                    if (!empty($data['selected_bundlings'])) {
+                        foreach ($data['selected_bundlings'] as $bundlingId) {
+                            $params['selected_bundlings[]'] = $bundlingId;
+                        }
+                    }
+                    
+                    // Add date parameters
+                    $params['start_date'] = $data['start_date'];
+                    $params['end_date'] = $data['end_date'];
+                    
+                    // Show success notification
+                    $productCount = count($data['selected_products'] ?? []);
+                    $bundlingCount = count($data['selected_bundlings'] ?? []);
+                    
+                    Notification::make()
+                        ->title('✅ Pencarian Berhasil')
+                        ->body("Menampilkan {$productCount} produk dan {$bundlingCount} bundling.")
+                        ->success()
+                        ->send();
+                    
+                    // Redirect with parameters
+                    return redirect()->to('/admin/unified-inventory?' . http_build_query($params));
+                })
+                ->modalSubmitActionLabel('🔍 Cari Sekarang')
+                ->modalWidth('4xl'),
+                
+            Actions\Action::make('reset_search')
+                ->label('Reset')
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->url('/admin/unified-inventory'),
                 
             Actions\Action::make('help')
                 ->label('Help')
