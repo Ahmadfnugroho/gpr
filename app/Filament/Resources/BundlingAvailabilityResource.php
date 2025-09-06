@@ -94,8 +94,7 @@ class BundlingAvailabilityResource extends Resource
                         $remaining = $record->products->count() - 3;
                         $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
                         return "Contains: {$productNames}{$suffix}";
-                    })
-                    ->descriptionColor('gray'),
+                    }),
 
                 TextColumn::make('total_quantity')
                     ->label('Total Bundles')

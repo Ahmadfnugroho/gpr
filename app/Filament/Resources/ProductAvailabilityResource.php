@@ -164,8 +164,7 @@ class ProductAvailabilityResource extends Resource
                             return "Used in bundles: {$bundlingNames}{$suffix}";
                         }
                         return null;
-                    })
-                    ->descriptionColor('gray'),
+                    }),
 
                 TextColumn::make('total_items')
                     ->label('Total Items')
