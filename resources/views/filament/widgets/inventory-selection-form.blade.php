@@ -1,5 +1,5 @@
 <x-filament-widgets::widget>
-    <x-filament::section>
+    <div class="filament-widget">
         {{ $this->form }}
-    </x-filament::section>
+    </div>
 </x-filament-widgets::widget>
