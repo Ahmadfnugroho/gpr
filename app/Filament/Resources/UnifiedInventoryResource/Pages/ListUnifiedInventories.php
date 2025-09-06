@@ -69,24 +69,14 @@ class ListUnifiedInventories extends ListRecords
     public function getTableRecords(): Paginator
     {
         $activeTab = $this->activeTab ?? 'products';
+        $selectedProducts = request('tableFilters.inventory_selection.product_ids', []);
+        $selectedBundlings = request('tableFilters.inventory_selection.bundling_ids', []);
         
-        if ($activeTab === 'bundlings') {
-            // Get bundlings and transform them to look like products for display
+        // If bundlings tab is active and bundlings are selected
+        if ($activeTab === 'bundlings' && !empty($selectedBundlings)) {
+            // Get selected bundlings only
             $bundlings = Bundling::with(['products.items'])
-                ->when(request('tableSearch'), function ($query, $search) {
-                    // Clean and normalize search term to match global search behavior
-                    $searchTerm = trim(strtolower($search));
-                    
-                    if (!empty($searchTerm) && strlen($searchTerm) >= 2) {
-                        // Use exact phrase search like global search
-                        $query->where(function ($q) use ($searchTerm) {
-                            $q->whereRaw('LOWER(name) LIKE ?', ["%{$searchTerm}%"])
-                                ->orWhereHas('products', function ($productQuery) use ($searchTerm) {
-                                    $productQuery->whereRaw('LOWER(name) LIKE ?', ["%{$searchTerm}%"]);
-                                });
-                        });
-                    }
-                })
+                ->whereIn('id', $selectedBundlings)
                 ->paginate(50);
 
             // Transform bundlings to have product-like structure
@@ -98,8 +88,8 @@ class ListUnifiedInventories extends ListRecords
 
             return $bundlings;
         }
-
-        // Default: show products
+        
+        // For all other cases (products tab or no selections), use parent method
         return parent::getTableRecords();
     }
 
@@ -120,8 +110,9 @@ class ListUnifiedInventories extends ListRecords
     public function getTableColumns(): array
     {
         $activeTab = $this->activeTab ?? 'products';
+        $selectedBundlings = request('tableFilters.inventory_selection.bundling_ids', []);
         
-        if ($activeTab === 'bundlings') {
+        if ($activeTab === 'bundlings' && !empty($selectedBundlings)) {
             return $this->getBundlingTableColumns();
         }
         
@@ -172,12 +163,12 @@ class ListUnifiedInventories extends ListRecords
             \Filament\Tables\Columns\TextColumn::make('available_bundles')
                 ->label('Available Bundles')
                 ->getStateUsing(function ($record) {
-                    $startDate = request('tableFilters.date_range.start_date');
-                    $endDate = request('tableFilters.date_range.end_date');
+                    $startDate = request('tableFilters.inventory_selection.start_date');
+                    $endDate = request('tableFilters.inventory_selection.end_date');
 
                     if (!$startDate || !$endDate) {
-                        $startDate = now()->format('Y-m-d');
-                        $endDate = now()->addDays(7)->format('Y-m-d');
+                        $startDate = now()->format('Y-m-d H:i:s');
+                        $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
                     }
 
                     return $record->getAvailableQuantityForPeriod(
@@ -211,12 +202,12 @@ class ListUnifiedInventories extends ListRecords
             \Filament\Tables\Columns\TextColumn::make('current_bundle_rentals')
                 ->label('Current Rentals')
                 ->getStateUsing(function ($record) {
-                    $startDate = request('tableFilters.date_range.start_date');
-                    $endDate = request('tableFilters.date_range.end_date');
+                    $startDate = request('tableFilters.inventory_selection.start_date');
+                    $endDate = request('tableFilters.inventory_selection.end_date');
 
                     if (!$startDate || !$endDate) {
-                        $startDate = now()->format('Y-m-d');
-                        $endDate = now()->addDays(7)->format('Y-m-d');
+                        $startDate = now()->format('Y-m-d H:i:s');
+                        $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
                     }
 
                     return $record->detailTransactions()

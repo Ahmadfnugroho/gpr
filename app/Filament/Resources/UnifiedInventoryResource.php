@@ -16,12 +16,18 @@ use Filament\Tables\Filters\Filter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Select;
 use Filament\Support\Enums\FontWeight;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Collection;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Actions\Action;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Actions\Action as FormAction;
+use Filament\Forms\Components\Actions;
+use Illuminate\Support\Facades\DB;
 
 class UnifiedInventoryResource extends Resource
 {
@@ -98,27 +104,21 @@ class UnifiedInventoryResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->modifyQueryUsing(function (Builder $query) {
-                // Only apply this query modification for products tab
-                // Bundlings tab is handled separately in getTableRecords()
-                $activeTab = request('activeTab') ?? 'products';
+                // By default, show no results until form is submitted
+                $selectedProducts = request('tableFilters.inventory_selection.product_ids', []);
+                $selectedBundlings = request('tableFilters.inventory_selection.bundling_ids', []);
                 
-                if ($activeTab === 'products' || $activeTab === 'all') {
-                    $searchTerm = request('tableSearch');
-                    
-                    if ($searchTerm && strlen(trim($searchTerm)) >= 2) {
-                        // Clean and normalize search term (match global search behavior)
-                        $searchTerm = trim(strtolower($searchTerm));
-                        
-                        // Use exact phrase search like global search
-                        $query->where(function ($q) use ($searchTerm) {
-                            $q->whereRaw('LOWER(name) LIKE ?', ["%{$searchTerm}%"]);
-                        });
-                    }
-                    
-                    return $query->with(['items', 'bundlings']);
+                // Only show results if selections are made
+                if (empty($selectedProducts) && empty($selectedBundlings)) {
+                    return $query->whereRaw('1 = 0'); // Return empty result set
                 }
                 
-                return $query;
+                // Filter by selected products only
+                if (!empty($selectedProducts)) {
+                    return $query->whereIn('id', $selectedProducts)->with(['items', 'bundlings']);
+                }
+                
+                return $query->whereRaw('1 = 0'); // Return empty if only bundlings selected
             })
             ->columns([
                 TextColumn::make('item_type')
@@ -165,12 +165,12 @@ class UnifiedInventoryResource extends Resource
                 TextColumn::make('available_items')
                     ->label('Available Items')
                     ->getStateUsing(function ($record) {
-                        $startDate = request('tableFilters.date_range.start_date');
-                        $endDate = request('tableFilters.date_range.end_date');
+                        $startDate = request('tableFilters.inventory_selection.start_date');
+                        $endDate = request('tableFilters.inventory_selection.end_date');
 
                         if (!$startDate || !$endDate) {
-                            $startDate = now()->format('Y-m-d');
-                            $endDate = now()->addDays(7)->format('Y-m-d');
+                            $startDate = now()->format('Y-m-d H:i:s');
+                            $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
                         }
 
                         return static::getAvailableItemsCount($record->id, $startDate, $endDate);
@@ -196,12 +196,12 @@ class UnifiedInventoryResource extends Resource
                 TextColumn::make('availability_percentage')
                     ->label('Availability %')
                     ->getStateUsing(function ($record) {
-                        $startDate = request('tableFilters.date_range.start_date');
-                        $endDate = request('tableFilters.date_range.end_date');
+                        $startDate = request('tableFilters.inventory_selection.start_date');
+                        $endDate = request('tableFilters.inventory_selection.end_date');
 
                         if (!$startDate || !$endDate) {
-                            $startDate = now()->format('Y-m-d');
-                            $endDate = now()->addDays(7)->format('Y-m-d');
+                            $startDate = now()->format('Y-m-d H:i:s');
+                            $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
                         }
 
                         if ($record instanceof \App\Models\Product) {
@@ -229,12 +229,12 @@ class UnifiedInventoryResource extends Resource
                 TextColumn::make('current_rentals')
                     ->label('Current Rentals')
                     ->getStateUsing(function ($record) {
-                        $startDate = request('tableFilters.date_range.start_date');
-                        $endDate = request('tableFilters.date_range.end_date');
+                        $startDate = request('tableFilters.inventory_selection.start_date');
+                        $endDate = request('tableFilters.inventory_selection.end_date');
 
                         if (!$startDate || !$endDate) {
-                            $startDate = now()->format('Y-m-d');
-                            $endDate = now()->addDays(7)->format('Y-m-d');
+                            $startDate = now()->format('Y-m-d H:i:s');
+                            $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
                         }
 
                         $activeRentals = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
@@ -258,37 +258,102 @@ class UnifiedInventoryResource extends Resource
                     ->icon('heroicon-o-clock'),
             ])
             ->filters([
-                Filter::make('date_range')
+                Filter::make('inventory_selection')
                     ->form([
-                        Grid::make(2)
+                        Section::make('📋 Pilih Produk/Bundling dan Tanggal')
+                            ->description('⚠️ Pilih minimal satu produk atau bundling untuk melihat ketersediaan. Sistem akan menampilkan hasil setelah form disubmit.')
+                            ->collapsible()
+                            ->persistCollapsed(false)
                             ->schema([
-                                DatePicker::make('start_date')
-                                    ->label('Start Date')
-                                    ->default(now())
-                                    ->maxDate(now()->addYear())
-                                    ->native(false)
-                                    ->displayFormat('d M Y'),
-                                DatePicker::make('end_date')
-                                    ->label('End Date')
-                                    ->default(now()->addDays(7))
-                                    ->after('start_date')
-                                    ->maxDate(now()->addYear())
-                                    ->native(false)
-                                    ->displayFormat('d M Y'),
+                                Grid::make(2)
+                                    ->schema([
+                                        Select::make('product_ids')
+                                            ->label('Pilih Produk')
+                                            ->multiple()
+                                            ->searchable()
+                                            ->preload()
+                                            ->options(function () {
+                                                return \App\Models\Product::select('id', 'name')
+                                                    ->where('status', '!=', 'deleted')
+                                                    ->pluck('name', 'id');
+                                            })
+                                            ->placeholder('Ketik untuk mencari produk...')
+                                            ->helperText('💡 Anda bisa memilih beberapa produk sekaligus')
+                                            ->live()
+                                            ->columnSpanFull(),
+                                            
+                                        Select::make('bundling_ids')
+                                            ->label('Pilih Bundling')
+                                            ->multiple()
+                                            ->searchable()
+                                            ->preload()
+                                            ->options(function () {
+                                                return \App\Models\Bundling::select('id', 'name')
+                                                    ->pluck('name', 'id');
+                                            })
+                                            ->placeholder('Ketik untuk mencari bundling...')
+                                            ->helperText('💡 Anda bisa memilih beberapa bundling sekaligus')
+                                            ->live()
+                                            ->columnSpanFull(),
+                                    ]),
+                                    
+                                Grid::make(2)
+                                    ->schema([
+                                        DateTimePicker::make('start_date')
+                                            ->label('📅 Tanggal & Waktu Mulai')
+                                            ->default(now())
+                                            ->maxDate(now()->addYear())
+                                            ->native(false)
+                                            ->displayFormat('d M Y H:i')
+                                            ->helperText('Tanggal mulai periode pengecekan')
+                                            ->required(),
+                                            
+                                        DateTimePicker::make('end_date')
+                                            ->label('📅 Tanggal & Waktu Selesai')
+                                            ->default(now()->addDays(7)->endOfDay())
+                                            ->after('start_date')
+                                            ->maxDate(now()->addYear())
+                                            ->native(false)
+                                            ->displayFormat('d M Y H:i')
+                                            ->helperText('Default: 7 hari kedepan jam 24:00')
+                                            ->required(),
+                                    ]),
                             ])
                     ])
                     ->query(function (Builder $query, array $data): Builder {
-                        // The query filtering is handled in the column state calculation
+                        // The query filtering is handled in modifyQueryUsing
                         return $query;
                     })
                     ->indicateUsing(function (array $data): array {
                         $indicators = [];
+                        
+                        if (!empty($data['product_ids'])) {
+                            $productNames = \App\Models\Product::whereIn('id', $data['product_ids'])
+                                ->pluck('name')
+                                ->take(3)
+                                ->implode(', ');
+                            $remaining = count($data['product_ids']) - 3;
+                            $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
+                            $indicators['products'] = 'Products: ' . $productNames . $suffix;
+                        }
+                        
+                        if (!empty($data['bundling_ids'])) {
+                            $bundlingNames = \App\Models\Bundling::whereIn('id', $data['bundling_ids'])
+                                ->pluck('name')
+                                ->take(3)
+                                ->implode(', ');
+                            $remaining = count($data['bundling_ids']) - 3;
+                            $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
+                            $indicators['bundlings'] = 'Bundlings: ' . $bundlingNames . $suffix;
+                        }
+                        
                         if ($data['start_date'] ?? null) {
-                            $indicators['start_date'] = 'Start: ' . Carbon::parse($data['start_date'])->format('d M Y');
+                            $indicators['start_date'] = 'Start: ' . Carbon::parse($data['start_date'])->format('d M Y H:i');
                         }
                         if ($data['end_date'] ?? null) {
-                            $indicators['end_date'] = 'End: ' . Carbon::parse($data['end_date'])->format('d M Y');
+                            $indicators['end_date'] = 'End: ' . Carbon::parse($data['end_date'])->format('d M Y H:i');
                         }
+                        
                         return $indicators;
                     }),
 
@@ -324,9 +389,9 @@ class UnifiedInventoryResource extends Resource
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close'),
             ])
-            ->emptyStateHeading('No inventory items found')
-            ->emptyStateDescription('Try adjusting your search terms or filters.')
-            ->emptyStateIcon('heroicon-o-cube-transparent')
+            ->emptyStateHeading('🔍 Pilih Produk/Bundling untuk Melihat Ketersediaan')
+            ->emptyStateDescription('📝 Langkah-langkah:\n1. Klik tombol "Filter" di atas\n2. Pilih produk atau bundling yang ingin dicek\n3. Atur tanggal periode pengecekan\n4. Klik "Apply" untuk melihat hasil')
+            ->emptyStateIcon('heroicon-o-funnel')
             ->striped()
             ->poll('30s'); // Auto-refresh every 30 seconds
     }
