@@ -13,7 +13,7 @@ class PdfController extends Controller
         try {
             // Eager load semua relasi yang diperlukan untuk PDF dengan nested relationships
             $record = Transaction::with([
-                'user',
+                'customer',
                 'promo',
                 'detailTransactions.product.rentalIncludes.includedProduct',
                 'detailTransactions.bundling.products.rentalIncludes.includedProduct',
@@ -22,8 +22,8 @@ class PdfController extends Controller
             ])->findOrFail($order->id);
 
             // Validasi data penting tidak null
-            if (!$record->user) {
-                abort(404, 'User data not found for this transaction');
+            if (!$record->customer) {
+                abort(404, 'Customer data not found for this transaction');
             }
 
             if ($record->detailTransactions->isEmpty()) {

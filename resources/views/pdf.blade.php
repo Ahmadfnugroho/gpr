@@ -383,15 +383,15 @@
         <div class="col col-6">
           <div class="text-medium mb-5">
             <span class="info-label font-semibold">Nama:</span>
-            <span class="font-normal">{{ $record->user?->name ?? 'N/A' }}</span>
+            <span class="font-normal">{{ $record->customer?->name ?? 'N/A' }}</span>
           </div>
           <div class="text-medium mb-5">
             <span class="info-label font-semibold">No Telepon:</span>
-            <span class="font-normal">{{ $record->user?->phone_number ?? 'N/A' }}</span>
+            <span class="font-normal">{{ $record->customer?->phone_number ?? 'N/A' }}</span>
           </div>
           <div class="text-medium mb-5">
             <span class="info-label font-semibold">Email:</span>
-            <span class="font-normal">{{ $record->user?->email ?? 'N/A' }}</span>
+            <span class="font-normal">{{ $record->customer?->email ?? 'N/A' }}</span>
           </div>
         </div>
         <div class="col col-6">
@@ -615,10 +615,10 @@
             <div style="margin-top: 25px;">{{ $currentUser?->name ?? 'Admin' }}</div>
           </td>
           <td class="signature-space">
-            <div style="margin-top: 25px;">{{ $record->user?->name ?? 'N/A' }}</div>
+            <div style="margin-top: 25px;">{{ $record->customer?->name ?? 'N/A' }}</div>
           </td>
           <td class="signature-space">
-            <div style="margin-top: 25px;">{{ $record->user?->name ?? 'N/A' }}</div>
+            <div style="margin-top: 25px;">{{ $record->customer?->name ?? 'N/A' }}</div>
           </td>
           <td class="signature-space">
             <div style="margin-top: 25px;">{{ $currentUser?->name ?? 'Admin' }}</div>

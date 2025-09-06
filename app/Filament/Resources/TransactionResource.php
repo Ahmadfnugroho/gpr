@@ -134,10 +134,10 @@ class TransactionResource extends Resource
                             ->where('end_date', '>=', $endDate);
                     });
             })
-            // EXCLUDE current transaction when editing to avoid false "unavailable" status
-            ->when($currentTransactionId, function ($q) use ($currentTransactionId) {
-                $q->where('id', '!=', $currentTransactionId);
-            });
+                // EXCLUDE current transaction when editing to avoid false "unavailable" status
+                ->when($currentTransactionId, function ($q) use ($currentTransactionId) {
+                    $q->where('id', '!=', $currentTransactionId);
+                });
         })
             ->pluck('product_item_id')
             ->toArray();
@@ -215,10 +215,10 @@ class TransactionResource extends Resource
                             ->where('end_date', '>=', $endDate);
                     });
             })
-            // EXCLUDE current transaction when editing to avoid false "unavailable" status
-            ->when($currentTransactionId, function ($q) use ($currentTransactionId) {
-                $q->where('id', '!=', $currentTransactionId);
-            });
+                // EXCLUDE current transaction when editing to avoid false "unavailable" status
+                ->when($currentTransactionId, function ($q) use ($currentTransactionId) {
+                    $q->where('id', '!=', $currentTransactionId);
+                });
         })
             ->pluck('product_item_id')
             ->toArray();
@@ -992,7 +992,7 @@ class TransactionResource extends Resource
                                             $quantity = (int) ($get('quantity') ?? 1);
                                             
                                             if (!$productId && !$bundlingId) {
-                                                return 'Pilih produk atau bundling terlebih dahulu';
+                                                return new HtmlString('Pilih produk atau bundling terlebih dahulu');
                                             }
                                             
                                             // Get assigned serial numbers display
@@ -1002,7 +1002,7 @@ class TransactionResource extends Resource
                                                 $detailTransaction = \App\Models\DetailTransaction::with('productItems.product')->find($detailTransactionId);
                                                 if ($detailTransaction && $detailTransaction->productItems->isNotEmpty()) {
                                                     $serialNumbers = $detailTransaction->productItems->pluck('serial_number')->toArray();
-                                                    return '<strong>Assigned:</strong> ' . implode(', ', $serialNumbers);
+                                                    return new HtmlString('<strong>Assigned:</strong> ' . implode(', ', $serialNumbers));
                                                 }
                                             }
                                             
@@ -1011,7 +1011,7 @@ class TransactionResource extends Resource
                                                 $available = \App\Filament\Resources\TransactionResource::resolveAvailableProductSerials($get);
                                                 if (!empty($available)) {
                                                     $items = \App\Models\ProductItem::whereIn('id', array_slice($available, 0, $quantity))->pluck('serial_number')->toArray();
-                                                    return '<strong>Will be assigned:</strong> ' . (empty($items) ? 'None available' : implode(', ', $items));
+                                                    return new HtmlString('<strong>Will be assigned:</strong> ' . (empty($items) ? 'None available' : implode(', ', $items)));
                                                 }
                                             } elseif ($bundlingId) {
                                                 $currentTransactionId = $get('../../id');
@@ -1028,15 +1028,14 @@ class TransactionResource extends Resource
                                                     $currentTransactionId,
                                                     $currentDetailTransactionId
                                                 );
-                                                return '<strong>Will be assigned:</strong> ' . ($result['display'] ?: 'None available');
+                                                return new HtmlString('<strong>Will be assigned:</strong> ' . ($result['display'] ?: 'None available'));
                                             }
                                             
-                                            return 'No items available';
+                                            return new HtmlString('No items available');
                                         })
                                         ->visible(function (Get $get) {
                                             return !is_null($get('selection_key'));
-                                        })
-                                        ->html(),
+                                        }),
 
                                     // Hidden field to store auto-assigned productItems
                                     Hidden::make('productItems')
@@ -1674,7 +1673,7 @@ class TransactionResource extends Resource
                             foreach ($record->detailTransactions as $detail) {
                                 $productInfo = '';
                                 $quantity = $detail->quantity ?? 1;
-                                
+
                                 if ($detail->bundling_id && $detail->relationLoaded('bundling') && $detail->bundling) {
                                     // BUNDLING: Show bundling name + products inside + serial numbers
                                     $bundleName = static::highlightSearchTerm($detail->bundling->name, $searchTerm);
@@ -1683,13 +1682,13 @@ class TransactionResource extends Resource
                                         $productInfo .= " x{$quantity}";
                                     }
                                     $productInfo .= ":</strong><br>";
-                                    
+
                                     // Get bundling products and their serial numbers
                                     if ($detail->bundling->relationLoaded('products')) {
                                         $bundlingDetails = [];
                                         foreach ($detail->bundling->products as $bundlingProduct) {
                                             $requiredQty = $quantity * ($bundlingProduct->pivot->quantity ?? 1);
-                                            
+
                                             // Get serial numbers for this product in this detail transaction
                                             $serialNumbers = [];
                                             if ($detail->relationLoaded('productItems')) {
@@ -1699,23 +1698,22 @@ class TransactionResource extends Resource
                                                     }
                                                 }
                                             }
-                                            
+
                                             $productDetail = "&nbsp;&nbsp;• {$bundlingProduct->name}";
                                             if ($requiredQty > 1) {
                                                 $productDetail .= " x{$requiredQty}";
                                             }
-                                            
+
                                             if (!empty($serialNumbers)) {
                                                 $productDetail .= ": " . implode(', ', $serialNumbers);
                                             } else {
                                                 $productDetail .= ": <em>No serial numbers</em>";
                                             }
-                                            
+
                                             $bundlingDetails[] = $productDetail;
                                         }
                                         $productInfo .= implode('<br>', $bundlingDetails);
                                     }
-                                    
                                 } elseif ($detail->product_id && $detail->relationLoaded('product') && $detail->product) {
                                     // SINGLE PRODUCT: Show product name + serial numbers
                                     $productName = static::highlightSearchTerm($detail->product->name, $searchTerm);
@@ -1724,7 +1722,7 @@ class TransactionResource extends Resource
                                         $productInfo .= " x{$quantity}";
                                     }
                                     $productInfo .= ":</strong> ";
-                                    
+
                                     // Get serial numbers for this product
                                     $serialNumbers = [];
                                     if ($detail->relationLoaded('productItems')) {
@@ -1732,14 +1730,14 @@ class TransactionResource extends Resource
                                             $serialNumbers[] = static::highlightSearchTerm($item->serial_number, $searchTerm);
                                         }
                                     }
-                                    
+
                                     if (!empty($serialNumbers)) {
                                         $productInfo .= implode(', ', $serialNumbers);
                                     } else {
                                         $productInfo .= "<em>No serial numbers</em>";
                                     }
                                 }
-                                
+
                                 if ($productInfo) {
                                     $products[] = $productInfo;
                                 }
@@ -1752,35 +1750,35 @@ class TransactionResource extends Resource
                     ->searchable()
                     ->wrap()
                     ->lineClamp(null), // Remove line clamp to show all content
-                TextColumn::make('detailTransactions.productItems.serial_number')
-                    ->label('S/N')
-                    ->size(TextColumnSize::ExtraSmall)
-                    ->formatStateUsing(function ($record) {
-                        $serialNumbers = [];
-                        $searchTerm = request('tableSearch');
+                // TextColumn::make('detailTransactions.productItems.serial_number')
+                //     ->label('S/N')
+                //     ->size(TextColumnSize::ExtraSmall)
+                //     ->formatStateUsing(function ($record) {
+                //         $serialNumbers = [];
+                //         $searchTerm = request('tableSearch');
 
-                        foreach ($record->detailTransactions as $detail) {
-                            foreach ($detail->productItems as $item) {
-                                $serialNumbers[] = static::highlightSearchTerm($item->serial_number, $searchTerm);
-                            }
-                        }
+                //         foreach ($record->detailTransactions as $detail) {
+                //             foreach ($detail->productItems as $item) {
+                //                 $serialNumbers[] = static::highlightSearchTerm($item->serial_number, $searchTerm);
+                //             }
+                //         }
 
-                        if (empty($serialNumbers)) {
-                            return '-';
-                        }
+                //         if (empty($serialNumbers)) {
+                //             return '-';
+                //         }
 
-                        if (count($serialNumbers) <= 5) {
-                            return implode(', ', $serialNumbers);
-                        }
+                //         if (count($serialNumbers) <= 5) {
+                //             return implode(', ', $serialNumbers);
+                //         }
 
-                        $first5 = array_slice($serialNumbers, 0, 5);
-                        $remaining = count($serialNumbers) - 5;
+                //         $first5 = array_slice($serialNumbers, 0, 5);
+                //         $remaining = count($serialNumbers) - 5;
 
-                        return implode(', ', $first5) . " <span style='color: #6b7280; font-style: italic;'>dan {$remaining} lainnya</span>";
-                    })
-                    ->html()
-                    ->searchable()
-                    ->wrap(),
+                //         return implode(', ', $first5) . " <span style='color: #6b7280; font-style: italic;'>dan {$remaining} lainnya</span>";
+                //     })
+                //     ->html()
+                //     ->searchable()
+                //     ->wrap(),
                 TextColumn::make('start_date')
                     ->label('Start')
                     ->wrap()
