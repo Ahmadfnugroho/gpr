@@ -1,0 +1,68 @@
+# MySQL Configuration Optimization for Bulk Operations
+# Copy the relevant settings to your my.cnf or my.ini file
+
+[mysqld]
+# Buffer Settings for Better Bulk Performance
+innodb_buffer_pool_size = 1G
+innodb_buffer_pool_instances = 4
+innodb_log_file_size = 256M
+innodb_log_buffer_size = 16M
+innodb_flush_log_at_trx_commit = 2
+
+# Connection and Query Cache
+max_connections = 300
+query_cache_size = 64M
+query_cache_type = 1
+query_cache_limit = 2M
+
+# Table Settings
+table_open_cache = 2000
+table_definition_cache = 1000
+
+# Bulk Insert Optimization
+bulk_insert_buffer_size = 8M
+myisam_sort_buffer_size = 32M
+key_buffer_size = 128M
+
+# Transaction Settings
+innodb_lock_wait_timeout = 50
+innodb_rollback_on_timeout = ON
+
+# Memory Settings
+tmp_table_size = 64M
+max_heap_table_size = 64M
+sort_buffer_size = 2M
+read_buffer_size = 1M
+read_rnd_buffer_size = 2M
+join_buffer_size = 2M
+
+# Binary Logging (disable for better performance during bulk operations)
+# Comment out these lines if you don't need replication
+# log-bin = mysql-bin
+# binlog_format = ROW
+
+# Slow Query Log for Performance Monitoring
+slow_query_log = 1
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time = 2
+
+# Performance Schema
+performance_schema = ON
+performance_schema_events_statements_history_size = 100
+performance_schema_events_statements_history_long_size = 1000
+
+# Character Set
+character_set_server = utf8mb4
+collation_server = utf8mb4_unicode_ci
+
+# Timeout Settings
+wait_timeout = 600
+interactive_timeout = 600
+net_read_timeout = 120
+net_write_timeout = 120
+
+[mysql]
+default-character-set = utf8mb4
+
+[client]
+default-character-set = utf8mb4

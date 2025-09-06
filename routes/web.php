@@ -62,6 +62,10 @@ Route::prefix('customers')->name('customers.')->middleware('auth')->group(functi
     Route::get('/export', [CustomerController::class, 'export'])->name('export');
     Route::get('/import/template', [CustomerController::class, 'downloadTemplate'])->name('import.template');
     Route::post('/bulk-action', [CustomerController::class, 'bulkAction'])->name('bulk-action');
+    
+    // Enhanced bulk action routes with progress tracking
+    Route::post('/bulk-action/start', [App\Http\Controllers\BulkActionProgressController::class, 'startBulkAction'])->name('bulk-action.start');
+    Route::get('/bulk-action/progress', [App\Http\Controllers\BulkActionProgressController::class, 'getProgress'])->name('bulk-action.progress');
 });
 
 // WhatsApp Management Routes (protected by auth)

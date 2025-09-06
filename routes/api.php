@@ -38,25 +38,50 @@ Route::prefix('sessions')->group(function () {
 
 Route::post('/sendText', [WhatsAppController::class, 'sendTestMessage']);
 
-Route::middleware(['api_key', 'throttle:60,1'])->group(function () {
-    Route::get('/product/{product:slug}', [ProductController::class, 'show']);
-    Route::get('/search-suggestions', [ProductController::class, 'searchSuggestions'])->middleware('throttle:30,1');
+// Public API Routes (no authentication required)
+Route::middleware(['throttle:120,1'])->group(function () {
+    // Product browsing endpoints (public access)
+    Route::get('/categories', [CategoryController::class, 'index']);
     Route::get('/category/{category:slug}', [CategoryController::class, 'show']);
-    Route::apiResource('/categories', CategoryController::class);
-    Route::get('/sub-categories/{subCategory:slug}', [SubCategoryController::class, 'show']);
-    Route::apiResource('/sub-categories', SubCategoryController::class);
+    Route::get('/brands', [BrandController::class, 'index']);
     Route::get('/brand/{brand:slug}', [BrandController::class, 'show']);
-    Route::apiResource('/brands', BrandController::class);
     Route::get('/brands-premiere', [BrandController::class, 'getPremiereBrands']);
+    Route::get('/products', [ProductController::class, 'index']);
+    Route::get('/product/{product:slug}', [ProductController::class, 'show']);
+    Route::get('/BrowseProduct', [ProductController::class, 'ProductsHome']);
+    Route::get('/bundlings', [\App\Http\Controllers\Api\BundlingController::class, 'index']);
+    Route::get('/bundling/{bundling:slug}', [\App\Http\Controllers\Api\BundlingController::class, 'show']);
+    Route::get('/sub-categories', [SubCategoryController::class, 'index']);
+    Route::get('/sub-categories/{subCategory:slug}', [SubCategoryController::class, 'show']);
+    Route::get('/search-suggestions', [ProductController::class, 'searchSuggestions'])->middleware('throttle:60,1');
+});
+
+// Protected API Routes (require API key)
+Route::middleware(['api_key', 'throttle:60,1'])->group(function () {
+    // Write operations require authentication
+    Route::post('/categories', [CategoryController::class, 'store']);
+    Route::put('/categories/{category}', [CategoryController::class, 'update']);
+    Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
+    
+    Route::post('/brands', [BrandController::class, 'store']);
+    Route::put('/brands/{brand}', [BrandController::class, 'update']);
+    Route::delete('/brands/{brand}', [BrandController::class, 'destroy']);
+    
+    Route::post('/products', [ProductController::class, 'store']);
+    Route::put('/products/{product}', [ProductController::class, 'update']);
+    Route::delete('/products/{product}', [ProductController::class, 'destroy']);
+    
+    Route::post('/bundlings', [\App\Http\Controllers\Api\BundlingController::class, 'store']);
+    Route::put('/bundlings/{bundling}', [\App\Http\Controllers\Api\BundlingController::class, 'update']);
+    Route::delete('/bundlings/{bundling}', [\App\Http\Controllers\Api\BundlingController::class, 'destroy']);
+    
+    Route::post('/sub-categories', [SubCategoryController::class, 'store']);
+    Route::put('/sub-categories/{sub_category}', [SubCategoryController::class, 'update']);
+    Route::delete('/sub-categories/{sub_category}', [SubCategoryController::class, 'destroy']);
+    
+    // Sync and transaction operations
     Route::post('/google-sheet-sync', [GoogleSheetSyncController::class, 'sync']);
     Route::get('/google-sheet-export', [GoogleSheetSyncController::class, 'export']);
-    // Bundling routes (slug based, RESTful)
-    Route::get('/bundling/{bundling:slug}', [\App\Http\Controllers\Api\BundlingController::class, 'show']);
-    Route::apiResource('/bundlings', \App\Http\Controllers\Api\BundlingController::class)->parameters([
-        'bundlings' => 'bundling:slug',
-    ]);
-    Route::apiResource('/products', ProductController::class);
-    Route::get('/BrowseProduct', [ProductController::class, 'ProductsHome']);
     Route::apiResource('/transactions-check', TransactionCheckController::class);
     Route::post('/transaction', [TransactionController::class, 'store']);
     Route::post('/check-transaction', [TransactionController::class, 'DetailTransaction']);

@@ -39,7 +39,17 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 300), // Increased for bulk operations
+            'after_commit' => false,
+        ],
+        
+        // Optimized database queue for bulk operations
+        'bulk_database' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'bulk_operations',
+            'retry_after' => (int) env('DB_BULK_QUEUE_RETRY_AFTER', 600), // 10 minutes for bulk ops
             'after_commit' => false,
         ],
 

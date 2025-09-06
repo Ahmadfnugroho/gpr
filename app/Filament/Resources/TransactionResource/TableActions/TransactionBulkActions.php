@@ -23,10 +23,14 @@ class TransactionBulkActions
 
 
                 ->action(function (Collection $records) {
-                    $records->each->update(['booking_status' => 'booking']);
+                    // Batch update for better performance
+                    $recordIds = $records->pluck('id')->toArray();
+                    \App\Models\Transaction::whereIn('id', $recordIds)
+                        ->update(['booking_status' => 'booking', 'updated_at' => now()]);
+                    
                     Notification::make()
                         ->success()
-                        ->title('Berhasil Mengubah Status Booking Transaksi')
+                        ->title('Berhasil Mengubah Status ' . count($recordIds) . ' Transaksi ke Booking')
                         ->send();
                 }),
 
@@ -40,10 +44,14 @@ class TransactionBulkActions
 
 
                 ->action(function (Collection $records) {
-                    $records->each->update(['booking_status' => 'paid']);
+                    // Batch update for better performance
+                    $recordIds = $records->pluck('id')->toArray();
+                    \App\Models\Transaction::whereIn('id', $recordIds)
+                        ->update(['booking_status' => 'paid', 'updated_at' => now()]);
+                    
                     Notification::make()
                         ->success()
-                        ->title('Berhasil Mengubah Status Booking Transaksi')
+                        ->title('Berhasil Mengubah Status ' . count($recordIds) . ' Transaksi ke Paid')
                         ->send();
                 }),
 
@@ -56,10 +64,14 @@ class TransactionBulkActions
 
 
                 ->action(function (Collection $records) {
-                    $records->each->update(['booking_status' => 'cancel']);
+                    // Batch update for better performance
+                    $recordIds = $records->pluck('id')->toArray();
+                    \App\Models\Transaction::whereIn('id', $recordIds)
+                        ->update(['booking_status' => 'cancel', 'updated_at' => now()]);
+                    
                     Notification::make()
                         ->success()
-                        ->title('Berhasil Mengubah Status Booking Transaksi')
+                        ->title('Berhasil Mengubah Status ' . count($recordIds) . ' Transaksi ke Cancel')
                         ->send();
                 }),
 
@@ -72,10 +84,14 @@ class TransactionBulkActions
 
 
                 ->action(function (Collection $records) {
-                    $records->each->update(['booking_status' => 'on_rented']);
+                    // Batch update for better performance
+                    $recordIds = $records->pluck('id')->toArray();
+                    \App\Models\Transaction::whereIn('id', $recordIds)
+                        ->update(['booking_status' => 'on_rented', 'updated_at' => now()]);
+                    
                     Notification::make()
                         ->success()
-                        ->title('Berhasil Mengubah Status Booking Transaksi')
+                        ->title('Berhasil Mengubah Status ' . count($recordIds) . ' Transaksi ke On Rented')
                         ->send();
                 }),
 
@@ -88,10 +104,14 @@ class TransactionBulkActions
 
 
                 ->action(function (Collection $records) {
-                    $records->each->update(['booking_status' => 'done']);
+                    // Batch update for better performance
+                    $recordIds = $records->pluck('id')->toArray();
+                    \App\Models\Transaction::whereIn('id', $recordIds)
+                        ->update(['booking_status' => 'done', 'updated_at' => now()]);
+                    
                     Notification::make()
                         ->success()
-                        ->title('Berhasil Mengubah Status Booking Transaksi')
+                        ->title('Berhasil Mengubah Status ' . count($recordIds) . ' Transaksi ke Done')
                         ->send();
                 }),
 

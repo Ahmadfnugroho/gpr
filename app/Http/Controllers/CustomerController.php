@@ -401,7 +401,7 @@ class CustomerController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'action' => 'required|in:delete,activate,deactivate,blacklist',
-            'customer_ids' => 'required|array|min:1',
+            'customer_ids' => 'required|array|min:1|max:1000', // Limit to prevent memory issues
             'customer_ids.*' => 'exists:customers,id'
         ]);
 
@@ -409,48 +409,98 @@ class CustomerController extends Controller
             return redirect()->back()->withErrors($validator);
         }
 
+        // Track performance
+        $startTime = microtime(true);
+        $startMemory = memory_get_usage(true);
+
         try {
             DB::beginTransaction();
 
+            $customerIds = $request->customer_ids;
             $count = 0;
+            
+            // Process in chunks to prevent memory exhaustion
+            $chunks = array_chunk($customerIds, 100); // Process 100 records at a time
             
             switch ($request->action) {
                 case 'delete':
-                    $customers = Customer::whereIn('id', $request->customer_ids)->get();
-                    foreach ($customers as $customer) {
-                        $customer->customerPhoneNumbers()->delete();
-                        $customer->customerPhotos()->delete();
-                        $customer->delete();
-                        $count++;
+                    foreach ($chunks as $chunk) {
+                        // Batch delete related records first
+                        DB::table('customer_phone_numbers')
+                          ->whereIn('customer_id', $chunk)
+                          ->delete();
+                        
+                        DB::table('customer_photos')
+                          ->whereIn('customer_id', $chunk)
+                          ->delete();
+                        
+                        // Then delete customers
+                        $deleted = Customer::whereIn('id', $chunk)->delete();
+                        $count += $deleted;
                     }
                     $message = "{$count} customer berhasil dihapus";
                     break;
 
                 case 'activate':
-                    $count = Customer::whereIn('id', $request->customer_ids)
-                                   ->update(['status' => Customer::STATUS_ACTIVE]);
+                    foreach ($chunks as $chunk) {
+                        $updated = Customer::whereIn('id', $chunk)
+                                         ->update([
+                                             'status' => Customer::STATUS_ACTIVE,
+                                             'updated_at' => now()
+                                         ]);
+                        $count += $updated;
+                    }
                     $message = "{$count} customer berhasil diaktifkan";
                     break;
 
                 case 'deactivate':
-                    $count = Customer::whereIn('id', $request->customer_ids)
-                                   ->update(['status' => Customer::STATUS_INACTIVE]);
+                    foreach ($chunks as $chunk) {
+                        $updated = Customer::whereIn('id', $chunk)
+                                         ->update([
+                                             'status' => Customer::STATUS_INACTIVE,
+                                             'updated_at' => now()
+                                         ]);
+                        $count += $updated;
+                    }
                     $message = "{$count} customer berhasil dinonaktifkan";
                     break;
 
                 case 'blacklist':
-                    $count = Customer::whereIn('id', $request->customer_ids)
-                                   ->update(['status' => Customer::STATUS_BLACKLIST]);
+                    foreach ($chunks as $chunk) {
+                        $updated = Customer::whereIn('id', $chunk)
+                                         ->update([
+                                             'status' => Customer::STATUS_BLACKLIST,
+                                             'updated_at' => now()
+                                         ]);
+                        $count += $updated;
+                    }
                     $message = "{$count} customer berhasil di-blacklist";
                     break;
             }
 
             DB::commit();
 
-            return redirect()->back()->with('success', $message);
+            // Log performance
+            $endTime = microtime(true);
+            $endMemory = memory_get_peak_usage(true);
+            $executionTime = $endTime - $startTime;
+            
+            \Log::info('Customer bulk action completed', [
+                'action' => $request->action,
+                'count' => $count,
+                'execution_time' => round($executionTime, 2) . 's',
+                'memory_peak' => round($endMemory / 1024 / 1024, 2) . 'MB'
+            ]);
+
+            return redirect()->back()->with('success', $message . " (" . round($executionTime, 1) . "s)");
 
         } catch (\Exception $e) {
             DB::rollback();
+            \Log::error('Customer bulk action failed', [
+                'action' => $request->action,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
