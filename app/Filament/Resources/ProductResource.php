@@ -291,33 +291,33 @@ class ProductResource extends Resource
                             ->sortable(),
 
 
-                        Tables\Columns\TextColumn::make('items.serial_number')
-                            ->label('Nomor Seri')
-                            ->formatStateUsing(function ($record) {
-                                $serialNumbers = $record->items->pluck('serial_number')->toArray();
+                        // Tables\Columns\TextColumn::make('items.serial_number')
+                        //     ->label('Nomor Seri')
+                        //     ->formatStateUsing(function ($record) {
+                        //         $serialNumbers = $record->items->pluck('serial_number')->toArray();
 
-                                if (count($serialNumbers) === 0) {
-                                    return '-';
-                                }
+                        //         if (count($serialNumbers) === 0) {
+                        //             return '-';
+                        //         }
 
-                                if (count($serialNumbers) <= 5) {
-                                    return implode(', ', $serialNumbers);
-                                }
+                        //         if (count($serialNumbers) <= 5) {
+                        //             return implode(', ', $serialNumbers);
+                        //         }
 
-                                $first5 = array_slice($serialNumbers, 0, 5);
-                                $remaining = count($serialNumbers) - 5;
+                        //         $first5 = array_slice($serialNumbers, 0, 5);
+                        //         $remaining = count($serialNumbers) - 5;
 
-                                return implode(', ', $first5) . " <span style='color: #6b7280; font-style: italic;'>dan {$remaining} lainnya</span>";
-                            })
-                            ->html()
-                            ->searchable()
-                            ->wrap()
-                            ->sortable(),
+                        //         return implode(', ', $first5) . " <span style='color: #6b7280; font-style: italic;'>dan {$remaining} lainnya</span>";
+                        //     })
+                        //     ->html()
+                        //     ->searchable()
+                        //     ->wrap()
+                        //     ->sortable(),
 
-                        Tables\Columns\TextColumn::make('price')
-                            ->formatStateUsing(fn($state) => 'Rp' . number_format($state, 0, ',', '.'))
-                            ->searchable()
-                            ->sortable(),
+                        // Tables\Columns\TextColumn::make('price')
+                        //     ->formatStateUsing(fn($state) => 'Rp' . number_format($state, 0, ',', '.'))
+                        //     ->searchable()
+                        //     ->sortable(),
                     ]
                 ),
 
