@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductAvailabilityResource\Pages;
 use App\Models\Product;
+use App\Models\Bundling;
 use App\Models\ProductItem;
 use App\Models\DetailTransactionProductItem;
 use Carbon\Carbon;
@@ -20,9 +21,11 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Grid;
 use Filament\Support\Enums\FontWeight;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Collection;
 
 class ProductAvailabilityResource extends Resource
 {
+    // Use a custom model collection that combines Products and Bundlings
     protected static ?string $model = Product::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
@@ -30,6 +33,68 @@ class ProductAvailabilityResource extends Resource
     protected static ?string $navigationLabel = 'Product Availability';
     protected static ?int $navigationSort = 25;
     protected static ?string $slug = 'product-availability';
+
+    /**
+     * Get all products and bundlings with availability data
+     */
+    public static function getAllAvailabilityData(?string $searchTerm = null): Collection
+    {
+        $items = collect();
+        
+        // Get products
+        $productsQuery = Product::with(['items']);
+        if ($searchTerm) {
+            $productsQuery = static::applySearchFilter($productsQuery, $searchTerm);
+        }
+        
+        $products = $productsQuery->get()->map(function ($product) {
+            return (object) [
+                'id' => $product->id,
+                'name' => $product->name,
+                'type' => 'product',
+                'model' => $product,
+            ];
+        });
+        
+        // Get bundlings
+        $bundlingsQuery = Bundling::with(['products.items']);
+        if ($searchTerm) {
+            $bundlingsQuery = static::applySearchFilter($bundlingsQuery, $searchTerm);
+        }
+        
+        $bundlings = $bundlingsQuery->get()->map(function ($bundling) {
+            return (object) [
+                'id' => $bundling->id,
+                'name' => $bundling->name . ' (Bundle)',
+                'type' => 'bundling',
+                'model' => $bundling,
+            ];
+        });
+        
+        return $products->merge($bundlings);
+    }
+    
+    /**
+     * Apply search filter with AND logic for keywords
+     */
+    protected static function applySearchFilter(Builder $query, string $searchTerm): Builder
+    {
+        if (strlen(trim($searchTerm)) >= 2) {
+            // Split search term into individual keywords
+            $keywords = array_filter(array_map('trim', explode(' ', strtolower($searchTerm))));
+            
+            if (!empty($keywords)) {
+                $query->where(function ($q) use ($keywords) {
+                    // For each keyword, it must be present in the name (AND logic)
+                    foreach ($keywords as $keyword) {
+                        $q->whereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
+                    }
+                });
+            }
+        }
+        
+        return $query;
+    }
 
     // Disable create, edit, delete since this is read-only
     public static function canCreate(): bool
@@ -65,7 +130,23 @@ class ProductAvailabilityResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->modifyQueryUsing(function (Builder $query) {
-                return $query->with(['items']);
+                $searchTerm = request('tableSearch');
+                
+                if ($searchTerm && strlen(trim($searchTerm)) >= 2) {
+                    // Split search term into individual keywords
+                    $keywords = array_filter(array_map('trim', explode(' ', strtolower($searchTerm))));
+                    
+                    if (!empty($keywords)) {
+                        $query->where(function ($q) use ($keywords) {
+                            // For each keyword, it must be present in the product name (AND logic)
+                            foreach ($keywords as $keyword) {
+                                $q->whereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
+                            }
+                        });
+                    }
+                }
+                
+                return $query->with(['items', 'bundlings']);
             })
             ->columns([
                 TextColumn::make('name')
@@ -73,7 +154,18 @@ class ProductAvailabilityResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->weight(FontWeight::SemiBold)
-                    ->wrap(),
+                    ->wrap()
+                    ->description(function ($record) {
+                        $bundlings = $record->bundlings;
+                        if ($bundlings->isNotEmpty()) {
+                            $bundlingNames = $bundlings->pluck('name')->take(3)->implode(', ');
+                            $remaining = $bundlings->count() - 3;
+                            $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
+                            return "Used in bundles: {$bundlingNames}{$suffix}";
+                        }
+                        return null;
+                    })
+                    ->descriptionColor('gray'),
 
                 TextColumn::make('total_items')
                     ->label('Total Items')
@@ -356,6 +448,50 @@ class ProductAvailabilityResource extends Resource
         $remaining = $availableSerials->count() - 5;
 
         return $first5 . " <span style='color: #6b7280; font-style: italic;'>and {$remaining} more</span>";
+    }
+
+    /**
+     * Get available bundling quantity for a date range
+     */
+    protected static function getAvailableBundlingCount(int $bundlingId, string $startDate, string $endDate): int
+    {
+        $bundling = Bundling::with('products.items')->find($bundlingId);
+        if (!$bundling) {
+            return 0;
+        }
+
+        return $bundling->getAvailableQuantityForPeriod(
+            Carbon::parse($startDate),
+            Carbon::parse($endDate)
+        );
+    }
+
+    /**
+     * Get bundling rental status information
+     */
+    protected static function getBundlingRentalStatus(int $bundlingId, string $startDate, string $endDate): string
+    {
+        $bundling = Bundling::find($bundlingId);
+        if (!$bundling) {
+            return 'No data';
+        }
+
+        // Check if bundling is currently rented
+        $activeRentals = $bundling->detailTransactions()
+            ->whereHas('transaction', function ($query) use ($startDate, $endDate) {
+                $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                    ->where(function ($q) use ($startDate, $endDate) {
+                        $q->whereBetween('start_date', [$startDate, $endDate])
+                            ->orWhereBetween('end_date', [$startDate, $endDate])
+                            ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                $q2->where('start_date', '<=', $startDate)
+                                    ->where('end_date', '>=', $endDate);
+                            });
+                    });
+            })
+            ->count();
+
+        return $activeRentals > 0 ? "{$activeRentals} active rentals" : 'No active rentals';
     }
 
     public static function getPages(): array
