@@ -2,12 +2,11 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\InventoryAvailabilityResource\Pages;
+use App\Filament\Resources\UnifiedInventoryResource\Pages;
 use App\Models\Product;
 use App\Models\Bundling;
 use App\Models\ProductItem;
 use App\Models\DetailTransactionProductItem;
-use App\Models\InventoryAvailability;
 use Carbon\Carbon;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -24,21 +23,15 @@ use Illuminate\Support\Collection;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Actions\Action;
 
-class InventoryAvailabilityResource extends Resource
+class UnifiedInventoryResource extends Resource
 {
-    protected static ?string $model = Product::class; // Using Product as base but showing combined data
+    protected static ?string $model = Product::class; // Using Product as base model
 
-    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
-    protected static ?string $navigationGroup = null; // Hide from navigation
-    protected static ?string $navigationLabel = 'Inventory Availability (Old)';
-    protected static ?int $navigationSort = 999;
-    protected static ?string $slug = 'old-inventory-availability';
-    
-    // Hide from navigation
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
+    protected static ?string $navigationIcon = 'heroicon-o-cube-transparent';
+    protected static ?string $navigationGroup = 'Inventory Management';
+    protected static ?string $navigationLabel = 'Product & Bundling Availability';
+    protected static ?int $navigationSort = 20;
+    protected static ?string $slug = 'unified-inventory';
 
     /**
      * Get available items count for a product in a date range
@@ -122,15 +115,13 @@ class InventoryAvailabilityResource extends Resource
                 return $query->with(['items', 'bundlings']);
             })
             ->columns([
-                TextColumn::make('type')
+                TextColumn::make('item_type')
                     ->label('Type')
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'product' => 'primary',
-                        'bundling' => 'success',
-                        default => 'gray',
+                    ->getStateUsing(function ($record) {
+                        return 'Product';
                     })
-                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
+                    ->badge()
+                    ->color('primary'),
 
                 TextColumn::make('name')
                     ->label('Name')
@@ -139,13 +130,20 @@ class InventoryAvailabilityResource extends Resource
                     ->weight(FontWeight::SemiBold)
                     ->wrap()
                     ->description(function ($record) {
-                        return $record->getDescription();
+                        $bundlings = $record->bundlings ?? collect();
+                        if ($bundlings->isNotEmpty()) {
+                            $bundlingNames = $bundlings->pluck('name')->take(3)->implode(', ');
+                            $remaining = $bundlings->count() - 3;
+                            $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
+                            return "Used in bundles: {$bundlingNames}{$suffix}";
+                        }
+                        return null;
                     }),
 
                 TextColumn::make('total_items')
                     ->label('Total Items')
                     ->getStateUsing(function ($record) {
-                        return $record->total_items;
+                        return $record->items()->count();
                     })
                     ->alignCenter()
                     ->sortable(false),
@@ -161,11 +159,11 @@ class InventoryAvailabilityResource extends Resource
                             $endDate = now()->addDays(7)->format('Y-m-d');
                         }
 
-                        return $record->getAvailableItemsForPeriod($startDate, $endDate);
+                        return static::getAvailableItemsCount($record->id, $startDate, $endDate);
                     })
                     ->alignCenter()
                     ->color(function ($state, $record) {
-                        $total = $record->total_items;
+                        $total = $record->items()->count();
                         if ($total == 0) return 'gray';
                         $percentage = ($state / $total) * 100;
                         if ($percentage >= 70) return 'success';
@@ -185,8 +183,8 @@ class InventoryAvailabilityResource extends Resource
                             $endDate = now()->addDays(7)->format('Y-m-d');
                         }
 
-                        $available = $record->getAvailableItemsForPeriod($startDate, $endDate);
-                        $total = $record->total_items;
+                        $available = static::getAvailableItemsCount($record->id, $startDate, $endDate);
+                        $total = $record->items()->count();
 
                         if ($total == 0) return '0%';
                         $percentage = round(($available / $total) * 100);
@@ -212,7 +210,21 @@ class InventoryAvailabilityResource extends Resource
                             $endDate = now()->addDays(7)->format('Y-m-d');
                         }
 
-                        return $record->getCurrentRentalsForPeriod($startDate, $endDate);
+                        $activeRentals = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
+                            $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                ->where(function ($q) use ($startDate, $endDate) {
+                                    $q->whereBetween('start_date', [$startDate, $endDate])
+                                        ->orWhereBetween('end_date', [$startDate, $endDate])
+                                        ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                            $q2->where('start_date', '<=', $startDate)
+                                                ->where('end_date', '>=', $endDate);
+                                        });
+                                });
+                        })->whereHas('productItem', function ($query) use ($record) {
+                            $query->where('product_id', $record->id);
+                        })->count();
+
+                        return $activeRentals;
                     })
                     ->alignCenter()
                     ->color('warning')
@@ -253,19 +265,6 @@ class InventoryAvailabilityResource extends Resource
                         return $indicators;
                     }),
 
-                SelectFilter::make('type')
-                    ->label('Item Type')
-                    ->options([
-                        'all' => 'All Items',
-                        'product' => 'Products Only',
-                        'bundling' => 'Bundlings Only',
-                    ])
-                    ->default('all')
-                    ->query(function (Builder $query, array $data): Builder {
-                        // This will be handled in the collection filtering
-                        return $query;
-                    }),
-
                 SelectFilter::make('availability_status')
                     ->label('Availability Status')
                     ->options([
@@ -276,7 +275,7 @@ class InventoryAvailabilityResource extends Resource
                     ])
                     ->default('all')
                     ->query(function (Builder $query, array $data): Builder {
-                        // This will be handled in the collection filtering
+                        // For now, return the query as is
                         return $query;
                     }),
             ])
@@ -285,14 +284,7 @@ class InventoryAvailabilityResource extends Resource
                     ->label('View Details')
                     ->icon('heroicon-o-eye')
                     ->color('primary')
-                    ->url(function ($record) {
-                        if ($record->type === 'product') {
-                            return route('filament.admin.resources.products.view', ['record' => $record->original_model->id]);
-                        } elseif ($record->type === 'bundling') {
-                            return route('filament.admin.resources.bundlings.view', ['record' => $record->original_model->id]);
-                        }
-                        return null;
-                    })
+                    ->url(fn ($record) => route('filament.admin.resources.products.view', ['record' => $record->id]))
                     ->openUrlInNewTab(),
             ])
             ->headerActions([
@@ -300,7 +292,7 @@ class InventoryAvailabilityResource extends Resource
                     ->label('Help')
                     ->icon('heroicon-o-question-mark-circle')
                     ->color('info')
-                    ->modalHeading('Inventory Availability Help')
+                    ->modalHeading('Product & Bundling Availability Help')
                     ->modalContent(view('filament.pages.product-availability-help'))
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close'),
@@ -315,7 +307,7 @@ class InventoryAvailabilityResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListInventoryAvailabilities::route('/'),
+            'index' => Pages\ListUnifiedInventories::route('/'),
         ];
     }
 }
