@@ -14,7 +14,7 @@
     }
 
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       line-height: 1.4;
       color: #000;
       background-color: #fff;
@@ -53,7 +53,7 @@
     }
 
     .col-3 {
-      width: 25%;
+      width: 50px;
     }
 
     .col-9 {
@@ -360,19 +360,39 @@
     <div class="header-section">
       <div class="row">
         <div class="col col-3">
-          <img src="{{ public_path('storage/LOGO-GPR.png') }}" alt="Logo" class="company-logo" />
+          <img
+            src="{{ public_path('storage/LOGO-GPR.png') }}"
+            alt="Logo"
+            class="company-logo" />
         </div>
-        <div class="col col-6 company-info" style="padding-left: 5px;">
-          <div class="h1" style="margin-top: -8px;">Global Photo Rental</div>
-          <div class="text-small font-normal mb-5">WA: 0812-1234-9564</div>
-          <div class="text-small font-normal mb-5">IG: global.photorental</div>
-          <div class="text-small font-normal mb-5">Alamat: Jln Kepu Selatan No. 11A RT 03</div>
-          <div class="text-small font-normal">RW 03, Kec. Kemayoran, Jakarta Pusat</div>
+        <div class="col col-6 company-info" style="padding-left: 8px">
+          <div class="h1" style="margin-top: 0px; margin-bottom: 2px">
+            Global Photo Rental
+          </div>
+          <div class="text-small font-normal" style="margin-bottom: 1px">
+            WA: 0812-1234-9564
+          </div>
+          <div class="text-small font-normal" style="margin-bottom: 1px">
+            IG: global.photorental
+          </div>
+          <div class="text-small font-normal" style="margin-bottom: 1px">
+            Alamat: Jln Kepu Selatan No. 11A RT 03
+          </div>
+          <div class="text-small font-normal">
+            RW 03, Kec. Kemayoran, Jakarta Pusat
+          </div>
         </div>
         <div class="col col-3 invoice-info text-right">
-          <div class="h4">Invoice #: {{ $record->booking_transaction_id ?? 'N/A' }}</div>
-          <div class="text-medium font-normal">Tanggal: {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y H:mm') }}</div>
-          <div class="text-small font-normal">Dicetak oleh: {{ $currentUser?->name ?? 'Admin' }}</div>
+          <div class="h4">
+            Invoice #: {{ $record->booking_transaction_id ?? 'N/A' }}
+          </div>
+          <div class="text-medium font-normal">
+            Tanggal: {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM
+              Y H:mm') }}
+          </div>
+          <div class="text-small font-normal">
+            Dicetak oleh: {{ $currentUser?->name ?? 'Admin' }}
+          </div>
         </div>
       </div>
     </div>
@@ -402,21 +422,17 @@
           <div class="text-medium mb-5">
             <span class="info-label font-semibold">Tanggal Mulai Sewa:</span>
             <span class="font-normal">
-              @if($record->start_date)
-              {{ \Carbon\Carbon::parse($record->start_date)->locale('id')->isoFormat('dddd, D MMMM Y H:mm') }}
-              @else
-              N/A
-              @endif
+              @if($record->start_date) {{
+                \Carbon\Carbon::parse($record->start_date)->locale('id')->isoFormat('dddd,
+                D MMMM Y H:mm') }} @else N/A @endif
             </span>
           </div>
           <div class="text-medium mb-5">
             <span class="info-label font-semibold">Tanggal Selesai Sewa:</span>
             <span class="font-normal">
-              @if($record->end_date)
-              {{ \Carbon\Carbon::parse($record->end_date)->locale('id')->isoFormat('dddd, D MMMM Y H:mm') }}
-              @else
-              N/A
-              @endif
+              @if($record->end_date) {{
+                \Carbon\Carbon::parse($record->end_date)->locale('id')->isoFormat('dddd,
+                D MMMM Y H:mm') }} @else N/A @endif
             </span>
           </div>
         </div>
@@ -428,11 +444,11 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th style="width: 5%;">No</th>
-          <th style="width: 45%;">Produk</th>
-          <th style="width: 20%;">No Seri</th>
-          <th style="width: 10%;">Jml</th>
-          <th style="width: 20%;">Harga</th>
+          <th style="width: 5%">No</th>
+          <th style="width: 45%">Produk</th>
+          <th style="width: 20%">No Seri</th>
+          <th style="width: 10%">Jml</th>
+          <th style="width: 20%">Harga</th>
         </tr>
       </thead>
       <tbody>
@@ -444,57 +460,40 @@
             <span class="font-medium">{{ $detail->product?->name ?? 'N/A' }}</span>
             @if($detail->product && $detail->product->rentalIncludes)
             @foreach($detail->product->rentalIncludes as $rentalInclude)
-            <br><span class="text-xs">&nbsp;&nbsp;• {{ $rentalInclude->includedProduct?->name ?? 'N/A' }}</span>
-            @endforeach
-            @endif
-            @else
+            <br /><span class="text-xs">&nbsp;&nbsp;• {{ $rentalInclude->includedProduct?->name ??
+                'N/A' }}</span>
+            @endforeach @endif @else
             <span class="font-semibold">{{ $detail->bundling?->name ?? 'N/A' }}</span>
             @if($detail->bundling && $detail->bundling->products)
             @foreach($detail->bundling->products as $product)
-            <br><span class="text-xs">&nbsp;&nbsp;— {{ $product->name ?? 'N/A' }}</span>
-            @if($product->rentalIncludes)
-            @foreach($product->rentalIncludes as $rentalInclude)
-            <br><span class="text-xs">&nbsp;&nbsp;&nbsp;&nbsp;• {{ $rentalInclude->includedProduct?->name ?? 'N/A' }}</span>
-            @endforeach
-            @endif
-            @endforeach
-            @endif
-            @endif
+            <br /><span class="text-xs">&nbsp;&nbsp;— {{ $product->name ?? 'N/A' }}</span>
+            @if($product->rentalIncludes) @foreach($product->rentalIncludes as
+            $rentalInclude)
+            <br /><span class="text-xs">&nbsp;&nbsp;&nbsp;&nbsp;• {{
+                $rentalInclude->includedProduct?->name ?? 'N/A' }}</span>
+            @endforeach @endif @endforeach @endif @endif
           </td>
           <td class="text-xs">
-            @if ($detail->bundling_id == null)
-            @if($detail->productItems && $detail->productItems->count() > 0)
-            @foreach($detail->productItems as $productItem)
-            {{ $productItem->serial_number ?? 'N/A' }}<br>
-            @endforeach
-            @else
-            N/A
-            @endif
-            @else
-            @if($detail->bundling && $detail->bundling->products)
-            @foreach($detail->bundling->products as $product)
-            @if($product->items && $product->items->count() > 0)
+            @if ($detail->bundling_id == null) @if($detail->productItems &&
+            $detail->productItems->count() > 0) @foreach($detail->productItems
+            as $productItem) {{ $productItem->serial_number ?? 'N/A' }}<br />
+            @endforeach @else N/A @endif @else @if($detail->bundling &&
+            $detail->bundling->products) @foreach($detail->bundling->products
+            as $product) @if($product->items && $product->items->count() > 0)
             @foreach($product->items->take($detail->quantity ?? 1) as $item)
-            {{ $item->serial_number ?? 'N/A' }}<br>
-            @endforeach
-            @endif
-            @endforeach
-            @else
-            N/A
-            @endif
-            @endif
+            {{ $item->serial_number ?? 'N/A' }}<br />
+            @endforeach @endif @endforeach @else N/A @endif @endif
           </td>
-          <td class="text-center font-medium">{{ $detail->quantity ?? 0 }}</td>
           <td class="text-center font-medium">
-            @php
-            $subtotalPrice = 0;
-            if ($detail->bundling_id && $detail->bundling) {
-            $subtotalPrice = ($detail->bundling->price ?? 0) * ($detail->quantity ?? 1);
-            } elseif ($detail->product_id && $detail->product) {
-            $subtotalPrice = ($detail->product->price ?? 0) * ($detail->quantity ?? 1);
-            }
-            @endphp
-            Rp{{ number_format($subtotalPrice, 0, ',', '.') }}
+            {{ $detail->quantity ?? 0 }}
+          </td>
+          <td class="text-center font-medium">
+            @php $subtotalPrice = 0; if ($detail->bundling_id &&
+            $detail->bundling) { $subtotalPrice = ($detail->bundling->price ??
+            0) * ($detail->quantity ?? 1); } elseif ($detail->product_id &&
+            $detail->product) { $subtotalPrice = ($detail->product->price ??
+            0) * ($detail->quantity ?? 1); } @endphp Rp{{
+              number_format($subtotalPrice, 0, ',', '.') }}
           </td>
         </tr>
         @endforeach
@@ -518,75 +517,61 @@
           <tr>
             <td class="summary-label">Total:</td>
             <td class="summary-value">
-              @php
-              $totalPrice = 0;
-              foreach ($record->DetailTransactions as $detail) {
-              if ($detail->bundling_id && $detail->bundling) {
-              $price = $detail->bundling->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              } elseif ($detail->product) {
-              $price = $detail->product->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              } else {
-              $price = $detail->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              }
-              $totalPrice += $price * $qty;
-              }
-              @endphp
-              Rp{{ number_format($totalPrice * ($record->duration ?? 1), 0, ',', '.') }}
+              @php $totalPrice = 0; foreach ($record->DetailTransactions as
+              $detail) { if ($detail->bundling_id && $detail->bundling) {
+              $price = $detail->bundling->price ?? 0; $qty = $detail->quantity
+              ?? 1; } elseif ($detail->product) { $price =
+              $detail->product->price ?? 0; $qty = $detail->quantity ?? 1; }
+              else { $price = $detail->price ?? 0; $qty = $detail->quantity ??
+              1; } $totalPrice += $price * $qty; } @endphp Rp{{
+                number_format($totalPrice * ($record->duration ?? 1), 0, ',',
+                '.') }}
             </td>
           </tr>
           <tr>
             <td class="summary-label">Diskon:</td>
             <td class="summary-value">
-              @php
-              $diskon = 0;
-              $totalPriceForDiscount = 0;
-
-              foreach ($record->DetailTransactions as $detail) {
-              if ($detail->bundling_id && $detail->bundling) {
-              $price = $detail->bundling->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              } elseif ($detail->product) {
-              $price = $detail->product->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              } else {
-              $price = $detail->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              }
-              $totalPriceForDiscount += $price * $qty;
-              }
-
-              if ($record->promo && $record->promo->rules) {
-              $rules = $record->promo->rules;
-              $duration = $record->duration ?? 1;
-              $groupSize = isset($rules[0]['group_size']) ? (int) $rules[0]['group_size'] : 1;
-              $payDays = isset($rules[0]['pay_days']) ? (int) $rules[0]['pay_days'] : $groupSize;
-              $discountedDays = (int) ($duration / $groupSize) * $payDays;
-              $remainingDays = $duration % $groupSize;
-              $daysToPay = $discountedDays + $remainingDays;
-
-              $diskon = match ($record->promo->type ?? 'none') {
-              'day_based' => (int) ((int) ($totalPriceForDiscount * $duration) - ($totalPriceForDiscount * $daysToPay)),
-              'percentage' => (int) (($totalPriceForDiscount * $duration) * (($rules[0]['percentage'] ?? 0) / 100)),
-              'nominal' => min($rules[0]['nominal'] ?? 0, (int) ($totalPriceForDiscount * $duration)),
-              default => 0,
-              };
-              }
-              @endphp
-              Rp{{ number_format($diskon, 0, ',', '.') }}
+              @php $diskon = 0; $totalPriceForDiscount = 0; foreach
+              ($record->DetailTransactions as $detail) { if
+              ($detail->bundling_id && $detail->bundling) { $price =
+              $detail->bundling->price ?? 0; $qty = $detail->quantity ?? 1; }
+              elseif ($detail->product) { $price = $detail->product->price ??
+              0; $qty = $detail->quantity ?? 1; } else { $price =
+              $detail->price ?? 0; $qty = $detail->quantity ?? 1; }
+              $totalPriceForDiscount += $price * $qty; } if ($record->promo &&
+              $record->promo->rules) { $rules = $record->promo->rules;
+              $duration = $record->duration ?? 1; $groupSize =
+              isset($rules[0]['group_size']) ? (int) $rules[0]['group_size'] :
+              1; $payDays = isset($rules[0]['pay_days']) ? (int)
+              $rules[0]['pay_days'] : $groupSize; $discountedDays = (int)
+              ($duration / $groupSize) * $payDays; $remainingDays = $duration
+              % $groupSize; $daysToPay = $discountedDays + $remainingDays;
+              $diskon = match ($record->promo->type ?? 'none') { 'day_based'
+              => (int) ((int) ($totalPriceForDiscount * $duration) -
+              ($totalPriceForDiscount * $daysToPay)), 'percentage' => (int)
+              (($totalPriceForDiscount * $duration) *
+              (($rules[0]['percentage'] ?? 0) / 100)), 'nominal' =>
+              min($rules[0]['nominal'] ?? 0, (int) ($totalPriceForDiscount *
+              $duration)), default => 0, }; } @endphp Rp{{
+                number_format($diskon, 0, ',', '.') }}
             </td>
           </tr>
-          @if($record->booking_status === 'cancel' && $record->cancellation_fee && $record->cancellation_fee > 0)
-          <tr style="background-color: #ffe6e6; color: #d63031;">
-            <td class="summary-label font-semibold">Biaya Pembatalan (50%):</td>
-            <td class="summary-value font-semibold">Rp{{ number_format($record->cancellation_fee, 0, ',', '.') }}</td>
+          @if($record->booking_status === 'cancel' &&
+          $record->cancellation_fee && $record->cancellation_fee > 0)
+          <tr style="background-color: #ffe6e6; color: #d63031">
+            <td class="summary-label font-semibold">
+              Biaya Pembatalan (50%):
+            </td>
+            <td class="summary-value font-semibold">
+              Rp{{ number_format($record->cancellation_fee, 0, ',', '.') }}
+            </td>
           </tr>
           @endif
           <tr class="grand-total">
             <td class="summary-label">Grand Total:</td>
-            <td class="summary-value">Rp{{ number_format($record->grand_total ?? 0, 0, ',', '.') }}</td>
+            <td class="summary-value">
+              Rp{{ number_format($record->grand_total ?? 0, 0, ',', '.') }}
+            </td>
           </tr>
         </table>
       </div>
@@ -594,8 +579,12 @@
 
     <!-- Payment Information -->
     <div class="payment-info">
-      <div class="text-small font-semibold mb-5">Pembayaran dapat dilakukan melalui:</div>
-      <div class="text-xs font-normal">Bank BCA: 0910079531 (Dissa Mustika)</div>
+      <div class="text-small font-semibold mb-5">
+        Pembayaran dapat dilakukan melalui:
+      </div>
+      <div class="text-xs font-normal">
+        Bank BCA: 0910079531 (Dissa Mustika)
+      </div>
     </div>
 
     <!-- Signature Section -->
@@ -612,16 +601,24 @@
       <tbody>
         <tr>
           <td class="signature-space">
-            <div style="margin-top: 25px;">{{ $currentUser?->name ?? 'Admin' }}</div>
+            <div style="margin-top: 25px">
+              {{ $currentUser?->name ?? 'Admin' }}
+            </div>
           </td>
           <td class="signature-space">
-            <div style="margin-top: 25px;">{{ $record->customer?->name ?? 'N/A' }}</div>
+            <div style="margin-top: 25px">
+              {{ $record->customer?->name ?? 'N/A' }}
+            </div>
           </td>
           <td class="signature-space">
-            <div style="margin-top: 25px;">{{ $record->customer?->name ?? 'N/A' }}</div>
+            <div style="margin-top: 25px">
+              {{ $record->customer?->name ?? 'N/A' }}
+            </div>
           </td>
           <td class="signature-space">
-            <div style="margin-top: 25px;">{{ $currentUser?->name ?? 'Admin' }}</div>
+            <div style="margin-top: 25px">
+              {{ $currentUser?->name ?? 'Admin' }}
+            </div>
           </td>
         </tr>
       </tbody>
@@ -632,11 +629,34 @@
       <div class="h4 text-center">Syarat dan Ketentuan</div>
       <ol class="terms-list">
         <li>Pihak yang menyewa wajib meninggalkan KTP Asli</li>
-        <li>Lama peminjaman 24 jam dihitung sejak jadwal yang tertera pada form di Invoice ini</li>
-        <li>Keterlambatan pengembalian alat 3 jam pertama dari jam tertera di form dikenakan denda 30% dari total sewa, keterlambatan lebih dari 3 jam dihitung penambahan pembayaran penuh 1 hari dengan konfirmasi kepada pihak Global Photo Rental sebelumnya</li>
-        <li>Apabila dalam waktu 1x24 jam unit sewa tidak dikembalikan tanpa konfirmasi atau pemberitahuan, pihak yang menyewa akan dilaporkan ke kepolisian setempat</li>
-        <li>Kerusakan/kehilangan barang sewaan selama peminjaman menjadi tanggung jawab pihak yang menyewa dan wajib mengganti biaya perbaikan atau komponen unit yang rusak/hilang. Apabila kerusakan tidak bisa diperbaiki maka pihak yang menyewa wajib mengganti dengan yang unit baru</li>
-        <li>Setiap alat dilengkapi dengan sticker Global Photo Rental. Dilarang keras merusak atau melepaskan sticker yang menempel pada alat, sticker yang dicopot atau dilepaskan tanpa izin akan dikenakan denda Rp500.000</li>
+        <li>
+          Lama peminjaman 24 jam dihitung sejak jadwal yang tertera pada form
+          di Invoice ini
+        </li>
+        <li>
+          Keterlambatan pengembalian alat 3 jam pertama dari jam tertera di
+          form dikenakan denda 30% dari total sewa, keterlambatan lebih dari 3
+          jam dihitung penambahan pembayaran penuh 1 hari dengan konfirmasi
+          kepada pihak Global Photo Rental sebelumnya
+        </li>
+        <li>
+          Apabila dalam waktu 1x24 jam unit sewa tidak dikembalikan tanpa
+          konfirmasi atau pemberitahuan, pihak yang menyewa akan dilaporkan ke
+          kepolisian setempat
+        </li>
+        <li>
+          Kerusakan/kehilangan barang sewaan selama peminjaman menjadi
+          tanggung jawab pihak yang menyewa dan wajib mengganti biaya
+          perbaikan atau komponen unit yang rusak/hilang. Apabila kerusakan
+          tidak bisa diperbaiki maka pihak yang menyewa wajib mengganti dengan
+          yang unit baru
+        </li>
+        <li>
+          Setiap alat dilengkapi dengan sticker Global Photo Rental. Dilarang
+          keras merusak atau melepaskan sticker yang menempel pada alat,
+          sticker yang dicopot atau dilepaskan tanpa izin akan dikenakan denda
+          Rp500.000
+        </li>
       </ol>
     </div>
   </div>

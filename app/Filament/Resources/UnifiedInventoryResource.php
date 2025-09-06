@@ -101,15 +101,13 @@ class UnifiedInventoryResource extends Resource
                 $searchTerm = request('tableSearch');
                 
                 if ($searchTerm && strlen(trim($searchTerm)) >= 2) {
-                    $keywords = array_filter(array_map('trim', explode(' ', strtolower($searchTerm))));
+                    // Clean and normalize search term (match global search behavior)
+                    $searchTerm = trim(strtolower($searchTerm));
                     
-                    if (!empty($keywords)) {
-                        $query->where(function ($q) use ($keywords) {
-                            foreach ($keywords as $keyword) {
-                                $q->whereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
-                            }
-                        });
-                    }
+                    // Use exact phrase search like global search
+                    $query->where(function ($q) use ($searchTerm) {
+                        $q->whereRaw('LOWER(name) LIKE ?', ["%{$searchTerm}%"]);
+                    });
                 }
                 
                 return $query->with(['items', 'bundlings']);
