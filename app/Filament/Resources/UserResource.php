@@ -49,7 +49,7 @@ class UserResource extends Resource
     {
         // Email verification status
         $emailVerified = $record->email_verified_at ? '✅ Verified' : '❌ Not Verified';
-        
+
         return [
             'Email' => $record->email,
             'Email Status' => $emailVerified,
@@ -59,7 +59,6 @@ class UserResource extends Resource
     }
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
-    protected static ?string $navigationGroup = 'User Management';
 
     protected static ?string $navigationLabel = 'Users';
 
@@ -92,9 +91,9 @@ class UserResource extends Resource
                         Forms\Components\TextInput::make('password')
                             ->label('Password')
                             ->password()
-                            ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
-                            ->dehydrated(fn ($state) => filled($state))
-                            ->required(fn (string $context): bool => $context === 'create')
+                            ->dehydrateStateUsing(fn($state) => filled($state) ? Hash::make($state) : null)
+                            ->dehydrated(fn($state) => filled($state))
+                            ->required(fn(string $context): bool => $context === 'create')
                             ->helperText('Leave blank to keep current password when editing'),
                         Forms\Components\CheckboxList::make('roles')
                             ->label('User Roles')
@@ -119,7 +118,7 @@ class UserResource extends Resource
                         $filePath = $service->generateTemplate();
                         return response()->download($filePath, 'user_import_template.xlsx')->deleteFileAfterSend();
                     }),
-                    
+
                 Action::make('import')
                     ->label('Import Excel')
                     ->icon('heroicon-o-arrow-up-tray')
@@ -141,7 +140,7 @@ class UserResource extends Resource
                             $service = new UserImportExportService();
                             $file = $data['excel_file'];
                             $updateExisting = $data['update_existing'] ?? false;
-                            
+
                             // Convert to UploadedFile if needed
                             if (is_string($file)) {
                                 $filePath = storage_path('app/public/' . $file);
@@ -153,11 +152,11 @@ class UserResource extends Resource
                                     true
                                 );
                             }
-                            
+
                             $results = $service->importUsers($file, $updateExisting);
-                            
+
                             $message = "Import completed! Total: {$results['total']}, Success: {$results['success']}, Updated: {$results['updated']}, Failed: {$results['failed']}";
-                            
+
                             if (!empty($results['errors'])) {
                                 Notification::make()
                                     ->title('Import Completed with Errors')
@@ -171,7 +170,6 @@ class UserResource extends Resource
                                     ->success()
                                     ->send();
                             }
-                            
                         } catch (\Exception $e) {
                             Notification::make()
                                 ->title('Import Failed')
@@ -180,7 +178,7 @@ class UserResource extends Resource
                                 ->send();
                         }
                     }),
-                    
+
                 Action::make('export')
                     ->label('Export All')
                     ->icon('heroicon-o-arrow-down-tray')
@@ -358,7 +356,7 @@ class UserResource extends Resource
                         ->label('Ubah Status User'),
 
                     Tables\Actions\DeleteBulkAction::make(),
-                    
+
                     Action::make('exportSelected')
                         ->label('Export Selected')
                         ->icon('heroicon-o-arrow-down-tray')

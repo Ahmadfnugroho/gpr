@@ -34,8 +34,7 @@ class UnifiedInventoryResource extends Resource
     protected static ?string $model = Product::class; // Using Product as base model
 
     protected static ?string $navigationIcon = 'heroicon-o-cube-transparent';
-    protected static ?string $navigationGroup = 'Inventory Management';
-    protected static ?string $navigationLabel = 'Product & Bundling Availability';
+    protected static ?string $navigationLabel = 'Product/Bundling Search';
     protected static ?int $navigationSort = 20;
     protected static ?string $slug = 'unified-inventory';
 
@@ -196,7 +195,7 @@ class UnifiedInventoryResource extends Resource
                         } else {
                             $total = $record->items()->count();
                         }
-                        
+
                         if ($total == 0) return 'gray';
                         $percentage = ($state / $total) * 100;
                         if ($percentage >= 70) return 'success';
@@ -285,11 +284,11 @@ class UnifiedInventoryResource extends Resource
                                         ->get();
                                     $allRentals = $allRentals->merge($activeRentals);
                                 }
-                                
+
                                 if ($allRentals->isEmpty()) {
                                     return 'No active bundle rentals';
                                 }
-                                
+
                                 // Group by transaction for bundling display
                                 $transactions = $allRentals->groupBy('detailTransaction.transaction.id');
                                 $rentalInfo = [];
@@ -300,12 +299,12 @@ class UnifiedInventoryResource extends Resource
                                     $status = ucfirst($transaction->booking_status);
                                     $rentalInfo[] = "{$startDate} - {$endDate} ({$status})";
                                 }
-                                
+
                                 $remaining = $transactions->count() - 3;
                                 if ($remaining > 0) {
                                     $rentalInfo[] = "+{$remaining} more transactions";
                                 }
-                                
+
                                 return implode('\n', $rentalInfo);
                             }
                             return 'No bundle data';
@@ -419,7 +418,7 @@ class UnifiedInventoryResource extends Resource
                     ->label('View Details')
                     ->icon('heroicon-o-eye')
                     ->color('primary')
-                    ->url(fn ($record) => route('filament.admin.resources.products.edit', ['record' => $record->id]))
+                    ->url(fn($record) => route('filament.admin.resources.products.edit', ['record' => $record->id]))
                     ->openUrlInNewTab(),
             ])
             ->headerActions([
