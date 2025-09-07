@@ -33,7 +33,6 @@ class ProductAvailabilityResource extends Resource
     protected static ?string $model = ProductAvailability::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
-    protected static ?string $navigationGroup = 'Inventory Management';
     protected static ?string $navigationLabel = 'Product Availability';
     protected static ?int $navigationSort = 25;
     protected static ?string $slug = 'product-availability';
