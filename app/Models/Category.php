@@ -42,4 +42,12 @@ class Category extends Model
     {
         return $this->hasMany(SubCategory::class);
     }
+
+    public function bundlings()
+    {
+        // Get bundlings that contain products from this category
+        return Bundling::whereHas('products', function($query) {
+            $query->where('category_id', $this->id);
+        });
+    }
 }

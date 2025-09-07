@@ -60,4 +60,12 @@ class Brand extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    public function bundlings()
+    {
+        // Get bundlings that contain products from this brand
+        return Bundling::whereHas('products', function($query) {
+            $query->where('brand_id', $this->id);
+        });
+    }
 }

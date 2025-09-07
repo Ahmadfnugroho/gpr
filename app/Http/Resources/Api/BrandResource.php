@@ -26,6 +26,20 @@ class BrandResource extends JsonResource
                 $this->products_count
             ),
             'products' => ProductResource::collection($this->whenLoaded('products')),
+            'bundlings' => $this->when(
+                request()->has('include_bundlings') || $this->relationLoaded('bundlings'),
+                function () {
+                    // Get bundlings using the method we defined in the model
+                    $bundlings = $this->bundlings()->with(['bundlingPhotos', 'products.category', 'products.brand'])->get();
+                    return BundlingResource::collection($bundlings);
+                }
+            ),
+            'bundlings_count' => $this->when(
+                request()->has('include_bundlings_count'),
+                function () {
+                    return $this->bundlings()->count();
+                }
+            ),
         ];
     }
 }
