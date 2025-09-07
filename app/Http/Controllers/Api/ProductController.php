@@ -149,43 +149,43 @@ class ProductController extends Controller
             return response()->json(['suggestions' => []]);
         }
 
-        // Use single optimized query with UNION for better performance
-        $suggestions = DB::select("
-            (SELECT 'product' as type, name, slug, thumbnail, 
-                    CONCAT('/product/', slug) as url, 
-                    name as display
-             FROM products 
-             WHERE MATCH(name) AGAINST(? IN NATURAL LANGUAGE MODE)
-             ORDER BY MATCH(name) AGAINST(? IN NATURAL LANGUAGE MODE) DESC
-             LIMIT 5)
-            UNION ALL
-            (SELECT 'category' as type, name, slug, NULL as thumbnail,
-                    CONCAT('/browse-product?category=', slug) as url,
-                    CONCAT('Kategori: ', name) as display
-             FROM categories
-             WHERE name LIKE ?
-             LIMIT 3)
-            UNION ALL
-            (SELECT 'brand' as type, name, slug, logo as thumbnail,
-                    CONCAT('/browse-product?brand=', slug) as url,
-                    CONCAT('Brand: ', name) as display
-             FROM brands
-             WHERE name LIKE ?
-             LIMIT 3)
-            UNION ALL
-            (SELECT 'subcategory' as type, name, slug, NULL as thumbnail,
-                    CONCAT('/browse-product?subcategory=', slug) as url,
-                    CONCAT('Subkategori: ', name) as display
-             FROM sub_categories
-             WHERE name LIKE ?
-             LIMIT 2)
-        ", [$query, $query, "%{$query}%", "%{$query}%", "%{$query}%"]);
-
-        // Convert to array and limit total results
-        $results = array_slice($suggestions, 0, 10);
-
-        return response()->json([
-            'suggestions' => $results
-        ]);
+        try {
+            // Use AdvancedSearchService for better suggestions
+            $searchService = app(\App\Services\AdvancedSearchService::class);
+            $results = $searchService->autocomplete($query, 10);
+            
+            return response()->json([
+                'suggestions' => $results['suggestions'] ?? []
+            ]);
+            
+        } catch (\Exception $e) {
+            // Fallback to basic search if service fails
+            \Log::warning('AdvancedSearchService failed, using fallback', [
+                'query' => $query,
+                'error' => $e->getMessage()
+            ]);
+            
+            // Simple fallback search
+            $products = Product::where('name', 'like', "%{$query}%")
+                ->where('status', 'available')
+                ->with(['category:id,name,slug', 'productPhotos:id,product_id,photo'])
+                ->take(6)
+                ->get();
+            
+            $suggestions = $products->map(function ($product) {
+                return [
+                    'type' => 'product',
+                    'name' => $product->name,
+                    'slug' => $product->slug,
+                    'thumbnail' => $product->productPhotos->first()?->photo,
+                    'url' => "/product/{$product->slug}",
+                    'display' => $product->name
+                ];
+            });
+            
+            return response()->json([
+                'suggestions' => $suggestions->toArray()
+            ]);
+        }
     }
 }

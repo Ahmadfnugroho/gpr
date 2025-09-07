@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\RegionController;
 use App\Http\Controllers\Api\SubCategoryController;
 use App\Http\Controllers\Api\TransactionController;
+use App\Http\Controllers\Api\AdvancedSearchController;
+use App\Http\Controllers\Api\AvailabilityController;
 use App\Http\Controllers\Admin\WhatsAppController;
 use App\Http\Controllers\GoogleSheetSyncController;
 use App\Http\Controllers\TransactionCheckController;
@@ -54,6 +56,30 @@ Route::middleware(['throttle:120,1'])->group(function () {
     Route::get('/sub-categories', [SubCategoryController::class, 'index']);
     Route::get('/sub-categories/{subCategory:slug}', [SubCategoryController::class, 'show']);
     Route::get('/search-suggestions', [ProductController::class, 'searchSuggestions'])->middleware('throttle:60,1');
+    
+    // Transactions API for availability checking
+    Route::prefix('transactions')->group(function () {
+        Route::get('/', [TransactionController::class, 'index'])->middleware('throttle:120,1');
+        Route::post('/check-availability', [TransactionController::class, 'checkAvailability'])->middleware('throttle:120,1');
+    });
+    
+    // Advanced Search API
+    Route::prefix('search')->group(function () {
+        Route::get('/', [AdvancedSearchController::class, 'search'])->middleware('throttle:120,1');
+        Route::get('/autocomplete', [AdvancedSearchController::class, 'autocomplete'])->middleware('throttle:180,1');
+        Route::get('/popular', [AdvancedSearchController::class, 'popularSuggestions'])->middleware('throttle:60,1');
+        Route::get('/stats', [AdvancedSearchController::class, 'getSearchStats'])->middleware('throttle:30,1');
+    });
+    
+    // Availability Checking API
+    Route::prefix('availability')->group(function () {
+        Route::post('/check', [AvailabilityController::class, 'check'])->middleware('throttle:120,1');
+        Route::post('/check-multiple', [AvailabilityController::class, 'checkMultiple'])->middleware('throttle:60,1');
+        Route::get('/unavailable-dates', [AvailabilityController::class, 'getUnavailableDates'])->middleware('throttle:180,1');
+        Route::post('/check-range', [AvailabilityController::class, 'isDateRangeAvailable'])->middleware('throttle:120,1');
+        Route::post('/check-cart', [AvailabilityController::class, 'checkCartAvailability'])->middleware('throttle:30,1');
+        Route::get('/stats', [AvailabilityController::class, 'getStats'])->middleware('throttle:30,1');
+    });
 });
 
 // Protected API Routes (require API key)
