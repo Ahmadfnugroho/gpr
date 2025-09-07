@@ -27,7 +27,6 @@ class DetailTransaction extends Model
         'available_quantity',
         'price',
         'total_price',
-        'productItems', // For auto-assigned serial numbers
     ];
     protected $casts = [
         'price' => 'float',

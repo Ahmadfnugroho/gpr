@@ -168,9 +168,9 @@ class ProductAvailability extends Model
                 }
                 return 0;
             } elseif ($this->type === 'bundling' && $this->bundling_model) {
-                // For bundling: get quantity from bundlings table
-                if (isset($this->bundling_model->quantity)) {
-                    return $this->bundling_model->quantity;
+                // For bundling: calculate maximum possible bundles based on products
+                if (isset($this->bundling_model->id)) {
+                    return $this->getTotalBundlingItems($this->bundling_model->id);
                 }
                 return 0;
             }
@@ -239,6 +239,38 @@ class ProductAvailability extends Model
     }
     
     /**
+     * Get total bundling items (maximum possible bundles based on products)
+     */
+    private function getTotalBundlingItems($bundlingId): int
+    {
+        try {
+            $bundling = \App\Models\Bundling::with(['products'])->find($bundlingId);
+            if (!$bundling || $bundling->products->isEmpty()) {
+                return 0;
+            }
+
+            $minQuantity = null;
+            
+            foreach ($bundling->products as $product) {
+                $requiredPerBundle = $product->pivot->quantity ?? 1;
+                $availableItems = \App\Models\ProductItem::where('product_id', $product->id)->count();
+                
+                // How many bundles can be made from this product
+                $possibleFromThisProduct = intval($availableItems / $requiredPerBundle);
+                
+                $minQuantity = is_null($minQuantity) 
+                    ? $possibleFromThisProduct 
+                    : min($minQuantity, $possibleFromThisProduct);
+            }
+            
+            return $minQuantity ?? 0;
+        } catch (\Exception $e) {
+            \Log::error('Error in getTotalBundlingItems: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
      * Calculate available bundling items for date range
      */
     private function getAvailableBundlingItems($bundlingId, $startDate, $endDate): int
@@ -250,29 +282,45 @@ class ProductAvailability extends Model
             return 0;
         }
 
-        // Get total bundling quantity
-        $bundling = \App\Models\Bundling::find($bundlingId);
-        if (!$bundling) {
+        $bundling = \App\Models\Bundling::with(['products'])->find($bundlingId);
+        if (!$bundling || $bundling->products->isEmpty()) {
             return 0;
         }
+
+        $minAvailable = null;
         
-        $totalQuantity = $bundling->quantity ?? 0;
+        foreach ($bundling->products as $product) {
+            $requiredPerBundle = $product->pivot->quantity ?? 1;
+            
+            // Get total items for this product
+            $totalItems = \App\Models\ProductItem::where('product_id', $product->id)->count();
+            
+            // Get used items for this product in the date range
+            $usedItems = \App\Models\DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($start, $end) {
+                $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                    ->where(function ($q) use ($start, $end) {
+                        $q->whereBetween('start_date', [$start, $end])
+                            ->orWhereBetween('end_date', [$start, $end])
+                            ->orWhere(function ($q2) use ($start, $end) {
+                                $q2->where('start_date', '<=', $start)
+                                    ->where('end_date', '>=', $end);
+                            });
+                    });
+            })->whereHas('productItem', function ($query) use ($product) {
+                $query->where('product_id', $product->id);
+            })->count();
+            
+            $availableItems = max(0, $totalItems - $usedItems);
+            
+            // How many bundles can be made from available items of this product
+            $possibleFromThisProduct = intval($availableItems / $requiredPerBundle);
+            
+            $minAvailable = is_null($minAvailable) 
+                ? $possibleFromThisProduct 
+                : min($minAvailable, $possibleFromThisProduct);
+        }
 
-        // Count bundlings used in transactions
-        $usedQuantity = \App\Models\DetailTransaction::whereHas('transaction', function ($query) use ($start, $end) {
-            $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-                ->where(function ($q) use ($start, $end) {
-                    $q->whereBetween('start_date', [$start, $end])
-                        ->orWhereBetween('end_date', [$start, $end])
-                        ->orWhere(function ($q2) use ($start, $end) {
-                            $q2->where('start_date', '<=', $start)
-                                ->where('end_date', '>=', $end);
-                        });
-                });
-        })->where('bundling_id', $bundlingId)
-          ->sum('quantity');
-
-        return max(0, $totalQuantity - $usedQuantity);
+        return $minAvailable ?? 0;
     }
 
     /**
