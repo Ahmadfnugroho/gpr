@@ -67,10 +67,30 @@ class ProductImporter extends Importer
             $serialNumbers = $this->data['serial_numbers'] ?? null;
             unset($this->data['serial_numbers']);
 
-            // Mapping category, brand, sub_category ke ID
-            $category = Category::where('name', $this->data['category'] ?? null)->first();
-            $brand = Brand::where('name', $this->data['brand'] ?? null)->first();
-            $subCategory = SubCategory::where('name', $this->data['sub_category'] ?? null)->first();
+            // Mapping category, brand, sub_category ke ID (case-insensitive)
+            $category = null;
+            if (!empty($this->data['category'])) {
+                $categoryName = trim($this->data['category']);
+                $category = Category::whereRaw('LOWER(name) = LOWER(?)', [$categoryName])->first();
+                if (!$category) {
+                }
+            }
+
+            $brand = null;
+            if (!empty($this->data['brand'])) {
+                $brandName = trim($this->data['brand']);
+                $brand = Brand::whereRaw('LOWER(name) = LOWER(?)', [$brandName])->first();
+                if (!$brand) {
+                }
+            }
+
+            $subCategory = null;
+            if (!empty($this->data['sub_category'])) {
+                $subCategoryName = trim($this->data['sub_category']);
+                $subCategory = SubCategory::whereRaw('LOWER(name) = LOWER(?)', [$subCategoryName])->first();
+                if (!$subCategory) {
+                }
+            }
 
             // Hapus kolom yang bukan field tabel
             unset($this->data['category']);
