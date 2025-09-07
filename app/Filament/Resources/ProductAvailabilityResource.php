@@ -208,21 +208,48 @@ class ProductAvailabilityResource extends Resource
             ])
             ->actions([
                 Action::make('view_details')
-                    ->label('View Details')
-                    ->icon('heroicon-m-eye')
+                    ->label('Edit Details')
+                    ->icon('heroicon-m-pencil-square')
                     ->url(function ($record) {
-                        if ($record->type === 'product') {
-                            return route('filament.admin.resources.products.view', [
-                                'record' => str_replace('product_', '', $record->id)
-                            ]);
-                        } elseif ($record->type === 'bundling') {
-                            return route('filament.admin.resources.bundlings.view', [
-                                'record' => str_replace('bundling_', '', $record->id)
-                            ]);
+                        try {
+                            if ($record->type === 'product') {
+                                $productId = str_replace('product_', '', $record->id);
+                                return route('filament.admin.resources.products.edit', [
+                                    'record' => $productId
+                                ]);
+                            } elseif ($record->type === 'bundling') {
+                                $bundlingId = str_replace('bundling_', '', $record->id);
+                                return route('filament.admin.resources.bundlings.edit', [
+                                    'record' => $bundlingId
+                                ]);
+                            }
+                        } catch (\Exception $e) {
+                            \Log::error('Error generating edit URL: ' . $e->getMessage());
+                            return null;
                         }
                         return null;
                     })
-                    ->openUrlInNewTab(),
+                    ->openUrlInNewTab()
+                    ->visible(fn ($record) => $record->type === 'product' || $record->type === 'bundling'),
+                    
+                Action::make('goto_list')
+                    ->label('View in List')
+                    ->icon('heroicon-m-list-bullet')
+                    ->url(function ($record) {
+                        try {
+                            if ($record->type === 'product') {
+                                return route('filament.admin.resources.products.index');
+                            } elseif ($record->type === 'bundling') {
+                                return route('filament.admin.resources.bundlings.index');
+                            }
+                        } catch (\Exception $e) {
+                            \Log::error('Error generating list URL: ' . $e->getMessage());
+                            return null;
+                        }
+                        return null;
+                    })
+                    ->openUrlInNewTab()
+                    ->visible(fn ($record) => $record->type === 'product' || $record->type === 'bundling'),
             ])
             ->defaultSort('name', 'asc')
             ->searchable(false) // We'll handle search differently
