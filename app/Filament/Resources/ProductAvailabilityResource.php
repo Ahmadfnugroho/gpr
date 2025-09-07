@@ -13,11 +13,16 @@ use Filament\Tables\Filters\Filter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Grid;
 use Filament\Support\Enums\FontWeight;
 use Illuminate\Support\HtmlString;
 use Filament\Tables\Actions\Action;
 use Illuminate\Support\Collection;
+use App\Models\Product;
+use App\Models\Bundling;
+use App\Models\Transaction;
 
 class ProductAvailabilityResource extends Resource
 {
@@ -162,53 +167,113 @@ class ProductAvailabilityResource extends Resource
                     })
                     ->weight(FontWeight::Bold),
 
-                TextColumn::make('period_status')
-                    ->label('Period Status')
-                    ->getStateUsing(function () {
-                        $startDate = request('tableFilters.date_range.start_date');
-                        $endDate = request('tableFilters.date_range.end_date');
+                TextColumn::make('rental_periods')
+                    ->label('Current Rentals')
+                    ->getStateUsing(function ($record) {
+                        try {
+                            $startDate = request('tableFilters.date_range.start_date');
+                            $endDate = request('tableFilters.date_range.end_date');
 
-                        if (!$startDate || !$endDate) {
-                            $startDate = now()->format('Y-m-d');
-                            $endDate = now()->addDays(7)->format('Y-m-d');
+                            if (!$startDate || !$endDate) {
+                                $startDate = now()->format('Y-m-d');
+                                $endDate = now()->addDays(7)->format('Y-m-d');
+                            }
+
+                            return $record->getActiveRentalPeriods($startDate, $endDate);
+                        } catch (\Exception $e) {
+                            return 'No active rentals';
                         }
-
-                        return Carbon::parse($startDate)->format('M d') . ' - ' . Carbon::parse($endDate)->format('M d, Y');
                     })
-                    ->alignCenter()
-                    ->color('gray')
-                    ->size(TextColumn\TextColumnSize::ExtraSmall),
+                    ->html()
+                    ->wrap()
+                    ->size(TextColumn\TextColumnSize::Small),
             ])
             ->filters([
+                Filter::make('item_selection')
+                    ->form([
+                        Select::make('selected_items')
+                            ->label('🛍️📦 Select Products/Bundlings')
+                            ->multiple()
+                            ->searchable()
+                            ->options(function () {
+                                $products = Product::where('status', '!=', 'deleted')
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id')
+                                    ->mapWithKeys(function($name, $id) {
+                                        return ["product-{$id}" => "🛍️ {$name}"];
+                                    });
+                                    
+                                $bundlings = Bundling::orderBy('name')
+                                    ->pluck('name', 'id')
+                                    ->mapWithKeys(function($name, $id) {
+                                        return ["bundling-{$id}" => "📦 {$name}"];
+                                    });
+                                    
+                                return $products->merge($bundlings)->toArray();
+                            })
+                            ->placeholder('Type to search products or bundlings...')
+                            ->helperText('💡 Leave empty to show all items'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        // For virtual model, filtering is handled in the page
+                        return $query;
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        if (empty($data['selected_items'])) {
+                            return null;
+                        }
+                        $count = count($data['selected_items']);
+                        return "Selected: {$count} items";
+                    }),
+                    
                 Filter::make('date_range')
                     ->form([
                         Grid::make(2)
                             ->schema([
-                                DatePicker::make('start_date')
-                                    ->label('Start Date')
+                                DateTimePicker::make('start_date')
+                                    ->label('📅 Start Date & Time')
                                     ->default(now())
+                                    ->displayFormat('d M Y H:i')
+                                    ->native(false)
                                     ->required(),
-                                DatePicker::make('end_date')
-                                    ->label('End Date')
-                                    ->default(now()->addDays(7))
+                                DateTimePicker::make('end_date')
+                                    ->label('📅 End Date & Time')
+                                    ->default(now()->addDays(7)->endOfDay())
+                                    ->after('start_date')
+                                    ->displayFormat('d M Y H:i')
+                                    ->native(false)
                                     ->required(),
                             ])
                     ])
                     ->query(function (Builder $query, array $data): Builder {
-                        // For virtual model, we don't modify the query here
-                        // The filtering is handled in the records method
+                        // For virtual model, filtering is handled in the page
                         return $query;
                     })
                     ->indicateUsing(function (array $data): ?string {
-                        $start = $data['start_date'] ?? now()->format('Y-m-d');
-                        $end = $data['end_date'] ?? now()->addDays(7)->format('Y-m-d');
+                        $start = $data['start_date'] ?? now()->format('Y-m-d H:i');
+                        $end = $data['end_date'] ?? now()->addDays(7)->format('Y-m-d H:i');
                         
-                        return 'Period: ' . Carbon::parse($start)->format('M d') . ' - ' . Carbon::parse($end)->format('M d, Y');
+                        return 'Period: ' . Carbon::parse($start)->format('M d H:i') . ' - ' . Carbon::parse($end)->format('M d H:i');
                     }),
             ])
             ->actions([
-                Action::make('view_details')
-                    ->label('Edit Details')
+                Action::make('view_transactions')
+                    ->label('View All Transactions')
+                    ->icon('heroicon-m-document-text')
+                    ->url(function ($record) {
+                        try {
+                            // Link to transactions index with filter for this item
+                            return route('filament.admin.resources.transactions.index');
+                        } catch (\Exception $e) {
+                            \Log::error('Error generating transactions URL: ' . $e->getMessage());
+                            return null;
+                        }
+                    })
+                    ->openUrlInNewTab()
+                    ->color('primary'),
+                    
+                Action::make('edit_item')
+                    ->label('Edit Item')
                     ->icon('heroicon-m-pencil-square')
                     ->url(function ($record) {
                         try {
@@ -230,25 +295,7 @@ class ProductAvailabilityResource extends Resource
                         return null;
                     })
                     ->openUrlInNewTab()
-                    ->visible(fn ($record) => $record->type === 'product' || $record->type === 'bundling'),
-                    
-                Action::make('goto_list')
-                    ->label('View in List')
-                    ->icon('heroicon-m-list-bullet')
-                    ->url(function ($record) {
-                        try {
-                            if ($record->type === 'product') {
-                                return route('filament.admin.resources.products.index');
-                            } elseif ($record->type === 'bundling') {
-                                return route('filament.admin.resources.bundlings.index');
-                            }
-                        } catch (\Exception $e) {
-                            \Log::error('Error generating list URL: ' . $e->getMessage());
-                            return null;
-                        }
-                        return null;
-                    })
-                    ->openUrlInNewTab()
+                    ->color('gray')
                     ->visible(fn ($record) => $record->type === 'product' || $record->type === 'bundling'),
             ])
             ->defaultSort('name', 'asc')

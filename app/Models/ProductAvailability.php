@@ -90,6 +90,70 @@ class ProductAvailability extends Model
         
         return $products->merge($bundlings);
     }
+    
+    /**
+     * Get availability data for selected products and bundlings only
+     */
+    public static function getSelectedAvailabilityData($searchTerm = null, $selectedProducts = [], $selectedBundlings = [])
+    {
+        $items = collect();
+        
+        // Get selected products
+        if (!empty($selectedProducts)) {
+            $productsQuery = Product::whereIn('id', $selectedProducts)->with(['items', 'bundlings']);
+            
+            if ($searchTerm && strlen(trim($searchTerm)) >= 2) {
+                $keywords = array_filter(array_map('trim', explode(' ', strtolower($searchTerm))));
+                if (!empty($keywords)) {
+                    $productsQuery->where(function ($q) use ($keywords) {
+                        foreach ($keywords as $keyword) {
+                            $q->whereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
+                        }
+                    });
+                }
+            }
+            
+            $products = $productsQuery->get()->map(function ($product) {
+                $item = new static();
+                $item->id = 'product_' . $product->id;
+                $item->name = $product->name;
+                $item->type = 'product';
+                $item->product_model = $product;
+                return $item;
+            });
+            
+            $items = $items->merge($products);
+        }
+        
+        // Get selected bundlings
+        if (!empty($selectedBundlings)) {
+            $bundlingsQuery = Bundling::whereIn('id', $selectedBundlings)->with(['products.items']);
+            
+            if ($searchTerm && strlen(trim($searchTerm)) >= 2) {
+                $keywords = array_filter(array_map('trim', explode(' ', strtolower($searchTerm))));
+                if (!empty($keywords)) {
+                    $bundlingsQuery->where(function ($q) use ($keywords) {
+                        foreach ($keywords as $keyword) {
+                            $q->whereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
+                        }
+                    });
+                }
+            }
+            
+            $bundlings = $bundlingsQuery->get()->map(function ($bundling) {
+                $item = new static();
+                $item->id = 'bundling_' . $bundling->id;
+                $item->name = $bundling->name . ' (Bundle)';
+                $item->type = 'bundling';
+                $item->bundling_model = $bundling;
+                return $item;
+            });
+            
+            $items = $items->merge($bundlings);
+        }
+        
+        return $items;
+    }
 
     /**
      * Get total items for availability calculation
@@ -217,5 +281,107 @@ class ProductAvailability extends Model
             return $this->bundling_model->description ?? null;
         }
         return null;
+    }
+
+    /**
+     * Get active rental periods for this item
+     */
+    public function getActiveRentalPeriods($startDate, $endDate)
+    {
+        try {
+            $start = Carbon::parse($startDate);
+            $end = Carbon::parse($endDate);
+            
+            if ($this->type === 'product' && $this->product_model) {
+                return $this->getProductRentalPeriods($this->product_model->id, $start, $end);
+            } elseif ($this->type === 'bundling' && $this->bundling_model) {
+                return $this->getBundlingRentalPeriods($this->bundling_model->id, $start, $end);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error getting rental periods: ' . $e->getMessage());
+        }
+        
+        return 'No active rentals';
+    }
+    
+    /**
+     * Get product rental periods
+     */
+    private function getProductRentalPeriods($productId, $start, $end)
+    {
+        // Get transactions that overlap with the specified period
+        $transactions = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+            ->where(function ($query) use ($start, $end) {
+                $query->whereBetween('start_date', [$start, $end])
+                      ->orWhereBetween('end_date', [$start, $end])
+                      ->orWhere(function ($q) use ($start, $end) {
+                          $q->where('start_date', '<=', $start)
+                            ->where('end_date', '>=', $end);
+                      });
+            })
+            ->whereHas('detailTransactions.detailTransactionProductItems.productItem', function ($query) use ($productId) {
+                $query->where('product_id', $productId);
+            })
+            ->with(['customer'])
+            ->get();
+            
+        return $this->formatRentalPeriods($transactions);
+    }
+    
+    /**
+     * Get bundling rental periods
+     */
+    private function getBundlingRentalPeriods($bundlingId, $start, $end)
+    {
+        // Get transactions that contain this bundling
+        $transactions = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+            ->where(function ($query) use ($start, $end) {
+                $query->whereBetween('start_date', [$start, $end])
+                      ->orWhereBetween('end_date', [$start, $end])
+                      ->orWhere(function ($q) use ($start, $end) {
+                          $q->where('start_date', '<=', $start)
+                            ->where('end_date', '>=', $end);
+                      });
+            })
+            ->whereHas('detailTransactions', function ($query) use ($bundlingId) {
+                $query->where('bundling_id', $bundlingId);
+            })
+            ->with(['customer'])
+            ->get();
+            
+        return $this->formatRentalPeriods($transactions);
+    }
+    
+    /**
+     * Format rental periods for display
+     */
+    private function formatRentalPeriods($transactions)
+    {
+        if ($transactions->isEmpty()) {
+            return '<span class="text-gray-500 text-sm">No active rentals</span>';
+        }
+        
+        $periods = [];
+        foreach ($transactions->take(3) as $transaction) { // Limit to 3 for display
+            $startDate = Carbon::parse($transaction->start_date)->format('M d');
+            $endDate = Carbon::parse($transaction->end_date)->format('M d, Y');
+            $customerName = $transaction->customer->name ?? 'Unknown';
+            
+            // Create clickable link to transaction
+            $editUrl = route('filament.admin.resources.transactions.edit', ['record' => $transaction->id]);
+            
+            $periods[] = '<div class="mb-1">'.
+                        '<a href="'.$editUrl.'" class="text-primary-600 hover:text-primary-800 font-medium" target="_blank">'.
+                        '🔗 '.$customerName.'</a><br>'.
+                        '<span class="text-xs text-gray-600">'.$startDate.' - '.$endDate.'</span>'.
+                        '</div>';
+        }
+        
+        $remaining = $transactions->count() - 3;
+        if ($remaining > 0) {
+            $periods[] = '<span class="text-xs text-gray-500">+' . $remaining . ' more rentals</span>';
+        }
+        
+        return implode('', $periods);
     }
 }

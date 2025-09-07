@@ -51,9 +51,13 @@ class ListProductAvailabilities extends ListRecords
     public function getTableRecords(): EloquentCollection|Paginator|CursorPaginator
     {
         $searchTerm = $this->getTableSearch();
+        $filters = $this->getTableFilters();
         
-        // Get all availability data from our virtual model
-        $records = ProductAvailability::getAllAvailabilityData($searchTerm);
+        // Get selected items from filter
+        $selectedItems = $filters['item_selection']['selected_items'] ?? [];
+        
+        // Get filtered availability data
+        $records = $this->getFilteredAvailabilityData($searchTerm, $selectedItems);
 
         // Handle sorting
         $sortColumn = $this->getTableSortColumn();
@@ -146,6 +150,31 @@ class ListProductAvailabilities extends ListRecords
      */
     public function getSubheading(): ?string
     {
-        return 'Real-time availability search for products and bundlings. Use the date filter to check availability for specific periods.';
+        return 'Real-time availability search for products and bundlings. Use filters to select specific items and date ranges.';
+    }
+    
+    /**
+     * Get filtered availability data based on selected items
+     */
+    protected function getFilteredAvailabilityData($searchTerm = null, $selectedItems = [])
+    {
+        // If no items are selected, show all (like the original behavior)
+        if (empty($selectedItems)) {
+            return ProductAvailability::getAllAvailabilityData($searchTerm);
+        }
+        
+        // Parse selected items to separate products and bundlings
+        $selectedProducts = [];
+        $selectedBundlings = [];
+        
+        foreach ($selectedItems as $item) {
+            if (str_starts_with($item, 'product-')) {
+                $selectedProducts[] = (int) str_replace('product-', '', $item);
+            } elseif (str_starts_with($item, 'bundling-')) {
+                $selectedBundlings[] = (int) str_replace('bundling-', '', $item);
+            }
+        }
+        
+        return ProductAvailability::getSelectedAvailabilityData($searchTerm, $selectedProducts, $selectedBundlings);
     }
 }
