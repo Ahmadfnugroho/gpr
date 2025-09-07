@@ -4,8 +4,8 @@
 # Run this from your local machine
 
 # Configuration - GANTI SESUAI SERVER ANDA
-SERVER_USER="your-username"
-SERVER_HOST="your-server-ip"
+SERVER_USER="root"
+SERVER_HOST="168.231.118.190"
 SERVER_PATH="/var/www/html/gpr"
 
 # Colors

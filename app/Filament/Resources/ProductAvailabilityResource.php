@@ -127,7 +127,6 @@ class ProductAvailabilityResource extends Resource
 
                             return $record->getAvailableItemsForPeriod($startDate, $endDate);
                         } catch (\Exception $e) {
-                            \Log::error('Error getting available items: ' . $e->getMessage());
                             return 0;
                         }
                     })
@@ -174,7 +173,7 @@ class ProductAvailabilityResource extends Resource
                     ->openUrlInNewTab()
                     ->color('primary'),
 
-Action::make('edit_transaction')
+                Action::make('edit_transaction')
                     ->label('Edit Transaction')
                     ->icon('heroicon-m-pencil-square')
                     ->url(function ($record) {
@@ -195,14 +194,13 @@ Action::make('edit_transaction')
                                     ->orderBy('start_date', 'desc')
                                     ->first();
                             }
-                            
+
                             if ($transaction) {
                                 return route('filament.admin.resources.transactions.edit', ['record' => $transaction->id]);
                             }
-                            
+
                             return null;
                         } catch (\Exception $e) {
-                            \Log::error('Error getting transaction for edit: ' . $e->getMessage());
                             return null;
                         }
                     })
@@ -226,11 +224,11 @@ Action::make('edit_transaction')
                             } else {
                                 $count = 0;
                             }
-                            
+
                             if ($count > 1) {
                                 return "Opens most recent transaction. Total {$count} active transactions - see Current Rentals column for all transactions.";
                             }
-                            
+
                             return "Edit the active transaction";
                         } catch (\Exception $e) {
                             return "Edit transaction";
