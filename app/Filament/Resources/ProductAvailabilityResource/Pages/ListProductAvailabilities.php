@@ -134,15 +134,31 @@ class ListProductAvailabilities extends ListRecords
      */
     public function getHeading(): string
     {
+        // Check URL parameters first (from widget or form)
+        $urlStartDate = request('start_date');
+        $urlEndDate = request('end_date');
+        $urlProducts = request('selected_products', []);
+        $urlBundlings = request('selected_bundlings', []);
+        
+        if ($urlStartDate && $urlEndDate) {
+            $startDate = \Carbon\Carbon::parse($urlStartDate)->format('M d H:i');
+            $endDate = \Carbon\Carbon::parse($urlEndDate)->format('M d H:i');
+            
+            $productCount = is_array($urlProducts) ? count($urlProducts) : 0;
+            $bundlingCount = is_array($urlBundlings) ? count($urlBundlings) : 0;
+            $totalCount = $productCount + $bundlingCount;
+            
+            return "📊 Availability Results ({$totalCount} items) - {$startDate} to {$endDate}";
+        }
+        
+        // Fallback to filter parameters
         $filters = $this->getTableFilters();
         $dateFilter = $filters['date_range'] ?? [];
         
-        $startDate = $dateFilter['start_date'] ?? now()->format('Y-m-d');
-        $endDate = $dateFilter['end_date'] ?? now()->addDays(7)->format('Y-m-d');
+        $startDate = $dateFilter['start_date'] ?? now()->format('Y-m-d H:i');
+        $endDate = $dateFilter['end_date'] ?? now()->addDays(7)->format('Y-m-d H:i');
         
-        return 'Product Availability - ' . 
-               \Carbon\Carbon::parse($startDate)->format('M d') . ' to ' . 
-               \Carbon\Carbon::parse($endDate)->format('M d, Y');
+        return '🔍 Product Availability Search';
     }
 
     /**
@@ -158,23 +174,36 @@ class ListProductAvailabilities extends ListRecords
      */
     protected function getFilteredAvailabilityData($searchTerm = null, $selectedItems = [])
     {
-        // If no items are selected, show all (like the original behavior)
-        if (empty($selectedItems)) {
-            return ProductAvailability::getAllAvailabilityData($searchTerm);
+        // Check URL parameters first (from widget or form)
+        $urlProducts = request('selected_products', []);
+        $urlBundlings = request('selected_bundlings', []);
+        
+        // If URL has parameters, use those instead of filter parameters
+        if (!empty($urlProducts) || !empty($urlBundlings)) {
+            $selectedProducts = is_array($urlProducts) ? array_map('intval', $urlProducts) : [];
+            $selectedBundlings = is_array($urlBundlings) ? array_map('intval', $urlBundlings) : [];
+            
+            return ProductAvailability::getSelectedAvailabilityData($searchTerm, $selectedProducts, $selectedBundlings);
         }
         
-        // Parse selected items to separate products and bundlings
-        $selectedProducts = [];
-        $selectedBundlings = [];
-        
-        foreach ($selectedItems as $item) {
-            if (str_starts_with($item, 'product-')) {
-                $selectedProducts[] = (int) str_replace('product-', '', $item);
-            } elseif (str_starts_with($item, 'bundling-')) {
-                $selectedBundlings[] = (int) str_replace('bundling-', '', $item);
+        // If no URL params, check filter params
+        if (!empty($selectedItems)) {
+            // Parse selected items to separate products and bundlings
+            $selectedProducts = [];
+            $selectedBundlings = [];
+            
+            foreach ($selectedItems as $item) {
+                if (str_starts_with($item, 'product-')) {
+                    $selectedProducts[] = (int) str_replace('product-', '', $item);
+                } elseif (str_starts_with($item, 'bundling-')) {
+                    $selectedBundlings[] = (int) str_replace('bundling-', '', $item);
+                }
             }
+            
+            return ProductAvailability::getSelectedAvailabilityData($searchTerm, $selectedProducts, $selectedBundlings);
         }
         
-        return ProductAvailability::getSelectedAvailabilityData($searchTerm, $selectedProducts, $selectedBundlings);
+        // If no selection at all, return empty collection to show empty state
+        return collect();
     }
 }

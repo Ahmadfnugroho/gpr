@@ -166,7 +166,7 @@ class InventorySelectionFormWidget extends Widget implements HasForms
             'start_date' => now()->format('Y-m-d H:i:s'),
             'end_date' => now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s'),
         ]);
-        $this->redirect('/admin/unified-inventory');
+        $this->redirect('/admin/product-availability');
     }
     
     public function searchInventory(array $data): void
@@ -226,8 +226,8 @@ class InventorySelectionFormWidget extends Widget implements HasForms
             ->success()
             ->send();
 
-        // Build the URL with proper array parameters
-        $url = '/admin/unified-inventory';
+        // Build the URL with proper array parameters for ProductAvailabilityResource
+        $url = '/admin/product-availability';
         if (!empty($params)) {
             $url .= '?' . http_build_query($params);
         }

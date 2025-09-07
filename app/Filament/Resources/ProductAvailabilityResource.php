@@ -23,6 +23,10 @@ use Illuminate\Support\Collection;
 use App\Models\Product;
 use App\Models\Bundling;
 use App\Models\Transaction;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Actions\Action as FormAction;
+use Filament\Forms\Components\Actions;
+use Illuminate\Support\Facades\DB;
 
 class ProductAvailabilityResource extends Resource
 {
@@ -76,12 +80,12 @@ class ProductAvailabilityResource extends Resource
                 TextColumn::make('type')
                     ->label('Type')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'product' => 'primary',
                         'bundling' => 'success',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
+                    ->formatStateUsing(fn(string $state): string => ucfirst($state)),
 
                 TextColumn::make('name')
                     ->label('Name')
@@ -93,7 +97,6 @@ class ProductAvailabilityResource extends Resource
                         try {
                             return $record->getDescription();
                         } catch (\Exception $e) {
-                            \Log::error('Error getting description: ' . $e->getMessage());
                             return 'Description unavailable';
                         }
                     }),
@@ -104,7 +107,6 @@ class ProductAvailabilityResource extends Resource
                         try {
                             return $record->getTotalItems();
                         } catch (\Exception $e) {
-                            \Log::error('Error getting total items: ' . $e->getMessage());
                             return 0;
                         }
                     })
@@ -125,7 +127,6 @@ class ProductAvailabilityResource extends Resource
 
                             return $record->getAvailableItemsForPeriod($startDate, $endDate);
                         } catch (\Exception $e) {
-                            \Log::error('Error getting available items: ' . $e->getMessage());
                             return 0;
                         }
                     })
@@ -199,16 +200,16 @@ class ProductAvailabilityResource extends Resource
                                 $products = Product::where('status', '!=', 'deleted')
                                     ->orderBy('name')
                                     ->pluck('name', 'id')
-                                    ->mapWithKeys(function($name, $id) {
+                                    ->mapWithKeys(function ($name, $id) {
                                         return ["product-{$id}" => "🛍️ {$name}"];
                                     });
-                                    
+
                                 $bundlings = Bundling::orderBy('name')
                                     ->pluck('name', 'id')
-                                    ->mapWithKeys(function($name, $id) {
+                                    ->mapWithKeys(function ($name, $id) {
                                         return ["bundling-{$id}" => "📦 {$name}"];
                                     });
-                                    
+
                                 return $products->merge($bundlings)->toArray();
                             })
                             ->placeholder('Type to search products or bundlings...')
@@ -225,7 +226,7 @@ class ProductAvailabilityResource extends Resource
                         $count = count($data['selected_items']);
                         return "Selected: {$count} items";
                     }),
-                    
+
                 Filter::make('date_range')
                     ->form([
                         Grid::make(2)
@@ -252,7 +253,7 @@ class ProductAvailabilityResource extends Resource
                     ->indicateUsing(function (array $data): ?string {
                         $start = $data['start_date'] ?? now()->format('Y-m-d H:i');
                         $end = $data['end_date'] ?? now()->addDays(7)->format('Y-m-d H:i');
-                        
+
                         return 'Period: ' . Carbon::parse($start)->format('M d H:i') . ' - ' . Carbon::parse($end)->format('M d H:i');
                     }),
             ])
@@ -265,13 +266,12 @@ class ProductAvailabilityResource extends Resource
                             // Link to transactions index with filter for this item
                             return route('filament.admin.resources.transactions.index');
                         } catch (\Exception $e) {
-                            \Log::error('Error generating transactions URL: ' . $e->getMessage());
                             return null;
                         }
                     })
                     ->openUrlInNewTab()
                     ->color('primary'),
-                    
+
                 Action::make('edit_item')
                     ->label('Edit Item')
                     ->icon('heroicon-m-pencil-square')
@@ -289,18 +289,167 @@ class ProductAvailabilityResource extends Resource
                                 ]);
                             }
                         } catch (\Exception $e) {
-                            \Log::error('Error generating edit URL: ' . $e->getMessage());
                             return null;
                         }
                         return null;
                     })
                     ->openUrlInNewTab()
                     ->color('gray')
-                    ->visible(fn ($record) => $record->type === 'product' || $record->type === 'bundling'),
+                    ->visible(fn($record) => $record->type === 'product' || $record->type === 'bundling'),
             ])
+            ->headerActions([
+                Action::make('search_availability')
+                    ->label('🔍 Search Availability')
+                    ->icon('heroicon-o-magnifying-glass')
+                    ->color('primary')
+                    ->modalHeading('🔍 Product & Bundling Availability Search')
+                    ->modalSubheading('Select products/bundlings and set date range to check availability')
+                    ->modalWidth('4xl')
+                    ->form([
+                        Section::make('📦 Item Selection')
+                            ->schema([
+                                Select::make('selected_items')
+                                    ->label('🛍️📦 Select Products/Bundlings')
+                                    ->multiple()
+                                    ->searchable()
+                                    ->options(function () {
+                                        $products = Product::where('status', '!=', 'deleted')
+                                            ->orderBy('name')
+                                            ->pluck('name', 'id')
+                                            ->mapWithKeys(function($name, $id) {
+                                                return ["product-{$id}" => "🛍️ {$name}"];
+                                            });
+                                            
+                                        $bundlings = Bundling::orderBy('name')
+                                            ->pluck('name', 'id')
+                                            ->mapWithKeys(function($name, $id) {
+                                                return ["bundling-{$id}" => "📦 {$name}"];
+                                            });
+                                            
+                                        return $products->merge($bundlings)->toArray();
+                                    })
+                                    ->placeholder('Type to search products or bundlings...')
+                                    ->helperText('💡 Select one or more items to check availability')
+                                    ->required()
+                                    ->minItems(1)
+                                    ->columnSpanFull(),
+                            ])
+                            ->columns(1),
+                            
+                        Section::make('📅 Date Range')
+                            ->schema([
+                                Grid::make(2)
+                                    ->schema([
+                                        DateTimePicker::make('start_date')
+                                            ->label('📅 Start Date & Time')
+                                            ->default(request('start_date', now()))
+                                            ->maxDate(now()->addYear())
+                                            ->native(false)
+                                            ->displayFormat('d M Y H:i')
+                                            ->helperText('Start of availability check period')
+                                            ->required(),
+                                            
+                                        DateTimePicker::make('end_date')
+                                            ->label('📅 End Date & Time')
+                                            ->default(request('end_date', now()->addDays(7)->endOfDay()))
+                                            ->after('start_date')
+                                            ->maxDate(now()->addYear())
+                                            ->native(false)
+                                            ->displayFormat('d M Y H:i')
+                                            ->helperText('End of availability check period')
+                                            ->required(),
+                                    ]),
+                            ]),
+                    ])
+                    ->action(function (array $data) {
+                        // Process the form data and redirect with parameters
+                        $selectedProducts = [];
+                        $selectedBundlings = [];
+                        
+                        foreach ($data['selected_items'] as $item) {
+                            if (str_starts_with($item, 'product-')) {
+                                $selectedProducts[] = str_replace('product-', '', $item);
+                            } elseif (str_starts_with($item, 'bundling-')) {
+                                $selectedBundlings[] = str_replace('bundling-', '', $item);
+                            }
+                        }
+                        
+                        $params = [];
+                        if (!empty($selectedProducts)) {
+                            $params['selected_products'] = $selectedProducts;
+                        }
+                        if (!empty($selectedBundlings)) {
+                            $params['selected_bundlings'] = $selectedBundlings;
+                        }
+                        if (isset($data['start_date'])) {
+                            $params['start_date'] = $data['start_date'];
+                        }
+                        if (isset($data['end_date'])) {
+                            $params['end_date'] = $data['end_date'];
+                        }
+                        
+                        $url = route('filament.admin.resources.product-availability.index');
+                        if (!empty($params)) {
+                            $url .= '?' . http_build_query($params);
+                        }
+                        
+                        return redirect($url);
+                    })
+                    ->modalSubmitActionLabel('🔍 Search Now')
+                    ->modalCancelActionLabel('Cancel'),
+                    
+                Action::make('clear_filters')
+                    ->label('🔄 Clear Filters')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('gray')
+                    ->url(route('filament.admin.resources.product-availability.index'))
+                    ->visible(fn () => request()->hasAny(['selected_products', 'selected_bundlings', 'start_date', 'end_date'])),
+                    
+                Action::make('help')
+                    ->label('❓ Help')
+                    ->icon('heroicon-o-question-mark-circle')
+                    ->color('info')
+                    ->modalHeading('📖 Product Availability Help')
+                    ->modalSubheading('How to use the Product Availability Search')
+                    ->modalContent(new HtmlString('
+                        <div class="space-y-4">
+                            <div>
+                                <h3 class="font-semibold text-lg">📝 How to Search:</h3>
+                                <ol class="list-decimal ml-6 space-y-2 mt-2">
+                                    <li>Click <strong>"🔍 Search Availability"</strong> button</li>
+                                    <li>Select products/bundlings you want to check</li>
+                                    <li>Set the date range for availability check</li>
+                                    <li>Click <strong>"🔍 Search Now"</strong> to see results</li>
+                                </ol>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-lg">📊 Understanding Results:</h3>
+                                <ul class="list-disc ml-6 space-y-2 mt-2">
+                                    <li><span class="text-green-600">Green</span>: High availability (70%+)</li>
+                                    <li><span class="text-yellow-600">Yellow</span>: Medium availability (30-70%)</li>
+                                    <li><span class="text-red-600">Red</span>: Low availability (<30%)</li>
+                                    <li><strong>Current Rentals</strong>: Shows active bookings with customer links</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-lg">🔗 Quick Actions:</h3>
+                                <ul class="list-disc ml-6 space-y-2 mt-2">
+                                    <li>Click customer names to edit transactions</li>
+                                    <li>Use "View All Transactions" to see transaction list</li>
+                                    <li>Use "Edit Item" to modify product/bundling details</li>
+                                </ul>
+                            </div>
+                        </div>
+                    '))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Got it!'),
+            ])
+            ->emptyStateHeading('🔍 Search Products & Bundlings Availability')
+            ->emptyStateDescription('Click "🔍 Search Availability" to select items and check their availability for specific dates.')
+            ->emptyStateIcon('heroicon-o-magnifying-glass')
             ->defaultSort('name', 'asc')
-            ->searchable(false) // We'll handle search differently
-            ->recordUrl(null); // Disable row click navigation
+            ->searchable(false)
+            ->recordUrl(null);
     }
 
     /**
