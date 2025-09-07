@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Imports\CustomerImporter;
+use App\\Filament\\Imports\\CustomerImporter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

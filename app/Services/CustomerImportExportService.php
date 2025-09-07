@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
-use App\Imports\CustomerImporter;
+use App\Filament\Imports\CustomerImporter;
 use App\Models\Customer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -85,7 +87,7 @@ class CustomerImportExportService
             $fileSize = $file->getSize();
             $estimatedRows = intval($fileSize / 250); // Rough estimate: 250 bytes per row
             
-            \Log::info('Starting optimized sync import', [
+            Log::info('Starting optimized sync import', [
                 'file_size' => $fileSize,
                 'estimated_rows' => $estimatedRows,
                 'file_name' => $file->getClientOriginalName()
@@ -145,11 +147,11 @@ class CustomerImportExportService
         
         if (!$results) {
             // Check if job is still processing
-            $queuedJobs = \Illuminate\Support\Facades\DB::table('jobs')
+            $queuedJobs = DB::table('jobs')
                 ->where('payload', 'like', '%' . $importId . '%')
                 ->count();
                 
-            $failedJobs = \Illuminate\Support\Facades\DB::table('failed_jobs')
+            $failedJobs = DB::table('failed_jobs')
                 ->where('payload', 'like', '%' . $importId . '%')
                 ->count();
 

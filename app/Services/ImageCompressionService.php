@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class ImageCompressionService
 {
@@ -93,7 +94,7 @@ class ImageCompressionService
             return null;
             
         } catch (\Exception $e) {
-            \Log::error('Image compression failed: ' . $e->getMessage(), [
+            Log::error('Image compression failed: ' . $e->getMessage(), [
                 'file' => $file->getClientOriginalName(),
                 'size' => $file->getSize(),
             ]);

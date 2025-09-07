@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Imports\BrandImporter;
+use App\\Filament\\Imports\\BrandImporter;
 use App\Models\Brand;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;

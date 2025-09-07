@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Bundling;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class ListBundlings extends Command
 {
@@ -41,11 +42,11 @@ class ListBundlings extends Command
         );
         
         // Show bundling_products table entries
-        $bundlingProductsCount = \DB::table('bundling_products')->count();
+        $bundlingProductsCount = DB::table('bundling_products')->count();
         $this->info("Total bundling_products entries: {$bundlingProductsCount}");
         
         if ($bundlingProductsCount > 0) {
-            $bundlingProducts = \DB::table('bundling_products')->limit(10)->get();
+            $bundlingProducts = DB::table('bundling_products')->limit(10)->get();
             $this->info('Sample bundling_products entries:');
             $this->table(
                 ['ID', 'Bundling ID', 'Product ID', 'Quantity'],

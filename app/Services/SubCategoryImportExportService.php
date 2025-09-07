@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Imports\SubCategoryImporter;
+use App\\Filament\\Imports\\SubCategoryImporter;
 use App\Models\SubCategory;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;

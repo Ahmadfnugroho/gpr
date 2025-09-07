@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Imports\CustomerImporter;
+use App\\Filament\\Imports\\CustomerImporter;
 use App\Models\Customer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;

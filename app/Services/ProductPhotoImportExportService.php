@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Imports\ProductPhotoImporter;
+use App\\Filament\\Imports\\ProductPhotoImporter;
 use App\Models\ProductPhoto;
 use App\Models\Product;
 use Illuminate\Http\UploadedFile;

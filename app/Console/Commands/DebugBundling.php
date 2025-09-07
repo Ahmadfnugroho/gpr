@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Bundling;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class DebugBundling extends Command
 {
@@ -27,20 +28,20 @@ class DebugBundling extends Command
     public function handle()
     {
         $slug = $this->argument('slug');
-        
+
         $bundling = Bundling::where('slug', $slug)->first();
-        
+
         if (!$bundling) {
             $this->error("Bundling with slug '{$slug}' not found");
             return;
         }
-        
+
         $this->info("Bundling found: {$bundling->name} (ID: {$bundling->id})");
-        
+
         // Check raw bundling_products table
-        $bundlingProducts = \DB::table('bundling_products')->where('bundling_id', $bundling->id)->get();
+        $bundlingProducts = DB::table('bundling_products')->where('bundling_id', $bundling->id)->get();
         $this->info("Raw bundling_products entries: {$bundlingProducts->count()}");
-        
+
         if ($bundlingProducts->count() > 0) {
             $this->table(
                 ['ID', 'Bundling ID', 'Product ID', 'Quantity'],
@@ -54,9 +55,9 @@ class DebugBundling extends Command
                 })->toArray()
             );
         }
-        
+
         $this->info("Products count via relationship: {$bundling->products->count()}");
-        
+
         if ($bundling->products->count() > 0) {
             $this->table(
                 ['Product ID', 'Product Name', 'Quantity'],

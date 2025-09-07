@@ -6,6 +6,7 @@ use App\Models\ApiKey;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Log;
 
 class FrontApiKey
 {
@@ -50,7 +51,7 @@ class FrontApiKey
         }
         
         // Log API key usage for monitoring
-        \Log::info('API key used', [
+        Log::info('API key used', [
             'key_name' => $keyRecord->name,
             'endpoint' => $request->path(),
             'method' => $request->method(),

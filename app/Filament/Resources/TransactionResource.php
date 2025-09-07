@@ -2,9 +2,12 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\BaseOptimizedResource;
 use App\Filament\Resources\TransactionResource\Number;
 use App\Filament\Resources\TransactionResource\Pages;
 use App\Services\TransactionImportExportService;
+use App\Services\ResourceCacheService;
+use App\Repositories\TransactionRepository;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
@@ -59,10 +62,63 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\Section as InfoSection;
 use Filament\Infolists\Components\Grid as InfoGrid;
 
-class TransactionResource extends Resource
+class TransactionResource extends BaseOptimizedResource
 {
     protected static ?string $model = Transaction::class;
     protected static ?string $recordTitleAttribute = 'booking_transaction_id';
+
+    /**
+     * Repository instance for optimized data access
+     */
+    protected static ?TransactionRepository $repository = null;
+
+    /**
+     * Get repository instance
+     */
+    protected static function getRepository(): TransactionRepository
+    {
+        if (static::$repository === null) {
+            static::$repository = new TransactionRepository(new Transaction());
+        }
+
+        return static::$repository;
+    }
+
+    /**
+     * Get columns to select for optimized queries
+     */
+    protected static function getSelectColumns(): array
+    {
+        return [
+            'transactions.id',
+            'transactions.booking_transaction_id',
+            'transactions.customer_id',
+            'transactions.start_date',
+            'transactions.end_date',
+            'transactions.grand_total',
+            'transactions.booking_status',
+            'transactions.promo_id',
+            'transactions.created_at',
+            'transactions.updated_at'
+        ];
+    }
+
+    /**
+     * Get relationships to eager load
+     */
+    protected static function getEagerLoadRelations(): array
+    {
+        return [
+            'customer:id,name,email',
+            'customer.customerPhoneNumbers:id,customer_id,phone_number',
+            'detailTransactions:id,transaction_id,product_id,bundling_id,quantity',
+            'detailTransactions.product:id,name,price',
+            'detailTransactions.bundling:id,name,price',
+            'detailTransactions.bundling.products:id,name',
+            'detailTransactions.productItems:id,serial_number,product_id',
+            'promo:id,name,type,rules'
+        ];
+    }
 
     // Global Search disabled for TransactionResource
     public static function getGloballySearchableAttributes(): array
@@ -1579,58 +1635,29 @@ class TransactionResource extends Resource
             ]);
     }
 
-    public static function getEagerLoadRelations(): array
-    {
-        return [
-            'customer.customerPhoneNumbers',
-            'detailTransactions.product',
-            'detailTransactions.bundling.products', // jika bundling membutuhkan eager load produk
-            'detailTransactions.productItem',
-            'promo',
-        ];
-    }
+
 
     public static function table(Table $table): Table
     {
         return $table
-            ->defaultPaginationPageOption(50)
+            ->defaultPaginationPageOption(25) // Reduced for better performance
+            ->deferLoading() // Enable deferred loading for better UX
+            ->poll('60s') // Refresh every minute
             ->modifyQueryUsing(function (Builder $query) {
+                // Apply optimized select and eager loading
+                $query->select(static::getSelectColumns())
+                    ->with(static::getEagerLoadRelations());
+
                 // Check for table search parameter
                 $searchTerm = request('tableSearch');
 
-                $query->with([
-                    'customer:id,name,email',
-                    'customer.customerPhoneNumbers:id,customer_id,phone_number',
-                    'detailTransactions:id,transaction_id,product_id,bundling_id,quantity',
-                    'detailTransactions.product:id,name',
-                    'detailTransactions.bundling:id,name',
-                    'detailTransactions.bundling.products:id,name',
-                    'detailTransactions.productItems:id,serial_number,product_id',
-                    'promo:id,name'
-                ]);
-
                 if ($searchTerm && strlen($searchTerm) >= 2) {
-                    $query->where(function ($q) use ($searchTerm) {
-                        // Search in transaction ID
-                        $q->where('booking_transaction_id', 'LIKE', "%{$searchTerm}%")
-                            // Search in customer name
-                            ->orWhereHas('customer', function ($customerQuery) use ($searchTerm) {
-                                $customerQuery->where('name', 'LIKE', "%{$searchTerm}%");
-                            })
-                            // Search in product names
-                            ->orWhereHas('detailTransactions.product', function ($productQuery) use ($searchTerm) {
-                                $productQuery->where('name', 'LIKE', "%{$searchTerm}%");
-                            })
-                            // Search in bundling names
-                            ->orWhereHas('detailTransactions.bundling', function ($bundlingQuery) use ($searchTerm) {
-                                $bundlingQuery->where('name', 'LIKE', "%{$searchTerm}%");
-                            })
-                            // Search in serial numbers
-                            ->orWhereHas('detailTransactions.productItems', function ($serialQuery) use ($searchTerm) {
-                                $serialQuery->where('serial_number', 'LIKE', "%{$searchTerm}%");
-                            });
-                    });
+                    // Use repository for optimized search
+                    return static::getRepository()->searchTransactions($searchTerm, 25)->getCollection()->toQuery();
                 }
+
+                // Apply default ordering for better performance
+                $query->orderBy('transactions.created_at', 'desc');
 
                 return $query;
             })

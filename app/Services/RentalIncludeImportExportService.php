@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Imports\RentalIncludeImporter;
+use App\\Filament\\Imports\\RentalIncludeImporter;
 use App\Models\RentalInclude;
 use App\Models\Product;
 use Illuminate\Http\UploadedFile;

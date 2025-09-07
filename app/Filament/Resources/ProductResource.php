@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources;
 
-
+use App\Filament\Resources\BaseOptimizedResource;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource\RelationManagers;
 use App\Models\Category;
@@ -21,6 +21,8 @@ use Filament\Tables\Actions\HeaderActions;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use App\Services\CustomNotificationService;
+use App\Services\ResourceCacheService;
+use App\Repositories\ProductRepository;
 use App\Filament\Imports\ProductImporter;
 use App\Filament\Exports\ProductExporter;
 use Filament\Forms\Components\Checkbox;
@@ -37,10 +39,57 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HtmlString;
 
-class ProductResource extends Resource
+class ProductResource extends BaseOptimizedResource
 {
     protected static ?string $model = Product::class;
     protected static ?string $recordTitleAttribute = 'name';
+    
+    /**
+     * Repository instance for optimized data access
+     */
+    protected static ?ProductRepository $repository = null;
+    
+    /**
+     * Get repository instance
+     */
+    protected static function getRepository(): ProductRepository
+    {
+        if (static::$repository === null) {
+            static::$repository = new ProductRepository(new Product());
+        }
+        
+        return static::$repository;
+    }
+    
+    /**
+     * Get columns to select for optimized queries
+     */
+    protected static function getSelectColumns(): array
+    {
+        return [
+            'products.id',
+            'products.name',
+            'products.status',
+            'products.premiere', 
+            'products.category_id',
+            'products.brand_id',
+            'products.sub_category_id',
+            'products.price',
+            'products.thumbnail'
+        ];
+    }
+    
+    /**
+     * Get relationships to eager load
+     */
+    protected static function getEagerLoadRelations(): array
+    {
+        return [
+            'category:id,name',
+            'brand:id,name',
+            'subCategory:id,name'
+        ];
+    }
 
     public static function getGlobalSearchResultTitle(Model $record): string |  Htmlable
     {
@@ -419,52 +468,64 @@ class ProductResource extends Resource
 
             ])
             ->modifyQueryUsing(function (Builder $query) {
-                return $query
-                    ->select([
-                        'products.id',
-                        'products.name',
-                        'products.status',
-                        'products.premiere',
-                        'products.category_id',
-                        'products.brand_id',
-                        'products.sub_category_id'
-                    ])
-                    ->withCount('items')
-                    ->with([
-                        'category:id,name',
-                        'brand:id,name',
-                        'subCategory:id,name'
-                    ])
-                    ->limit(500);
+                // Use optimized repository query
+                return static::getRepository()
+                    ->optimized()
+                    ->query()
+                    ->select(static::getSelectColumns())
+                    ->withCount(['items as items_count'])
+                    ->with(static::getEagerLoadRelations())
+                    ->orderBy('products.name');
             })
 
 
 
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
-                    ->options([
-                        'available' => 'available',
-                        'unavailable' => 'unavailable',
-                    ])
+                    ->options(function () {
+                        return ResourceCacheService::cacheFilterOptions(
+                            'filter_options_product_status',
+                            collect([
+                                'available' => 'Available',
+                                'unavailable' => 'Unavailable',
+                                'maintenance' => 'Maintenance'
+                            ])
+                        );
+                    })
                     ->label('Status')
                     ->multiple()
                     ->searchable()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('category_id')
                     ->label('Kategori')
-                    ->relationship('category', 'name')
+                    ->options(function () {
+                        return ResourceCacheService::cacheFilterOptions(
+                            'filter_options_categories',
+                            \App\Models\Category::query()
+                        );
+                    })
                     ->searchable()
                     ->multiple()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('brand_id')
                     ->label('Brand')
-                    ->relationship('brand', 'name')
+                    ->options(function () {
+                        return ResourceCacheService::cacheFilterOptions(
+                            'filter_options_brands',
+                            \App\Models\Brand::query()
+                        );
+                    })
                     ->searchable()
                     ->multiple()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('sub_category_id')
                     ->label('Sub Kategori')
-                    ->relationship('subCategory', 'name')
+                    ->options(function () {
+                        return ResourceCacheService::cacheFilterOptions(
+                            'filter_options_sub_categories',
+                            \App\Models\SubCategory::query()
+                        );
+                    })
                     ->searchable()
                     ->multiple()
                     ->preload(),

@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Imports\ProductImporter;
+use App\Filament\Imports\ProductImporter;
 use App\Exports\FailedImportExport;
 use App\Models\Product;
 use App\Models\Brand;

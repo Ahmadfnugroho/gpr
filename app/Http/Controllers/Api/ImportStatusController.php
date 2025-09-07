@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\CustomerImportExportService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class ImportStatusController extends Controller
 {
@@ -74,8 +75,8 @@ class ImportStatusController extends Controller
     {
         try {
             // Check if there are pending jobs
-            $pendingJobs = \Illuminate\Support\Facades\DB::table('jobs')->count();
-            $failedJobs = \Illuminate\Support\Facades\DB::table('failed_jobs')->count();
+            $pendingJobs = DB::table('jobs')->count();
+            $failedJobs = DB::table('failed_jobs')->count();
             
             return response()->json([
                 'success' => true,

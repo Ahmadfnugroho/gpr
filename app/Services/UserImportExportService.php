@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Imports\UserImporter;
+use App\\Filament\\Imports\\UserImporter;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;

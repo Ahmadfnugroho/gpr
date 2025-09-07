@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\BundlingPhoto;
 use App\Models\Bundling;
-use App\Imports\BundlingPhotoImporter;
+use App\\Filament\\Imports\\BundlingPhotoImporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;

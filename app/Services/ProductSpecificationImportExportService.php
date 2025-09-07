@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Imports\ProductSpecificationImporter;
+use App\\Filament\\Imports\\ProductSpecificationImporter;
 use App\Models\ProductSpecification;
 use App\Models\Product;
 use Illuminate\Http\UploadedFile;
