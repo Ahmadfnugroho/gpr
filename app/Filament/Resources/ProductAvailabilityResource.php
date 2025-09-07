@@ -85,13 +85,23 @@ class ProductAvailabilityResource extends Resource
                     ->weight(FontWeight::SemiBold)
                     ->wrap()
                     ->description(function ($record) {
-                        return $record->getDescription();
+                        try {
+                            return $record->getDescription();
+                        } catch (\Exception $e) {
+                            \Log::error('Error getting description: ' . $e->getMessage());
+                            return 'Description unavailable';
+                        }
                     }),
 
                 TextColumn::make('total_items')
                     ->label('Total Items')
                     ->getStateUsing(function ($record) {
-                        return $record->getTotalItems();
+                        try {
+                            return $record->getTotalItems();
+                        } catch (\Exception $e) {
+                            \Log::error('Error getting total items: ' . $e->getMessage());
+                            return 0;
+                        }
                     })
                     ->alignCenter()
                     ->sortable(false),
@@ -99,15 +109,20 @@ class ProductAvailabilityResource extends Resource
                 TextColumn::make('available_items')
                     ->label('Available Items')
                     ->getStateUsing(function ($record) {
-                        $startDate = request('tableFilters.date_range.start_date');
-                        $endDate = request('tableFilters.date_range.end_date');
+                        try {
+                            $startDate = request('tableFilters.date_range.start_date');
+                            $endDate = request('tableFilters.date_range.end_date');
 
-                        if (!$startDate || !$endDate) {
-                            $startDate = now()->format('Y-m-d');
-                            $endDate = now()->addDays(7)->format('Y-m-d');
+                            if (!$startDate || !$endDate) {
+                                $startDate = now()->format('Y-m-d');
+                                $endDate = now()->addDays(7)->format('Y-m-d');
+                            }
+
+                            return $record->getAvailableItemsForPeriod($startDate, $endDate);
+                        } catch (\Exception $e) {
+                            \Log::error('Error getting available items: ' . $e->getMessage());
+                            return 0;
                         }
-
-                        return $record->getAvailableItemsForPeriod($startDate, $endDate);
                     })
                     ->alignCenter()
                     ->color(function ($state, $record) {

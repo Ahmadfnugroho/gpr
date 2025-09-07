@@ -96,21 +96,37 @@ class ProductAvailability extends Model
      */
     public function getTotalItems()
     {
-        if ($this->type === 'product' && $this->product_model) {
-            return $this->product_model->items()->count();
-        } elseif ($this->type === 'bundling' && $this->bundling_model) {
-            // Calculate minimum bundles possible
-            $minAvailable = null;
-            foreach ($this->bundling_model->products as $product) {
-                $requiredPerBundle = $product->pivot->quantity ?? 1;
-                $totalItems = $product->items()->count();
-                $maxBundlesFromThisProduct = intdiv($totalItems, $requiredPerBundle);
+        try {
+            if ($this->type === 'product' && $this->product_model) {
+                return $this->product_model->items()->count();
+            } elseif ($this->type === 'bundling' && $this->bundling_model) {
+                // Calculate minimum bundles possible
+                $products = $this->bundling_model->products ?? null;
+                if (!$products || !is_countable($products)) {
+                    return 0;
+                }
                 
-                $minAvailable = is_null($minAvailable) 
-                    ? $maxBundlesFromThisProduct 
-                    : min($minAvailable, $maxBundlesFromThisProduct);
+                $minAvailable = null;
+                foreach ($products as $product) {
+                    if (!$product || !method_exists($product, 'items')) {
+                        continue;
+                    }
+                    
+                    $requiredPerBundle = $product->pivot->quantity ?? 1;
+                    if ($requiredPerBundle <= 0) continue;
+                    
+                    $totalItems = $product->items()->count();
+                    $maxBundlesFromThisProduct = intdiv($totalItems, $requiredPerBundle);
+                    
+                    $minAvailable = is_null($minAvailable) 
+                        ? $maxBundlesFromThisProduct 
+                        : min($minAvailable, $maxBundlesFromThisProduct);
+                }
+                return $minAvailable ?? 0;
             }
-            return $minAvailable ?? 0;
+        } catch (\Exception $e) {
+            \Log::error('Error in getTotalItems: ' . $e->getMessage());
+            return 0;
         }
         return 0;
     }
@@ -120,13 +136,21 @@ class ProductAvailability extends Model
      */
     public function getAvailableItemsForPeriod($startDate, $endDate)
     {
-        if ($this->type === 'product' && $this->product_model) {
-            return $this->getAvailableProductItems($this->product_model->id, $startDate, $endDate);
-        } elseif ($this->type === 'bundling' && $this->bundling_model) {
-            return $this->bundling_model->getAvailableQuantityForPeriod(
-                Carbon::parse($startDate),
-                Carbon::parse($endDate)
-            );
+        try {
+            if ($this->type === 'product' && $this->product_model) {
+                return $this->getAvailableProductItems($this->product_model->id, $startDate, $endDate);
+            } elseif ($this->type === 'bundling' && $this->bundling_model) {
+                if (method_exists($this->bundling_model, 'getAvailableQuantityForPeriod')) {
+                    return $this->bundling_model->getAvailableQuantityForPeriod(
+                        Carbon::parse($startDate),
+                        Carbon::parse($endDate)
+                    );
+                }
+                return 0;
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error in getAvailableItemsForPeriod: ' . $e->getMessage());
+            return 0;
         }
         return 0;
     }
@@ -168,19 +192,29 @@ class ProductAvailability extends Model
     public function getDescription()
     {
         if ($this->type === 'product' && $this->product_model) {
-            $bundlings = $this->product_model->bundlings ?? collect();
-            if ($bundlings->isNotEmpty()) {
+            // Handle product bundlings with safety checks
+            $bundlings = $this->product_model->bundlings ?? null;
+            if ($bundlings && is_countable($bundlings) && count($bundlings) > 0) {
+                // Ensure we have a collection
+                $bundlings = collect($bundlings);
                 $bundlingNames = $bundlings->pluck('name')->take(3)->implode(', ');
                 $remaining = $bundlings->count() - 3;
                 $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
                 return "Used in bundles: {$bundlingNames}{$suffix}";
             }
-            return null;
+            return $this->product_model->description ?? null;
         } elseif ($this->type === 'bundling' && $this->bundling_model) {
-            $productNames = $this->bundling_model->products->pluck('name')->take(3)->implode(', ');
-            $remaining = $this->bundling_model->products->count() - 3;
-            $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
-            return "Contains products: {$productNames}{$suffix}";
+            // Handle bundling products with safety checks
+            $products = $this->bundling_model->products ?? null;
+            if ($products && is_countable($products) && count($products) > 0) {
+                // Ensure we have a collection
+                $products = collect($products);
+                $productNames = $products->pluck('name')->take(3)->implode(', ');
+                $remaining = $products->count() - 3;
+                $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
+                return "Contains products: {$productNames}{$suffix}";
+            }
+            return $this->bundling_model->description ?? null;
         }
         return null;
     }
