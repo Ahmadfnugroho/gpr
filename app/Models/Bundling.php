@@ -14,7 +14,7 @@ class Bundling extends Model
 {
     use LogsActivity, HasFactory;
 
-    protected $fillable = ['name', 'price', 'slug', 'premiere'];
+    protected $fillable = ['name', 'price', 'slug', 'premiere', 'custom_id'];
 
     public function getActivitylogOptions(): LogOptions
     {
