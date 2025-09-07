@@ -1,0 +1,13 @@
+name,price,product_name,quantity
+Basic Package,500000,Test Product 1,1
+Basic Package,500000,Test Product 2,1
+Premium Package,800000,Test Product 1,2
+Premium Package,800000,Test Product 2,1
+Premium Package,800000,Test Product 3,1
+Complete Package,1200000,Test Product 1,2
+Complete Package,1200000,Test Product 2,2
+Complete Package,1200000,Test Product 3,1
+Complete Package,1200000,Test Product 4,1
+Starter Kit,300000,Test Product 1,1
+Advanced Kit,600000,Test Product 3,1
+Advanced Kit,600000,Test Product 4,1
