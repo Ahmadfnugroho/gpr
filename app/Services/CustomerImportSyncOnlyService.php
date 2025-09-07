@@ -133,7 +133,7 @@ class CustomerImportSyncOnlyService
     /**
      * Export customers to Excel
      */
-    public function exportCustomers(array $customerIds = null): string
+    public function exportCustomers(?array $customerIds = null): string
     {
         $export = new CustomerExport($customerIds);
         $filename = 'customers_export_' . date('Y-m-d_H-i-s') . '.xlsx';
@@ -163,7 +163,8 @@ class CustomerImportSyncOnlyService
     {
         try {
             // Quick validation - just check if file can be opened
-            $data = Excel::toArray(new CustomerImporter(), $file);
+            // Simple validation without creating importer instance
+            $data = Excel::toArray([], $file);
 
             if (empty($data) || empty($data[0])) {
                 return [
@@ -226,7 +227,7 @@ class CustomerExport implements FromCollection, WithHeadings, WithMapping, WithS
 {
     protected $customerIds;
 
-    public function __construct(array $customerIds = null)
+    public function __construct(?array $customerIds = null)
     {
         $this->customerIds = $customerIds;
     }
@@ -330,7 +331,11 @@ class CustomerImportTemplate implements FromCollection, WithHeadings, WithStyles
 
     public function headings(): array
     {
-        return CustomerImporter::getExpectedHeaders();
+        return [
+            'name', 'email', 'phone_1', 'phone_2', 'gender', 'status',
+            'address', 'job', 'office_address', 'instagram_username', 'facebook_username',
+            'emergency_contact_name', 'emergency_contact_number', 'source_info'
+        ]; // Define expected headers
     }
 
     public function styles(Worksheet $sheet)
