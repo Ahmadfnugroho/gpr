@@ -162,35 +162,17 @@ class ProductAvailability extends Model
     {
         try {
             if ($this->type === 'product' && $this->product_model) {
-                // Ensure we have a proper model instance
-                if (method_exists($this->product_model, 'items')) {
-                    return $this->product_model->items()->count();
+                // For product: count serial numbers from product_items table
+                if (isset($this->product_model->id)) {
+                    return \App\Models\ProductItem::where('product_id', $this->product_model->id)->count();
                 }
                 return 0;
             } elseif ($this->type === 'bundling' && $this->bundling_model) {
-                // Calculate minimum bundles possible
-                $products = $this->bundling_model->products ?? null;
-                if (!$products || !is_countable($products)) {
-                    return 0;
+                // For bundling: get quantity from bundlings table
+                if (isset($this->bundling_model->quantity)) {
+                    return $this->bundling_model->quantity;
                 }
-                
-                $minAvailable = null;
-                foreach ($products as $product) {
-                    if (!$product || !method_exists($product, 'items')) {
-                        continue;
-                    }
-                    
-                    $requiredPerBundle = $product->pivot->quantity ?? 1;
-                    if ($requiredPerBundle <= 0) continue;
-                    
-                    $totalItems = $product->items()->count();
-                    $maxBundlesFromThisProduct = intdiv($totalItems, $requiredPerBundle);
-                    
-                    $minAvailable = is_null($minAvailable) 
-                        ? $maxBundlesFromThisProduct 
-                        : min($minAvailable, $maxBundlesFromThisProduct);
-                }
-                return $minAvailable ?? 0;
+                return 0;
             }
         } catch (\Exception $e) {
             \Log::error('Error in getTotalItems: ' . $e->getMessage());
@@ -206,17 +188,15 @@ class ProductAvailability extends Model
     {
         try {
             if ($this->type === 'product' && $this->product_model) {
-                // Ensure we have a proper model with id property
+                // For product: Total items - items in transactions
                 if (isset($this->product_model->id)) {
                     return $this->getAvailableProductItems($this->product_model->id, $startDate, $endDate);
                 }
                 return 0;
             } elseif ($this->type === 'bundling' && $this->bundling_model) {
-                if (method_exists($this->bundling_model, 'getAvailableQuantityForPeriod')) {
-                    return $this->bundling_model->getAvailableQuantityForPeriod(
-                        Carbon::parse($startDate),
-                        Carbon::parse($endDate)
-                    );
+                // For bundling: Total quantity - quantity in transactions
+                if (isset($this->bundling_model->id)) {
+                    return $this->getAvailableBundlingItems($this->bundling_model->id, $startDate, $endDate);
                 }
                 return 0;
             }
@@ -256,6 +236,43 @@ class ProductAvailability extends Model
         })->count();
 
         return max(0, $totalItems - $usedItems);
+    }
+    
+    /**
+     * Calculate available bundling items for date range
+     */
+    private function getAvailableBundlingItems($bundlingId, $startDate, $endDate): int
+    {
+        try {
+            $start = Carbon::parse($startDate);
+            $end = Carbon::parse($endDate);
+        } catch (\Exception $e) {
+            return 0;
+        }
+
+        // Get total bundling quantity
+        $bundling = \App\Models\Bundling::find($bundlingId);
+        if (!$bundling) {
+            return 0;
+        }
+        
+        $totalQuantity = $bundling->quantity ?? 0;
+
+        // Count bundlings used in transactions
+        $usedQuantity = \App\Models\DetailTransaction::whereHas('transaction', function ($query) use ($start, $end) {
+            $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                ->where(function ($q) use ($start, $end) {
+                    $q->whereBetween('start_date', [$start, $end])
+                        ->orWhereBetween('end_date', [$start, $end])
+                        ->orWhere(function ($q2) use ($start, $end) {
+                            $q2->where('start_date', '<=', $start)
+                                ->where('end_date', '>=', $end);
+                        });
+                });
+        })->where('bundling_id', $bundlingId)
+          ->sum('quantity');
+
+        return max(0, $totalQuantity - $usedQuantity);
     }
 
     /**
@@ -317,20 +334,13 @@ class ProductAvailability extends Model
      */
     private function getProductRentalPeriods($productId, $start, $end)
     {
-        // Get transactions that overlap with the specified period
+        // Get ALL transactions for this product with booking, paid, or on_rented status
         $transactions = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-            ->where(function ($query) use ($start, $end) {
-                $query->whereBetween('start_date', [$start, $end])
-                      ->orWhereBetween('end_date', [$start, $end])
-                      ->orWhere(function ($q) use ($start, $end) {
-                          $q->where('start_date', '<=', $start)
-                            ->where('end_date', '>=', $end);
-                      });
-            })
             ->whereHas('detailTransactions.detailTransactionProductItems.productItem', function ($query) use ($productId) {
                 $query->where('product_id', $productId);
             })
             ->with(['customer'])
+            ->orderBy('start_date', 'desc')
             ->get();
             
         return $this->formatRentalPeriods($transactions);
@@ -341,20 +351,13 @@ class ProductAvailability extends Model
      */
     private function getBundlingRentalPeriods($bundlingId, $start, $end)
     {
-        // Get transactions that contain this bundling
+        // Get ALL transactions for this bundling with booking, paid, or on_rented status
         $transactions = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-            ->where(function ($query) use ($start, $end) {
-                $query->whereBetween('start_date', [$start, $end])
-                      ->orWhereBetween('end_date', [$start, $end])
-                      ->orWhere(function ($q) use ($start, $end) {
-                          $q->where('start_date', '<=', $start)
-                            ->where('end_date', '>=', $end);
-                      });
-            })
             ->whereHas('detailTransactions', function ($query) use ($bundlingId) {
                 $query->where('bundling_id', $bundlingId);
             })
             ->with(['customer'])
+            ->orderBy('start_date', 'desc')
             ->get();
             
         return $this->formatRentalPeriods($transactions);
@@ -366,30 +369,49 @@ class ProductAvailability extends Model
     private function formatRentalPeriods($transactions)
     {
         if ($transactions->isEmpty()) {
-            return '<span class="text-gray-500 text-sm">No active rentals</span>';
+            return '<span class="text-gray-500 text-sm">No transactions</span>';
         }
         
-        $periods = [];
-        foreach ($transactions->take(3) as $transaction) { // Limit to 3 for display
+        if ($transactions->count() == 1) {
+            // Single transaction - show direct edit link
+            $transaction = $transactions->first();
             $startDate = Carbon::parse($transaction->start_date)->format('M d');
             $endDate = Carbon::parse($transaction->end_date)->format('M d, Y');
             $customerName = $transaction->customer->name ?? 'Unknown';
+            $status = ucfirst($transaction->booking_status);
             
-            // Create clickable link to transaction
             $editUrl = route('filament.admin.resources.transactions.edit', ['record' => $transaction->id]);
             
-            $periods[] = '<div class="mb-1">'.
-                        '<a href="'.$editUrl.'" class="text-primary-600 hover:text-primary-800 font-medium" target="_blank">'.
-                        '🔗 '.$customerName.'</a><br>'.
-                        '<span class="text-xs text-gray-600">'.$startDate.' - '.$endDate.'</span>'.
-                        '</div>';
+            return '<div class="text-sm">'.
+                   '<a href="'.$editUrl.'" class="text-primary-600 hover:text-primary-800 font-medium" target="_blank">'.
+                   '🔗 '.$customerName.'</a><br>'.
+                   '<span class="text-xs text-gray-600">'.$startDate.' - '.$endDate.'</span><br>'.
+                   '<span class="text-xs px-1 py-0.5 rounded bg-blue-100 text-blue-800">'.$status.'</span>'.
+                   '</div>';
+        } else {
+            // Multiple transactions - show each with individual edit links
+            $periods = [];
+            foreach ($transactions as $index => $transaction) {
+                $startDate = Carbon::parse($transaction->start_date)->format('M d');
+                $endDate = Carbon::parse($transaction->end_date)->format('M d, Y');
+                $customerName = $transaction->customer->name ?? 'Unknown';
+                $status = ucfirst($transaction->booking_status);
+                $editUrl = route('filament.admin.resources.transactions.edit', ['record' => $transaction->id]);
+                
+                $periods[] = '<div class="mb-2 p-2 border-l-2 border-gray-200 text-xs">'.
+                            '<a href="'.$editUrl.'" class="text-primary-600 hover:text-primary-800 font-medium" target="_blank">'.
+                            '🔗 '.$customerName.'</a><br>'.
+                            '<span class="text-gray-600">'.$startDate.' - '.$endDate.'</span><br>'.
+                            '<span class="px-1 py-0.5 rounded bg-blue-100 text-blue-800">'.$status.'</span>'.
+                            '</div>';
+            }
+            
+            $totalCount = $transactions->count();
+            return '<div class="text-sm">'.
+                   '<div class="font-medium text-gray-700 mb-1">'.$totalCount.' Active Transactions:</div>'.
+                   '<div class="max-h-40 overflow-y-auto space-y-1">'.implode('', array_slice($periods, 0, 5)).'</div>'.
+                   ($totalCount > 5 ? '<div class="text-xs text-gray-500 mt-1">+'.($totalCount-5).' more transactions...</div>' : '').
+                   '</div>';
         }
-        
-        $remaining = $transactions->count() - 3;
-        if ($remaining > 0) {
-            $periods[] = '<span class="text-xs text-gray-500">+' . $remaining . ' more rentals</span>';
-        }
-        
-        return implode('', $periods);
     }
 }

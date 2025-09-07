@@ -117,63 +117,33 @@ class ProductAvailabilityResource extends Resource
                     ->label('Available Items')
                     ->getStateUsing(function ($record) {
                         try {
-                            $startDate = request('tableFilters.date_range.start_date');
-                            $endDate = request('tableFilters.date_range.end_date');
+                            $startDate = request('start_date');
+                            $endDate = request('end_date');
 
                             if (!$startDate || !$endDate) {
-                                $startDate = now()->format('Y-m-d');
-                                $endDate = now()->addDays(7)->format('Y-m-d');
+                                $startDate = now()->format('Y-m-d H:i:s');
+                                $endDate = now()->addDays(7)->format('Y-m-d H:i:s');
                             }
 
                             return $record->getAvailableItemsForPeriod($startDate, $endDate);
                         } catch (\Exception $e) {
+                            \Log::error('Error getting available items: ' . $e->getMessage());
                             return 0;
                         }
                     })
                     ->alignCenter()
-                    ->color(function ($state, $record) {
-                        $total = $record->getTotalItems();
-                        if ($total == 0) return 'gray';
-                        $percentage = ($state / $total) * 100;
-                        if ($percentage >= 70) return 'success';
-                        if ($percentage >= 30) return 'warning';
-                        return 'danger';
-                    })
-                    ->weight(FontWeight::Bold),
-
-                TextColumn::make('availability_percentage')
-                    ->label('Availability %')
-                    ->getStateUsing(function ($record) {
-                        $startDate = request('tableFilters.date_range.start_date');
-                        $endDate = request('tableFilters.date_range.end_date');
-
-                        if (!$startDate || !$endDate) {
-                            $startDate = now()->format('Y-m-d');
-                            $endDate = now()->addDays(7)->format('Y-m-d');
-                        }
-
-                        $available = $record->getAvailableItemsForPeriod($startDate, $endDate);
-                        $total = $record->getTotalItems();
-
-                        if ($total == 0) return '0%';
-                        $percentage = round(($available / $total) * 100);
-                        return "{$percentage}%";
-                    })
-                    ->alignCenter()
                     ->color(function ($state) {
-                        $percentage = (int) str_replace('%', '', $state);
-                        if ($percentage >= 70) return 'success';
-                        if ($percentage >= 30) return 'warning';
-                        return 'danger';
+                        // Red if 0, green if > 0
+                        return $state == 0 ? 'danger' : 'success';
                     })
                     ->weight(FontWeight::Bold),
 
-                TextColumn::make('rental_periods')
+                TextColumn::make('current_rentals')
                     ->label('Current Rentals')
                     ->getStateUsing(function ($record) {
                         try {
-                            $startDate = request('tableFilters.date_range.start_date');
-                            $endDate = request('tableFilters.date_range.end_date');
+                            $startDate = request('start_date');
+                            $endDate = request('end_date');
 
                             if (!$startDate || !$endDate) {
                                 $startDate = now()->format('Y-m-d');
@@ -204,9 +174,95 @@ class ProductAvailabilityResource extends Resource
                     ->openUrlInNewTab()
                     ->color('primary'),
 
+Action::make('edit_transaction')
+                    ->label('Edit Transaction')
+                    ->icon('heroicon-m-pencil-square')
+                    ->url(function ($record) {
+                        try {
+                            // Get first active transaction for this item
+                            if ($record->type === 'product' && $record->product_model) {
+                                $transaction = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                    ->whereHas('detailTransactions.detailTransactionProductItems.productItem', function ($query) use ($record) {
+                                        $query->where('product_id', $record->product_model->id);
+                                    })
+                                    ->orderBy('start_date', 'desc')
+                                    ->first();
+                            } elseif ($record->type === 'bundling' && $record->bundling_model) {
+                                $transaction = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                    ->whereHas('detailTransactions', function ($query) use ($record) {
+                                        $query->where('bundling_id', $record->bundling_model->id);
+                                    })
+                                    ->orderBy('start_date', 'desc')
+                                    ->first();
+                            }
+                            
+                            if ($transaction) {
+                                return route('filament.admin.resources.transactions.edit', ['record' => $transaction->id]);
+                            }
+                            
+                            return null;
+                        } catch (\Exception $e) {
+                            \Log::error('Error getting transaction for edit: ' . $e->getMessage());
+                            return null;
+                        }
+                    })
+                    ->openUrlInNewTab()
+                    ->color('warning')
+                    ->tooltip(function ($record) {
+                        try {
+                            // Show tooltip with transaction count
+                            if ($record->type === 'product' && $record->product_model) {
+                                $count = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                    ->whereHas('detailTransactions.detailTransactionProductItems.productItem', function ($query) use ($record) {
+                                        $query->where('product_id', $record->product_model->id);
+                                    })
+                                    ->count();
+                            } elseif ($record->type === 'bundling' && $record->bundling_model) {
+                                $count = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                    ->whereHas('detailTransactions', function ($query) use ($record) {
+                                        $query->where('bundling_id', $record->bundling_model->id);
+                                    })
+                                    ->count();
+                            } else {
+                                $count = 0;
+                            }
+                            
+                            if ($count > 1) {
+                                return "Opens most recent transaction. Total {$count} active transactions - see Current Rentals column for all transactions.";
+                            }
+                            
+                            return "Edit the active transaction";
+                        } catch (\Exception $e) {
+                            return "Edit transaction";
+                        }
+                    })
+                    ->visible(function ($record) {
+                        try {
+                            // Only show if there are active transactions
+                            if ($record->type === 'product' && $record->product_model) {
+                                $count = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                    ->whereHas('detailTransactions.detailTransactionProductItems.productItem', function ($query) use ($record) {
+                                        $query->where('product_id', $record->product_model->id);
+                                    })
+                                    ->count();
+                                return $count > 0;
+                            } elseif ($record->type === 'bundling' && $record->bundling_model) {
+                                $count = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                    ->whereHas('detailTransactions', function ($query) use ($record) {
+                                        $query->where('bundling_id', $record->bundling_model->id);
+                                    })
+                                    ->count();
+                                return $count > 0;
+                            }
+                            return false;
+                        } catch (\Exception $e) {
+                            return false;
+                        }
+                    }),
+
                 Action::make('edit_item')
                     ->label('Edit Item')
-                    ->icon('heroicon-m-pencil-square')
+                    ->icon('heroicon-m-cog-6-tooth')
                     ->url(function ($record) {
                         try {
                             if ($record->type === 'product') {
@@ -250,17 +306,18 @@ class ProductAvailabilityResource extends Resource
                             <div>
                                 <h3 class="font-semibold text-lg">📊 Understanding Results:</h3>
                                 <ul class="list-disc ml-6 space-y-2 mt-2">
-                                    <li><span class="text-green-600">Green</span>: High availability (70%+)</li>
-                                    <li><span class="text-yellow-600">Yellow</span>: Medium availability (30-70%)</li>
-                                    <li><span class="text-red-600">Red</span>: Low availability (<30%)</li>
-                                    <li><strong>Current Rentals</strong>: Shows active bookings with customer links</li>
+                                    <li><span class="text-green-600">Green Available Items</span>: Items are available (>0)</li>
+                                    <li><span class="text-red-600">Red Available Items</span>: No items available (0)</li>
+                                    <li><strong>Current Rentals</strong>: Shows all active bookings (booking, paid, on_rented)</li>
+                                    <li>Each transaction shows customer name and can be clicked to edit</li>
                                 </ul>
                             </div>
                             <div>
                                 <h3 class="font-semibold text-lg">🔗 Quick Actions:</h3>
                                 <ul class="list-disc ml-6 space-y-2 mt-2">
-                                    <li>Click customer names to edit transactions</li>
-                                    <li>Use "View All Transactions" to see transaction list</li>
+                                    <li>Click customer names in Current Rentals to edit transactions directly</li>
+                                    <li>Use "Edit Transaction" to select from multiple active transactions</li>
+                                    <li>Use "View All Transactions" to see complete transaction list</li>
                                     <li>Use "Edit Item" to modify product/bundling details</li>
                                 </ul>
                             </div>
