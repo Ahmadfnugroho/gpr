@@ -23,6 +23,8 @@ class ListProductAvailabilities extends ListRecords implements HasForms
 
     protected static string $resource = ProductAvailabilityResource::class;
     
+    protected static string $view = 'filament.resources.product-availability-resource.pages.list-product-availabilities';
+    
     public ?array $data = [];
     
     public function mount(): void
@@ -61,7 +63,56 @@ class ListProductAvailabilities extends ListRecords implements HasForms
     
     public function form(\Filament\Forms\Form $form): \Filament\Forms\Form
     {
-        return ProductAvailabilityResource::form($form)->statePath('data');
+        return $form
+            ->schema([
+                \Filament\Forms\Components\Grid::make(1)
+                    ->schema([
+                        \Filament\Forms\Components\Select::make('selected_items')
+                            ->label('🛍️📦 Select Products/Bundlings')
+                            ->multiple()
+                            ->searchable()
+                            ->options(function () {
+                                $products = \App\Models\Product::where('status', '!=', 'deleted')
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id')
+                                    ->mapWithKeys(function($name, $id) {
+                                        return ["product-{$id}" => "🛍️ {$name}"];
+                                    });
+                                    
+                                $bundlings = \App\Models\Bundling::orderBy('name')
+                                    ->pluck('name', 'id')
+                                    ->mapWithKeys(function($name, $id) {
+                                        return ["bundling-{$id}" => "📦 {$name}"];
+                                    });
+                                    
+                                return $products->merge($bundlings)->toArray();
+                            })
+                            ->placeholder('Type to search products or bundlings...')
+                            ->helperText('💡 Select one or more items to check availability')
+                            ->columnSpanFull(),
+                    ]),
+                    
+                \Filament\Forms\Components\Grid::make(2)
+                    ->schema([
+                        \Filament\Forms\Components\DateTimePicker::make('start_date')
+                            ->label('📅 Start Date & Time')
+                            ->default(request('start_date', now()))
+                            ->native(false)
+                            ->displayFormat('d M Y H:i')
+                            ->helperText('Start of availability check period')
+                            ->required(),
+                            
+                        \Filament\Forms\Components\DateTimePicker::make('end_date')
+                            ->label('📅 End Date & Time')
+                            ->default(request('end_date', now()->addDays(7)->endOfDay()))
+                            ->after('start_date')
+                            ->native(false)
+                            ->displayFormat('d M Y H:i')
+                            ->helperText('End of availability check period')
+                            ->required(),
+                    ]),
+            ])
+            ->statePath('data');
     }
     
     protected function getViewData(): array
