@@ -28,9 +28,12 @@ class ResourceCacheService
     /**
      * Cache filter options with long TTL
      */
-    public static function cacheFilterOptions(string $key, Builder $query, int $ttl = self::LONG_TTL): array
+    public static function cacheFilterOptions(string $key, Builder|array $query, int $ttl = self::LONG_TTL): array
     {
         return Cache::remember($key, now()->addMinutes($ttl), function () use ($query) {
+            if (is_array($query)) {
+                return $query;
+            }
             return $query->pluck('name', 'id')->toArray();
         });
     }

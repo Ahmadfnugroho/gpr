@@ -482,16 +482,11 @@ class ProductResource extends BaseOptimizedResource
 
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
-                    ->options(function () {
-                        return ResourceCacheService::cacheFilterOptions(
-                            'filter_options_product_status',
-                            collect([
-                                'available' => 'Available',
-                                'unavailable' => 'Unavailable',
-                                'maintenance' => 'Maintenance'
-                            ])
-                        );
-                    })
+                    ->options([
+                        'available' => 'Available',
+                        'unavailable' => 'Unavailable',
+                        'maintenance' => 'Maintenance'
+                    ])
                     ->label('Status')
                     ->multiple()
                     ->searchable()
