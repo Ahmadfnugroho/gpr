@@ -3,7 +3,6 @@
 namespace App\Filament\Exports;
 
 use App\Models\Transaction;
-use App\Models\ExportSetting;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
@@ -14,150 +13,185 @@ class TransactionExporter extends Exporter
 {
     protected static ?string $model = Transaction::class;
 
-    public static function getColumns(): array
+    // Override to generate raw data with one row per product/bundling
+    public function getRecords(): \Illuminate\Support\Collection
     {
-        $settings = ExportSetting::getSettings('TransactionResource');
-        $includedColumns = $settings['included_columns'] ?? [];
-        $excludedColumns = $settings['excluded_columns'] ?? [];
+        $transactions = parent::getRecords();
+        $expandedRows = collect();
 
-        $allColumns = [
-            'booking_transaction_id' => ExportColumn::make('booking_transaction_id')
-                ->label('Transaction ID'),
-            'customer_name' => ExportColumn::make('customer.name')
-                ->label('Customer Name'),
-            'customer_email' => ExportColumn::make('customer.email')
-                ->label('Customer Email'),
-            'customer_phone' => ExportColumn::make('customer_phone')
-                ->label('Customer Phone')
-                ->state(function (Transaction $record): string {
-                    return $record->customer->customerPhoneNumbers->first()?->phone_number ?? 'N/A';
-                }),
-            'product_info' => ExportColumn::make('product_info')
-                ->label('Products/Bundles')
-                ->state(function (Transaction $record): string {
-                    $products = [];
-                    foreach ($record->detailTransactions as $detail) {
-                        if ($detail->bundling_id && $detail->bundling) {
-                            $products[] = $detail->bundling->name . ' (Bundle)';
-                        } elseif ($detail->product_id && $detail->product) {
-                            $products[] = $detail->product->name;
-                        }
-                    }
-                    return implode(', ', array_unique($products));
-                }),
-            'detail_transactions' => ExportColumn::make('detail_transactions')
-                ->label('Detail Transactions')
-                ->state(function (Transaction $record): string {
-                    $details = [];
-                    foreach ($record->detailTransactions as $detail) {
-                        $itemName = '';
-                        if ($detail->bundling_id && $detail->bundling) {
-                            $itemName = $detail->bundling->name . ' (Bundle)';
-                        } elseif ($detail->product_id && $detail->product) {
-                            $itemName = $detail->product->name;
-                        }
+        foreach ($transactions as $transaction) {
+            // Load relationships
+            $transaction->load([
+                'customer',
+                'customer.customerPhoneNumbers',
+                'detailTransactions.product',
+                'detailTransactions.bundling',
+                'promo'
+            ]);
 
-                        if ($itemName) {
-                            $details[] = $itemName . ' x' . $detail->quantity;
-                        }
-                    }
-                    return implode('; ', $details);
-                }),
-            'serial_numbers' => ExportColumn::make('serial_numbers')
-                ->label('Serial Numbers')
-                ->state(function (Transaction $record): string {
-                    $serialNumbers = [];
-                    foreach ($record->detailTransactions as $detail) {
-                        foreach ($detail->productItems as $item) {
-                            $serialNumbers[] = $item->serial_number;
-                        }
-                    }
-                    return implode(', ', $serialNumbers);
-                }),
-            'start_date' => ExportColumn::make('start_date')
-                ->label('Start Date')
-                ->state(fn(Transaction $record): string => $record->start_date ? $record->start_date->format('d M Y, H:i') : ''),
-            'end_date' => ExportColumn::make('end_date')
-                ->label('End Date')
-                ->state(fn(Transaction $record): string => $record->end_date ? $record->end_date->format('d M Y, H:i') : ''),
-            'duration' => ExportColumn::make('duration')
-                ->label('Duration (Days)'),
-            'grand_total' => ExportColumn::make('grand_total')
-                ->label('Grand Total')
-                ->state(fn(Transaction $record): string => 'Rp' . number_format($record->grand_total, 0, ',', '.')),
-            'down_payment' => ExportColumn::make('down_payment')
-                ->label('Down Payment')
-                ->state(fn(Transaction $record): string => 'Rp' . number_format($record->down_payment, 0, ',', '.')),
-            'remaining_payment' => ExportColumn::make('remaining_payment')
-                ->label('Remaining Payment')
-                ->state(fn(Transaction $record): string => $record->remaining_payment == 0 ? 'LUNAS' : 'Rp' . number_format($record->remaining_payment, 0, ',', '.')),
-            'booking_status' => ExportColumn::make('booking_status')
-                ->label('Status'),
-            'promo_applied' => ExportColumn::make('promo.name')
-                ->label('Promo Applied')
-                ->default('None'),
-            'additional_services_info' => ExportColumn::make('additional_services_info')
-                ->label('Additional Services')
-                ->state(function (Transaction $record): string {
-                    $services = [];
+            // Get common transaction data
+            $baseData = $this->getBaseTransactionData($transaction);
 
-                    // New additional_services structure
-                    if ($record->additional_services && is_array($record->additional_services)) {
-                        foreach ($record->additional_services as $service) {
-                            if (is_array($service) && isset($service['name'], $service['amount'])) {
-                                $services[] = $service['name'] . ': Rp' . number_format((int)$service['amount'], 0, ',', '.');
-                            }
-                        }
+            // If no detail transactions, create one row with empty product/bundling
+            if ($transaction->detailTransactions->isEmpty()) {
+                $baseData['product_bundling'] = '';
+                $expandedRows->push($baseData);
+            } else {
+                // Create separate row for each product/bundling
+                foreach ($transaction->detailTransactions as $detail) {
+                    $rowData = $baseData;
+                    
+                    if ($detail->bundling_id && $detail->bundling) {
+                        $rowData['product_bundling'] = $detail->bundling->name . ' (Bundle)';
+                    } elseif ($detail->product_id && $detail->product) {
+                        $rowData['product_bundling'] = $detail->product->name;
+                    } else {
+                        $rowData['product_bundling'] = 'Unknown Item';
                     }
-
-                    // Legacy additional_fee structure for backward compatibility
-                    if ($record->additional_fee_1_name && $record->additional_fee_1_amount) {
-                        $services[] = $record->additional_fee_1_name . ': Rp' . number_format($record->additional_fee_1_amount, 0, ',', '.');
-                    }
-                    if ($record->additional_fee_2_name && $record->additional_fee_2_amount) {
-                        $services[] = $record->additional_fee_2_name . ': Rp' . number_format($record->additional_fee_2_amount, 0, ',', '.');
-                    }
-                    if ($record->additional_fee_3_name && $record->additional_fee_3_amount) {
-                        $services[] = $record->additional_fee_3_name . ': Rp' . number_format($record->additional_fee_3_amount, 0, ',', '.');
-                    }
-
-                    return empty($services) ? 'None' : implode(', ', $services);
-                }),
-            'cancellation_fee' => ExportColumn::make('cancellation_fee')
-                ->label('Cancellation Fee')
-                ->state(function (Transaction $record): string {
-                    if ($record->booking_status === 'cancel' && $record->cancellation_fee && $record->cancellation_fee > 0) {
-                        return 'Rp' . number_format($record->cancellation_fee, 0, ',', '.');
-                    }
-                    return 'None';
-                }),
-            'note' => ExportColumn::make('note')
-                ->label('Notes')
-                ->default(''),
-            'created_at' => ExportColumn::make('created_at')
-                ->label('Created At')
-                ->state(fn(Transaction $record): string => $record->created_at ? $record->created_at->format('d M Y, H:i') : ''),
-        ];
-
-        // Filter columns based on settings
-        $filteredColumns = [];
-        foreach ($allColumns as $key => $column) {
-            // Include column if it's in included_columns and not in excluded_columns
-            if (in_array($key, $includedColumns) && !in_array($key, $excludedColumns)) {
-                $filteredColumns[] = $column;
+                    
+                    $expandedRows->push((object) $rowData);
+                }
             }
         }
 
-        return $filteredColumns;
+        return $expandedRows;
     }
 
+    private function getBaseTransactionData(Transaction $transaction): array
+    {
+        // Parse additional services
+        $additionalServices = $this->parseAdditionalServices($transaction);
+        
+        return [
+            'id' => $transaction->id,
+            'booking_transaction_id' => $transaction->booking_transaction_id,
+            'customer_name' => $transaction->customer->name ?? 'N/A',
+            'customer_email' => $transaction->customer->email ?? 'N/A',
+            'staff_user' => '-', // You can modify this if you have user/staff data
+            'booking_status' => ucfirst($transaction->booking_status),
+            'start_date' => $transaction->start_date ? $transaction->start_date->format('Y-m-d H:i') : '',
+            'end_date' => $transaction->end_date ? $transaction->end_date->format('Y-m-d H:i') : '',
+            'duration' => $transaction->duration,
+            'grand_total' => $transaction->grand_total,
+            'down_payment' => $transaction->down_payment,
+            'remaining_payment' => $transaction->remaining_payment,
+            'promo' => $transaction->promo->name ?? '',
+            'additional_fee_1_name' => $additionalServices['fee_1']['name'] ?? '',
+            'additional_fee_1_amount' => $additionalServices['fee_1']['amount'] ?? '',
+            'additional_fee_2_name' => $additionalServices['fee_2']['name'] ?? '',
+            'additional_fee_2_amount' => $additionalServices['fee_2']['amount'] ?? '',
+            'additional_fee_3_name' => $additionalServices['fee_3']['name'] ?? '',
+            'additional_fee_3_amount' => $additionalServices['fee_3']['amount'] ?? '',
+            'cancellation_fee' => $transaction->booking_status === 'cancel' ? $transaction->cancellation_fee : 0,
+            'note' => $transaction->note ?? '',
+            'created_at' => $transaction->created_at->format('Y-m-d H:i:s'),
+            'updated_at' => $transaction->updated_at->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    private function parseAdditionalServices(Transaction $transaction): array
+    {
+        $services = ['fee_1' => [], 'fee_2' => [], 'fee_3' => []];
+        $index = 1;
+
+        // Parse new additional_services structure
+        if ($transaction->additional_services && is_array($transaction->additional_services)) {
+            foreach ($transaction->additional_services as $service) {
+                if (is_array($service) && isset($service['name'], $service['amount']) && $index <= 3) {
+                    $services["fee_$index"] = [
+                        'name' => $service['name'],
+                        'amount' => $service['amount']
+                    ];
+                    $index++;
+                }
+            }
+        }
+
+        // Parse legacy additional_fee structure (if no new structure)
+        if ($index === 1) {
+            if ($transaction->additional_fee_1_name && $transaction->additional_fee_1_amount) {
+                $services['fee_1'] = [
+                    'name' => $transaction->additional_fee_1_name,
+                    'amount' => $transaction->additional_fee_1_amount
+                ];
+            }
+            if ($transaction->additional_fee_2_name && $transaction->additional_fee_2_amount) {
+                $services['fee_2'] = [
+                    'name' => $transaction->additional_fee_2_name,
+                    'amount' => $transaction->additional_fee_2_amount
+                ];
+            }
+            if ($transaction->additional_fee_3_name && $transaction->additional_fee_3_amount) {
+                $services['fee_3'] = [
+                    'name' => $transaction->additional_fee_3_name,
+                    'amount' => $transaction->additional_fee_3_amount
+                ];
+            }
+        }
+
+        return $services;
+    }
+
+    public static function getColumns(): array
+    {
+        return [
+            ExportColumn::make('id')
+                ->label('ID Transaksi'),
+            ExportColumn::make('booking_transaction_id')
+                ->label('Booking ID'),
+            ExportColumn::make('customer_name')
+                ->label('Customer'),
+            ExportColumn::make('customer_email')
+                ->label('Customer Email'),
+            ExportColumn::make('staff_user')
+                ->label('Staff/User'),
+            ExportColumn::make('booking_status')
+                ->label('Status'),
+            ExportColumn::make('start_date')
+                ->label('Tanggal Mulai'),
+            ExportColumn::make('end_date')
+                ->label('Tanggal Selesai'),
+            ExportColumn::make('duration')
+                ->label('Durasi (Hari)'),
+            ExportColumn::make('product_bundling')
+                ->label('Produk/Bundling'),
+            ExportColumn::make('grand_total')
+                ->label('Grand Total'),
+            ExportColumn::make('down_payment')
+                ->label('DP'),
+            ExportColumn::make('remaining_payment')
+                ->label('Sisa Bayar'),
+            ExportColumn::make('promo')
+                ->label('Promo'),
+            ExportColumn::make('additional_fee_1_name')
+                ->label('Biaya Tambahan 1'),
+            ExportColumn::make('additional_fee_1_amount')
+                ->label('Jumlah Biaya Tambahan 1'),
+            ExportColumn::make('additional_fee_2_name')
+                ->label('Biaya Tambahan 2'),
+            ExportColumn::make('additional_fee_2_amount')
+                ->label('Jumlah Biaya Tambahan 2'),
+            ExportColumn::make('additional_fee_3_name')
+                ->label('Biaya Tambahan 3'),
+            ExportColumn::make('additional_fee_3_amount')
+                ->label('Jumlah Biaya Tambahan 3'),
+            ExportColumn::make('cancellation_fee')
+                ->label('Biaya Cancel'),
+            ExportColumn::make('note')
+                ->label('Catatan'),
+            ExportColumn::make('created_at')
+                ->label('Tanggal Dibuat'),
+            ExportColumn::make('updated_at')
+                ->label('Terakhir Update'),
+        ];
+    }
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Your transaction export has completed and ' . number_format($export->successful_rows) . ' ' . str('row')->plural($export->successful_rows) . ' exported.';
+        $body = 'Export transaksi telah selesai dengan ' . number_format($export->successful_rows) . ' baris data.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to export.';
+            $body .= ' ' . number_format($failedRowsCount) . ' baris gagal di-export.';
         }
 
         return $body;

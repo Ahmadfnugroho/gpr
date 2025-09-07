@@ -1678,13 +1678,54 @@ class TransactionResource extends BaseOptimizedResource
                     ->searchable(),
                 TextColumn::make('customer.phone_number')
                     ->label('WA')
-                    ->formatStateUsing(fn($state) => '+62' . ltrim($state, '0'))
-                    ->url(fn($record) => 'https://wa.me/62' . ltrim($record->customer->phone_number, '0'))
+                    ->formatStateUsing(function ($state, $record) {
+                        // Get phone number from customer relationship
+                        $phoneNumber = $record->customer->customerPhoneNumbers->first()->phone_number ?? $record->customer->phone_number ?? $state;
+                        
+                        // Clean and format phone number
+                        $cleanNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
+                        
+                        // Handle different formats
+                        if (str_starts_with($cleanNumber, '62')) {
+                            // Already has country code
+                            $formattedNumber = '+' . $cleanNumber;
+                        } elseif (str_starts_with($cleanNumber, '0')) {
+                            // Starts with 0, replace with +62
+                            $formattedNumber = '+62' . substr($cleanNumber, 1);
+                        } else {
+                            // No country code or leading 0, add +62
+                            $formattedNumber = '+62' . $cleanNumber;
+                        }
+                        
+                        return $formattedNumber;
+                    })
+                    ->url(function ($record) {
+                        // Get phone number from customer relationship
+                        $phoneNumber = $record->customer->customerPhoneNumbers->first()->phone_number ?? $record->customer->phone_number ?? '';
+                        
+                        // Clean phone number (remove non-digits)
+                        $cleanNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
+                        
+                        // Handle different formats for WhatsApp URL
+                        if (str_starts_with($cleanNumber, '62')) {
+                            // Already has country code 62
+                            $waNumber = $cleanNumber;
+                        } elseif (str_starts_with($cleanNumber, '0')) {
+                            // Starts with 0, replace with 62
+                            $waNumber = '62' . substr($cleanNumber, 1);
+                        } else {
+                            // No country code, add 62
+                            $waNumber = '62' . $cleanNumber;
+                        }
+                        
+                        return 'https://wa.me/' . $waNumber;
+                    })
                     ->openUrlInNewTab()
                     ->color('success')
+                    ->icon('heroicon-m-chat-bubble-left-ellipsis')
                     ->size(TextColumnSize::ExtraSmall)
-
-                    ->copyable(),
+                    ->copyable()
+                    ->tooltip('Click to chat on WhatsApp'),
                 TextColumn::make('product_info')
                     ->label('Product + Serial Numbers')
                     ->size(TextColumnSize::ExtraSmall)
