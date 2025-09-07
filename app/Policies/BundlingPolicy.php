@@ -15,7 +15,7 @@ class BundlingPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->can('view_any_bundling');
+        return $user->can('view_any_bundling::availability');
     }
 
     /**
@@ -23,7 +23,7 @@ class BundlingPolicy
      */
     public function view(User $user, Bundling $bundling): bool
     {
-        return $user->can('view_bundling');
+        return $user->can('view_bundling::availability');
     }
 
     /**
@@ -31,7 +31,7 @@ class BundlingPolicy
      */
     public function create(User $user): bool
     {
-        return $user->can('create_bundling');
+        return $user->can('create_bundling::availability');
     }
 
     /**
@@ -39,7 +39,7 @@ class BundlingPolicy
      */
     public function update(User $user, Bundling $bundling): bool
     {
-        return $user->can('update_bundling');
+        return $user->can('update_bundling::availability');
     }
 
     /**
@@ -47,7 +47,7 @@ class BundlingPolicy
      */
     public function delete(User $user, Bundling $bundling): bool
     {
-        return $user->can('delete_bundling');
+        return $user->can('delete_bundling::availability');
     }
 
     /**
@@ -55,7 +55,7 @@ class BundlingPolicy
      */
     public function deleteAny(User $user): bool
     {
-        return $user->can('delete_any_bundling');
+        return $user->can('delete_any_bundling::availability');
     }
 
     /**
@@ -63,7 +63,7 @@ class BundlingPolicy
      */
     public function forceDelete(User $user, Bundling $bundling): bool
     {
-        return $user->can('force_delete_bundling');
+        return $user->can('force_delete_bundling::availability');
     }
 
     /**
@@ -71,7 +71,7 @@ class BundlingPolicy
      */
     public function forceDeleteAny(User $user): bool
     {
-        return $user->can('force_delete_any_bundling');
+        return $user->can('force_delete_any_bundling::availability');
     }
 
     /**
@@ -79,7 +79,7 @@ class BundlingPolicy
      */
     public function restore(User $user, Bundling $bundling): bool
     {
-        return $user->can('restore_bundling');
+        return $user->can('restore_bundling::availability');
     }
 
     /**
@@ -87,7 +87,7 @@ class BundlingPolicy
      */
     public function restoreAny(User $user): bool
     {
-        return $user->can('restore_any_bundling');
+        return $user->can('restore_any_bundling::availability');
     }
 
     /**
@@ -95,7 +95,7 @@ class BundlingPolicy
      */
     public function replicate(User $user, Bundling $bundling): bool
     {
-        return $user->can('replicate_bundling');
+        return $user->can('replicate_bundling::availability');
     }
 
     /**
@@ -103,6 +103,6 @@ class BundlingPolicy
      */
     public function reorder(User $user): bool
     {
-        return $user->can('reorder_bundling');
+        return $user->can('reorder_bundling::availability');
     }
 }

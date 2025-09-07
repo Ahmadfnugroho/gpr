@@ -3,15 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductAvailabilityResource\Pages;
-use App\Models\Product;
-use App\Models\Bundling;
-use App\Models\ProductItem;
-use App\Models\DetailTransactionProductItem;
+use App\Models\ProductAvailability;
 use Carbon\Carbon;
-use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -21,87 +16,18 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Grid;
 use Filament\Support\Enums\FontWeight;
 use Illuminate\Support\HtmlString;
+use Filament\Tables\Actions\Action;
 use Illuminate\Support\Collection;
 
 class ProductAvailabilityResource extends Resource
 {
-    // Use a custom model collection that combines Products and Bundlings
-    protected static ?string $model = Product::class;
+    protected static ?string $model = ProductAvailability::class;
 
-    // This resource is now deprecated - use InventoryAvailabilityResource instead
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
-    protected static ?string $navigationGroup = null; // Hidden from navigation
-    protected static ?string $navigationLabel = 'Product Availability (Deprecated)';
+    protected static ?string $navigationGroup = 'Inventory Management';
+    protected static ?string $navigationLabel = 'Product Availability';
     protected static ?int $navigationSort = 25;
-    
-    // Hide from navigation
-    public static function shouldRegisterNavigation(): bool
-    {
-        return false;
-    }
     protected static ?string $slug = 'product-availability';
-
-    /**
-     * Get all products and bundlings with availability data
-     */
-    public static function getAllAvailabilityData(?string $searchTerm = null): Collection
-    {
-        $items = collect();
-        
-        // Get products
-        $productsQuery = Product::with(['items']);
-        if ($searchTerm) {
-            $productsQuery = static::applySearchFilter($productsQuery, $searchTerm);
-        }
-        
-        $products = $productsQuery->get()->map(function ($product) {
-            return (object) [
-                'id' => $product->id,
-                'name' => $product->name,
-                'type' => 'product',
-                'model' => $product,
-            ];
-        });
-        
-        // Get bundlings
-        $bundlingsQuery = Bundling::with(['products.items']);
-        if ($searchTerm) {
-            $bundlingsQuery = static::applySearchFilter($bundlingsQuery, $searchTerm);
-        }
-        
-        $bundlings = $bundlingsQuery->get()->map(function ($bundling) {
-            return (object) [
-                'id' => $bundling->id,
-                'name' => $bundling->name . ' (Bundle)',
-                'type' => 'bundling',
-                'model' => $bundling,
-            ];
-        });
-        
-        return $products->merge($bundlings);
-    }
-    
-    /**
-     * Apply search filter with AND logic for keywords
-     */
-    protected static function applySearchFilter(Builder $query, string $searchTerm): Builder
-    {
-        if (strlen(trim($searchTerm)) >= 2) {
-            // Split search term into individual keywords
-            $keywords = array_filter(array_map('trim', explode(' ', strtolower($searchTerm))));
-            
-            if (!empty($keywords)) {
-                $query->where(function ($q) use ($keywords) {
-                    // For each keyword, it must be present in the name (AND logic)
-                    foreach ($keywords as $keyword) {
-                        $q->whereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
-                    }
-                });
-            }
-        }
-        
-        return $query;
-    }
 
     // Disable create, edit, delete since this is read-only
     public static function canCreate(): bool
@@ -137,46 +63,35 @@ class ProductAvailabilityResource extends Resource
         return $table
             ->defaultPaginationPageOption(50)
             ->modifyQueryUsing(function (Builder $query) {
-                $searchTerm = request('tableSearch');
-                
-                if ($searchTerm && strlen(trim($searchTerm)) >= 2) {
-                    // Split search term into individual keywords
-                    $keywords = array_filter(array_map('trim', explode(' ', strtolower($searchTerm))));
-                    
-                    if (!empty($keywords)) {
-                        $query->where(function ($q) use ($keywords) {
-                            // For each keyword, it must be present in the product name (AND logic)
-                            foreach ($keywords as $keyword) {
-                                $q->whereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"]);
-                            }
-                        });
-                    }
-                }
-                
-                return $query->with(['items', 'bundlings']);
+                // Since we're using a virtual model, we'll handle the data differently
+                // This query won't be used, but we need to return something
+                return $query->whereRaw('1 = 0'); // Return empty initially
             })
             ->columns([
+                TextColumn::make('type')
+                    ->label('Type')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'product' => 'primary',
+                        'bundling' => 'success',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
+
                 TextColumn::make('name')
-                    ->label('Product Name')
+                    ->label('Name')
                     ->searchable()
                     ->sortable()
                     ->weight(FontWeight::SemiBold)
                     ->wrap()
                     ->description(function ($record) {
-                        $bundlings = $record->bundlings;
-                        if ($bundlings->isNotEmpty()) {
-                            $bundlingNames = $bundlings->pluck('name')->take(3)->implode(', ');
-                            $remaining = $bundlings->count() - 3;
-                            $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
-                            return "Used in bundles: {$bundlingNames}{$suffix}";
-                        }
-                        return null;
+                        return $record->getDescription();
                     }),
 
                 TextColumn::make('total_items')
                     ->label('Total Items')
                     ->getStateUsing(function ($record) {
-                        return $record->items()->count();
+                        return $record->getTotalItems();
                     })
                     ->alignCenter()
                     ->sortable(false),
@@ -192,11 +107,11 @@ class ProductAvailabilityResource extends Resource
                             $endDate = now()->addDays(7)->format('Y-m-d');
                         }
 
-                        return static::getAvailableItemsCount($record->id, $startDate, $endDate);
+                        return $record->getAvailableItemsForPeriod($startDate, $endDate);
                     })
                     ->alignCenter()
                     ->color(function ($state, $record) {
-                        $total = $record->items()->count();
+                        $total = $record->getTotalItems();
                         if ($total == 0) return 'gray';
                         $percentage = ($state / $total) * 100;
                         if ($percentage >= 70) return 'success';
@@ -205,8 +120,8 @@ class ProductAvailabilityResource extends Resource
                     })
                     ->weight(FontWeight::Bold),
 
-                TextColumn::make('rental_status')
-                    ->label('Current Rentals')
+                TextColumn::make('availability_percentage')
+                    ->label('Availability %')
                     ->getStateUsing(function ($record) {
                         $startDate = request('tableFilters.date_range.start_date');
                         $endDate = request('tableFilters.date_range.end_date');
@@ -216,23 +131,25 @@ class ProductAvailabilityResource extends Resource
                             $endDate = now()->addDays(7)->format('Y-m-d');
                         }
 
-                        return static::getRentalStatusInfo($record->id, $startDate, $endDate);
-                    })
-                    ->html()
-                    ->wrap(),
+                        $available = $record->getAvailableItemsForPeriod($startDate, $endDate);
+                        $total = $record->getTotalItems();
 
-                TextColumn::make('next_available_date')
-                    ->label('Next Available')
-                    ->getStateUsing(function ($record) {
-                        return static::getNextAvailableDate($record->id);
+                        if ($total == 0) return '0%';
+                        $percentage = round(($available / $total) * 100);
+                        return "{$percentage}%";
                     })
-                    ->date('d M Y')
-                    ->placeholder('Available now')
-                    ->sortable(false),
+                    ->alignCenter()
+                    ->color(function ($state) {
+                        $percentage = (int) str_replace('%', '', $state);
+                        if ($percentage >= 70) return 'success';
+                        if ($percentage >= 30) return 'warning';
+                        return 'danger';
+                    })
+                    ->weight(FontWeight::Bold),
 
-                TextColumn::make('serial_numbers')
-                    ->label('Available Serial Numbers')
-                    ->getStateUsing(function ($record) {
+                TextColumn::make('period_status')
+                    ->label('Period Status')
+                    ->getStateUsing(function () {
                         $startDate = request('tableFilters.date_range.start_date');
                         $endDate = request('tableFilters.date_range.end_date');
 
@@ -241,11 +158,11 @@ class ProductAvailabilityResource extends Resource
                             $endDate = now()->addDays(7)->format('Y-m-d');
                         }
 
-                        return static::getAvailableSerialNumbers($record->id, $startDate, $endDate);
+                        return Carbon::parse($startDate)->format('M d') . ' - ' . Carbon::parse($endDate)->format('M d, Y');
                     })
-                    ->wrap()
-                    ->limit(50)
-                    ->placeholder('No items available'),
+                    ->alignCenter()
+                    ->color('gray')
+                    ->size(TextColumn\TextColumnSize::ExtraSmall),
             ])
             ->filters([
                 Filter::make('date_range')
@@ -255,249 +172,55 @@ class ProductAvailabilityResource extends Resource
                                 DatePicker::make('start_date')
                                     ->label('Start Date')
                                     ->default(now())
-                                    ->native(false)
-                                    ->displayFormat('d M Y')
                                     ->required(),
                                 DatePicker::make('end_date')
                                     ->label('End Date')
                                     ->default(now()->addDays(7))
-                                    ->native(false)
-                                    ->displayFormat('d M Y')
-                                    ->required()
-                                    ->after('start_date'),
+                                    ->required(),
                             ])
                     ])
                     ->query(function (Builder $query, array $data): Builder {
-                        // The actual filtering is handled in the column getStateUsing methods
-                        // This filter just provides the date inputs
+                        // For virtual model, we don't modify the query here
+                        // The filtering is handled in the records method
                         return $query;
                     })
                     ->indicateUsing(function (array $data): ?string {
-                        if (!$data['start_date'] || !$data['end_date']) {
-                            return null;
-                        }
-
-                        return 'Date range: ' . Carbon::parse($data['start_date'])->format('d M Y')
-                            . ' - ' . Carbon::parse($data['end_date'])->format('d M Y');
-                    }),
-
-                Filter::make('availability_status')
-                    ->label('Availability Status')
-                    ->toggle()
-                    ->query(function (Builder $query, array $data): Builder {
-                        if (empty($data['value']) || !$data['value']) {
-                            return $query;
-                        }
-
-                        $startDate = request('tableFilters.date_range.start_date', now()->format('Y-m-d'));
-                        $endDate = request('tableFilters.date_range.end_date', now()->addDays(7)->format('Y-m-d'));
-
-                        return $query->whereHas('items', function ($q) use ($startDate, $endDate) {
-                            $q->whereNotExists(function ($subQuery) use ($startDate, $endDate) {
-                                $subQuery->select('*')
-                                    ->from('detail_transaction_product_items as dtpi')
-                                    ->join('detail_transactions as dt', 'dtpi.detail_transaction_id', '=', 'dt.id')
-                                    ->join('transactions as t', 'dt.transaction_id', '=', 't.id')
-                                    ->whereColumn('dtpi.product_item_id', 'product_items.id')
-                                    ->where('t.booking_status', '!=', 'cancel')
-                                    ->where(function ($q) use ($startDate, $endDate) {
-                                        $q->whereBetween('t.start_date', [$startDate, $endDate])
-                                            ->orWhereBetween('t.end_date', [$startDate, $endDate])
-                                            ->orWhere(function ($q2) use ($startDate, $endDate) {
-                                                $q2->where('t.start_date', '<=', $startDate)
-                                                    ->where('t.end_date', '>=', $endDate);
-                                            });
-                                    });
-                            });
-                        });
-                    })
-                    ->indicateUsing(function (array $data): ?string {
-                        return (!empty($data['value']) && $data['value']) ? 'Only available products' : null;
+                        $start = $data['start_date'] ?? now()->format('Y-m-d');
+                        $end = $data['end_date'] ?? now()->addDays(7)->format('Y-m-d');
+                        
+                        return 'Period: ' . Carbon::parse($start)->format('M d') . ' - ' . Carbon::parse($end)->format('M d, Y');
                     }),
             ])
             ->actions([
-                // No actions needed for read-only resource
+                Action::make('view_details')
+                    ->label('View Details')
+                    ->icon('heroicon-m-eye')
+                    ->url(function ($record) {
+                        if ($record->type === 'product') {
+                            return route('filament.admin.resources.products.view', [
+                                'record' => str_replace('product_', '', $record->id)
+                            ]);
+                        } elseif ($record->type === 'bundling') {
+                            return route('filament.admin.resources.bundlings.view', [
+                                'record' => str_replace('bundling_', '', $record->id)
+                            ]);
+                        }
+                        return null;
+                    })
+                    ->openUrlInNewTab(),
             ])
-            ->bulkActions([
-                // No bulk actions needed for read-only resource
-            ])
-            ->defaultSort('name')
-            ->poll('30s') // Auto-refresh every 30 seconds for real-time data
-            ->emptyStateHeading('No products found')
-            ->emptyStateDescription('There are no products in the system or none match your current filters.')
-            ->emptyStateIcon('heroicon-o-calendar-days');
+            ->defaultSort('name', 'asc')
+            ->searchable(false) // We'll handle search differently
+            ->recordUrl(null); // Disable row click navigation
     }
 
     /**
-     * Get count of available items for a product in date range
+     * Override the default records method to use our virtual model data
      */
-    protected static function getAvailableItemsCount(int $productId, string $startDate, string $endDate): int
+    public static function getEloquentQuery(): Builder
     {
-        $usedItemIds = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
-            $query->where('booking_status', '!=', 'cancel')
-                ->where(function ($q) use ($startDate, $endDate) {
-                    $q->whereBetween('start_date', [$startDate, $endDate])
-                        ->orWhereBetween('end_date', [$startDate, $endDate])
-                        ->orWhere(function ($q2) use ($startDate, $endDate) {
-                            $q2->where('start_date', '<=', $startDate)
-                                ->where('end_date', '>=', $endDate);
-                        });
-                });
-        })
-            ->whereHas('productItem', function ($q) use ($productId) {
-                $q->where('product_id', $productId);
-            })
-            ->pluck('product_item_id')
-            ->unique();
-
-        return ProductItem::where('product_id', $productId)
-            ->whereNotIn('id', $usedItemIds)
-            ->count();
-    }
-
-    /**
-     * Get rental status information for a product
-     */
-    protected static function getRentalStatusInfo(int $productId, string $startDate, string $endDate): string
-    {
-        $rentals = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
-            $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-                ->where(function ($q) use ($startDate, $endDate) {
-                    $q->whereBetween('start_date', [$startDate, $endDate])
-                        ->orWhereBetween('end_date', [$startDate, $endDate])
-                        ->orWhere(function ($q2) use ($startDate, $endDate) {
-                            $q2->where('start_date', '<=', $startDate)
-                                ->where('end_date', '>=', $endDate);
-                        });
-                });
-        })
-            ->whereHas('productItem', function ($q) use ($productId) {
-                $q->where('product_id', $productId);
-            })
-            ->with(['detailTransaction.transaction'])
-            ->get()
-            ->groupBy('detailTransaction.transaction.booking_status');
-
-        $statusInfo = [];
-        foreach (['booking', 'paid', 'on_rented'] as $status) {
-            $count = $rentals->get($status, collect())->count();
-            if ($count > 0) {
-                $color = match ($status) {
-                    'booking' => 'orange',
-                    'paid' => 'blue',
-                    'on_rented' => 'green',
-                    default => 'gray'
-                };
-                $statusInfo[] = "<span style='color: {$color}; font-weight: bold;'>{$count} {$status}</span>";
-            }
-        }
-
-        return empty($statusInfo) ? 'No active rentals' : implode(' • ', $statusInfo);
-    }
-
-    /**
-     * Get next available date for a product
-     */
-    protected static function getNextAvailableDate(int $productId): ?string
-    {
-        $nextRental = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) {
-            $query->where('booking_status', '!=', 'cancel')
-                ->where('end_date', '>', now());
-        })
-            ->whereHas('productItem', function ($q) use ($productId) {
-                $q->where('product_id', $productId);
-            })
-            ->with(['detailTransaction.transaction'])
-            ->get()
-            ->min('detailTransaction.transaction.end_date');
-
-        return $nextRental ? Carbon::parse($nextRental)->addDay()->format('Y-m-d') : null;
-    }
-
-    /**
-     * Get available serial numbers for a product in date range
-     */
-    protected static function getAvailableSerialNumbers(int $productId, string $startDate, string $endDate): string
-    {
-        $usedItemIds = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
-            $query->where('booking_status', '!=', 'cancel')
-                ->where(function ($q) use ($startDate, $endDate) {
-                    $q->whereBetween('start_date', [$startDate, $endDate])
-                        ->orWhereBetween('end_date', [$startDate, $endDate])
-                        ->orWhere(function ($q2) use ($startDate, $endDate) {
-                            $q2->where('start_date', '<=', $startDate)
-                                ->where('end_date', '>=', $endDate);
-                        });
-                });
-        })
-            ->whereHas('productItem', function ($q) use ($productId) {
-                $q->where('product_id', $productId);
-            })
-            ->pluck('product_item_id')
-            ->unique();
-
-        $availableSerials = ProductItem::where('product_id', $productId)
-            ->whereNotIn('id', $usedItemIds)
-            ->pluck('serial_number')
-            ->sort()
-            ->values();
-
-        if ($availableSerials->isEmpty()) {
-            return '';
-        }
-
-        if ($availableSerials->count() <= 10) {
-            return $availableSerials->implode(', ');
-        }
-
-        $first5 = $availableSerials->take(5)->implode(', ');
-        $remaining = $availableSerials->count() - 5;
-
-        return $first5 . " <span style='color: #6b7280; font-style: italic;'>and {$remaining} more</span>";
-    }
-
-    /**
-     * Get available bundling quantity for a date range
-     */
-    protected static function getAvailableBundlingCount(int $bundlingId, string $startDate, string $endDate): int
-    {
-        $bundling = Bundling::with('products.items')->find($bundlingId);
-        if (!$bundling) {
-            return 0;
-        }
-
-        return $bundling->getAvailableQuantityForPeriod(
-            Carbon::parse($startDate),
-            Carbon::parse($endDate)
-        );
-    }
-
-    /**
-     * Get bundling rental status information
-     */
-    protected static function getBundlingRentalStatus(int $bundlingId, string $startDate, string $endDate): string
-    {
-        $bundling = Bundling::find($bundlingId);
-        if (!$bundling) {
-            return 'No data';
-        }
-
-        // Check if bundling is currently rented
-        $activeRentals = $bundling->detailTransactions()
-            ->whereHas('transaction', function ($query) use ($startDate, $endDate) {
-                $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-                    ->where(function ($q) use ($startDate, $endDate) {
-                        $q->whereBetween('start_date', [$startDate, $endDate])
-                            ->orWhereBetween('end_date', [$startDate, $endDate])
-                            ->orWhere(function ($q2) use ($startDate, $endDate) {
-                                $q2->where('start_date', '<=', $startDate)
-                                    ->where('end_date', '>=', $endDate);
-                            });
-                    });
-            })
-            ->count();
-
-        return $activeRentals > 0 ? "{$activeRentals} active rentals" : 'No active rentals';
+        // This creates a fake query that we'll replace with our virtual data
+        return ProductAvailability::query()->whereRaw('1 = 0');
     }
 
     public static function getPages(): array
