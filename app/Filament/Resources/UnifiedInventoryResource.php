@@ -34,7 +34,7 @@ class UnifiedInventoryResource extends Resource
     protected static ?string $model = Product::class; // Using Product as base model
 
     protected static ?string $navigationIcon = 'heroicon-o-cube-transparent';
-    protected static ?string $navigationLabel = 'Product / Bundling Search';
+    protected static ?string $navigationLabel = 'Product/Bundling Search';
     protected static ?int $navigationSort = 20;
     protected static ?string $slug = 'unified-inventory';
 
