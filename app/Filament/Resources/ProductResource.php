@@ -35,7 +35,6 @@ use Illuminate\Database\Eloquent\Model;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\FacadesLog;
 use Illuminate\Support\HtmlString;
 
 class ProductResource extends Resource
@@ -140,10 +139,79 @@ class ProductResource extends Resource
                     ->numeric()
                     ->prefix('Rp'),
                 \Filament\Forms\Components\FileUpload::make('thumbnail')
-                    ->label('Foto Produk')
+                    ->label('Thumbnail Produk (Utama)')
+                    ->image()
+                    ->directory('product-thumbnails')
+                    ->visibility('public')
+                    ->imageEditor()
+                    ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
+                    ->imageResizeTargetWidth('800')
+                    ->imageResizeTargetHeight('600')
+                    ->maxSize(3072) // 3MB
+                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                    ->helperText('Upload satu foto utama untuk thumbnail produk')
+                    ->nullable(),
+                    
+                \Filament\Forms\Components\FileUpload::make('product_photos')
+                    ->label('Galeri Foto Produk')
                     ->image()
                     ->multiple()
-                    ->nullable(),
+                    ->directory('product-photos')
+                    ->visibility('public')
+                    ->imageEditor()
+                    ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
+                    ->imageResizeTargetWidth('1920')
+                    ->imageResizeTargetHeight('1080')
+                    ->maxSize(5120) // 5MB per file
+                    ->maxFiles(10) // Maximum 10 files
+                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                    ->helperText('Upload beberapa foto sekaligus untuk galeri produk. Maksimal 10 file, 5MB per file.')
+                    ->dehydrated(false) // Don't save to product table
+                    ->afterStateUpdated(function ($state, $record) {
+                        // This will be handled in the create/update hooks
+                    })
+                    ->nullable()
+                    ->columnSpanFull(),
+                    
+                Forms\Components\Placeholder::make('existing_photos_display')
+                    ->label('Foto yang Sudah Ada')
+                    ->content(function ($record) {
+                        if (! $record) return 'Belum ada foto yang diupload.';
+                        
+                        $photos = $record->productPhotos;
+                        
+                        if ($photos->isEmpty()) {
+                            return 'Belum ada foto yang diupload.';
+                        }
+                        
+                        $photoHtml = '<div class="grid grid-cols-4 gap-4">';
+                        foreach ($photos->take(8) as $photo) {
+                            $imageUrl = asset('storage/' . $photo->photo);
+                            $photoHtml .= '
+                                <div class="relative">
+                                    <img src="' . $imageUrl . '" 
+                                         alt="Product Photo" 
+                                         class="w-full h-20 object-cover rounded-lg border" />
+                                    <div class="absolute top-1 right-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
+                                        #' . $photo->id . '
+                                    </div>
+                                </div>';
+                        }
+                        
+                        if ($photos->count() > 8) {
+                            $remaining = $photos->count() - 8;
+                            $photoHtml .= '<div class="flex items-center justify-center h-20 bg-gray-100 rounded-lg border">';
+                            $photoHtml .= '<span class="text-gray-500 text-sm">+' . $remaining . ' lainnya</span>';
+                            $photoHtml .= '</div>';
+                        }
+                        
+                        $photoHtml .= '</div>';
+                        $photoHtml .= '<p class="text-sm text-gray-600 mt-2">Total: ' . $photos->count() . ' foto. Gunakan tab "Product Photos" untuk mengelola foto.</p>';
+                        
+                        return new \Illuminate\Support\HtmlString($photoHtml);
+                    })
+                    ->visible(fn($record) => $record !== null)
+                    ->columnSpanFull(),
                 Select::make('status')
                     ->label('Status')
                     ->options([

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ProductResource\RelationManagers;
 
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Components;
 use Filament\Forms\Components\FileUpload;
 use Filament\Resources\RelationManagers\RelationManager;
 use App\Models\ProductPhoto;
@@ -20,29 +21,62 @@ use Illuminate\Support\HtmlString;
 
 class ProductPhotoRelationManager extends RelationManager
 {
-    protected static string $relationship = 'ProductPhotos';
+    protected static string $relationship = 'productPhotos';
 
     public function form(Form $form): Form
     {
         return $form
             ->schema([
-                FileUpload::make('photo')
-                    ->label('Product Photo')
-                    ->image()
-                    ->directory('product-photos')
-                    ->visibility('public')
-                    ->imageEditor()
-                    ->imageEditorAspectRatios([
-                        '16:9',
-                        '4:3',
-                        '1:1',
+                Forms\Components\Tabs::make('Upload Options')
+                    ->tabs([
+                        Forms\Components\Tabs\Tab::make('Multiple Photos')
+                            ->schema([
+                                FileUpload::make('photos')
+                                    ->label('Upload Multiple Photos')
+                                    ->image()
+                                    ->multiple()
+                                    ->directory('product-photos')
+                                    ->visibility('public')
+                                    ->imageEditor()
+                                    ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
+                                    ->imageCropAspectRatio('16:9')
+                                    ->imageResizeTargetWidth('1920')
+                                    ->imageResizeTargetHeight('1080')
+                                    ->maxSize(5120) // 5MB per file
+                                    ->maxFiles(10) // Maximum 10 files
+                                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                                    ->helperText('Upload multiple photos at once. Maximum 10 files, 5MB each.')
+                                    ->dehydrated(false),
+                            ]),
+                        Forms\Components\Tabs\Tab::make('Single Photo')
+                            ->schema([
+                                FileUpload::make('photo')
+                                    ->label('Upload Single Photo')
+                                    ->image()
+                                    ->directory('product-photos')
+                                    ->visibility('public')
+                                    ->imageEditor()
+                                    ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
+                                    ->imageCropAspectRatio('16:9')
+                                    ->imageResizeTargetWidth('1920')
+                                    ->imageResizeTargetHeight('1080')
+                                    ->maxSize(5120) // 5MB
+                                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                                    ->helperText('Upload a single photo.')
+                                    ->required(),
+                            ]),
                     ])
-                    ->imageCropAspectRatio('16:9')
-                    ->imageResizeTargetWidth('1920')
-                    ->imageResizeTargetHeight('1080')
-                    ->maxSize(5120) // 5MB
-                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                    ->required()
+                    ->columnSpanFull(),
+                    
+                Forms\Components\Placeholder::make('existing_photos_info')
+                    ->label('Current Photos')
+                    ->content(function () {
+                        $product = $this->ownerRecord;
+                        if (!$product) return 'Product not found';
+                        
+                        $photosCount = $product->productPhotos()->count();
+                        return "This product currently has {$photosCount} photo(s) in the gallery.";
+                    })
                     ->columnSpanFull(),
             ]);
     }
@@ -90,11 +124,51 @@ class ProductPhotoRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->label('Upload Photo')
+                    ->label('Upload Photos')
                     ->icon('heroicon-o-photo')
-                    ->modalHeading('Upload Product Photo')
-                    ->modalDescription('Upload a new photo for this product. Recommended size: 1920x1080px')
-                    ->modalSubmitActionLabel('Upload'),
+                    ->modalHeading('Upload Product Photos')
+                    ->modalDescription('Upload multiple photos for this product. Recommended size: 1920x1080px')
+                    ->modalSubmitActionLabel('Upload Photos')
+                    ->mutateFormDataUsing(function (array $data): array {
+                        // Handle multiple photo uploads
+                        return $data;
+                    })
+                    ->using(function (array $data, string $model): Model {
+                        $product = $this->ownerRecord;
+                        $uploadedCount = 0;
+                        $createdRecords = [];
+                        
+                        // Handle multiple photos
+                        if (!empty($data['photos']) && is_array($data['photos'])) {
+                            foreach ($data['photos'] as $photo) {
+                                $record = $model::create([
+                                    'product_id' => $product->id,
+                                    'photo' => $photo,
+                                ]);
+                                $createdRecords[] = $record;
+                                $uploadedCount++;
+                            }
+                        }
+                        
+                        // Handle single photo
+                        if (!empty($data['photo'])) {
+                            $record = $model::create([
+                                'product_id' => $product->id,
+                                'photo' => $data['photo'],
+                            ]);
+                            $createdRecords[] = $record;
+                            $uploadedCount++;
+                        }
+                        
+                        // Return the last created record or a new model instance
+                        return end($createdRecords) ?: new $model();
+                    })
+                    ->successNotificationTitle(function ($data) {
+                        $multiCount = count($data['photos'] ?? []);
+                        $singleCount = !empty($data['photo']) ? 1 : 0;
+                        $totalCount = $multiCount + $singleCount;
+                        return "Successfully uploaded {$totalCount} photo(s)";
+                    }),
                     
                 ImportAction::make()
                     ->importer(ProductPhotoImporter::class)
