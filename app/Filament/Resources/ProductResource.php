@@ -43,12 +43,12 @@ class ProductResource extends BaseOptimizedResource
 {
     protected static ?string $model = Product::class;
     protected static ?string $recordTitleAttribute = 'name';
-    
+
     /**
      * Repository instance for optimized data access
      */
     protected static ?ProductRepository $repository = null;
-    
+
     /**
      * Get repository instance
      */
@@ -57,10 +57,10 @@ class ProductResource extends BaseOptimizedResource
         if (static::$repository === null) {
             static::$repository = new ProductRepository(new Product());
         }
-        
+
         return static::$repository;
     }
-    
+
     /**
      * Get columns to select for optimized queries
      */
@@ -70,7 +70,7 @@ class ProductResource extends BaseOptimizedResource
             'products.id',
             'products.name',
             'products.status',
-            'products.premiere', 
+            'products.premiere',
             'products.category_id',
             'products.brand_id',
             'products.sub_category_id',
@@ -78,7 +78,7 @@ class ProductResource extends BaseOptimizedResource
             'products.thumbnail'
         ];
     }
-    
+
     /**
      * Get relationships to eager load
      */
@@ -205,7 +205,7 @@ class ProductResource extends BaseOptimizedResource
                         return $compressedPath;
                     })
                     ->nullable(),
-                    
+
                 \Filament\Forms\Components\FileUpload::make('product_photos')
                     ->label('Galeri Foto Produk')
                     ->image()
@@ -231,18 +231,18 @@ class ProductResource extends BaseOptimizedResource
                     })
                     ->nullable()
                     ->columnSpanFull(),
-                    
+
                 Forms\Components\Placeholder::make('existing_photos_display')
                     ->label('Foto yang Sudah Ada')
                     ->content(function ($record) {
                         if (! $record) return 'Belum ada foto yang diupload.';
-                        
+
                         $photos = $record->productPhotos;
-                        
+
                         if ($photos->isEmpty()) {
                             return 'Belum ada foto yang diupload.';
                         }
-                        
+
                         $photoHtml = '<div class="grid grid-cols-4 gap-4">';
                         foreach ($photos->take(8) as $photo) {
                             $imageUrl = asset('storage/' . $photo->photo);
@@ -250,23 +250,23 @@ class ProductResource extends BaseOptimizedResource
                                 <div class="relative">
                                     <img src="' . $imageUrl . '" 
                                          alt="Product Photo" 
-                                         class="w-full h-20 object-cover rounded-lg border" />
+                                         class="w-full h-10 object-cover rounded-lg border" />
                                     <div class="absolute top-1 right-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
                                         #' . $photo->id . '
                                     </div>
                                 </div>';
                         }
-                        
+
                         if ($photos->count() > 8) {
                             $remaining = $photos->count() - 8;
                             $photoHtml .= '<div class="flex items-center justify-center h-20 bg-gray-100 rounded-lg border">';
                             $photoHtml .= '<span class="text-gray-500 text-sm">+' . $remaining . ' lainnya</span>';
                             $photoHtml .= '</div>';
                         }
-                        
+
                         $photoHtml .= '</div>';
                         $photoHtml .= '<p class="text-sm text-gray-600 mt-2">Total: ' . $photos->count() . ' foto. Gunakan tab "Product Photos" untuk mengelola foto.</p>';
-                        
+
                         return new \Illuminate\Support\HtmlString($photoHtml);
                     })
                     ->visible(fn($record) => $record !== null)
@@ -417,6 +417,11 @@ class ProductResource extends BaseOptimizedResource
                             ->getStateUsing(function ($record) {
                                 return $record->items_count ?? 0;
                             }),
+                        Tables\Columns\ImageColumn::make('productPhotos.0.photo')
+                            ->label('Foto')
+                            ->circular()
+                            ->size(50)
+                            ->alignCenter(),
 
 
                         // Tables\Columns\TextColumn::make('items.serial_number')
