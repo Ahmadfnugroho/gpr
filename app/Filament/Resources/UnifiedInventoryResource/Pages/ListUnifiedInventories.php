@@ -63,23 +63,72 @@ class ListUnifiedInventories extends ListRecords
         ];
     }
 
-    public function getTabs(): array
-    {
-        return [
-            'all' => Tab::make('All Items')
-                ->icon('heroicon-o-squares-2x2')
-                ->badge(Product::count())
-                ->modifyQueryUsing(fn (Builder $query) => $query),
-        ];
-    }
+    // Removed tabs to show all items in single view
 
     /**
-     * Get table records - simplified to always show products
+     * Get table records - unified view for both products and bundlings
      */
     public function getTableRecords(): Paginator
     {
-        // Always use parent method to show products
-        return parent::getTableRecords();
+        $selectedProducts = request('selected_products', []);
+        $selectedBundlings = request('selected_bundlings', []);
+        
+        // If no selections, return empty
+        if (empty($selectedProducts) && empty($selectedBundlings)) {
+            return new \Illuminate\Pagination\LengthAwarePaginator([], 0, 50);
+        }
+        
+        $allItems = collect();
+        
+        // Get selected products
+        if (!empty($selectedProducts)) {
+            $products = Product::with(['items', 'bundlings', 'category', 'brand', 'subCategory'])
+                ->whereIn('id', $selectedProducts)
+                ->get();
+            
+            foreach ($products as $product) {
+                $product->item_type = 'Product';
+                $product->unified_type = 'product';
+                $allItems->push($product);
+            }
+        }
+        
+        // Get selected bundlings and transform them to look like products
+        if (!empty($selectedBundlings)) {
+            $bundlings = Bundling::with(['products.items'])
+                ->whereIn('id', $selectedBundlings)
+                ->get();
+            
+            foreach ($bundlings as $bundling) {
+                // Create a pseudo-product object for bundlings
+                $bundlingAsProduct = new Product();
+                $bundlingAsProduct->id = $bundling->id;
+                $bundlingAsProduct->name = $bundling->name;
+                $bundlingAsProduct->item_type = 'Bundle';
+                $bundlingAsProduct->unified_type = 'bundling';
+                $bundlingAsProduct->original_bundling = $bundling;
+                
+                // Calculate total items from all products in bundle
+                $bundlingAsProduct->total_bundle_items = $bundling->products->sum(function($product) {
+                    return $product->items()->count();
+                });
+                
+                $allItems->push($bundlingAsProduct);
+            }
+        }
+        
+        // Paginate the collection
+        $currentPage = request('page', 1);
+        $perPage = 50;
+        $currentItems = $allItems->slice(($currentPage - 1) * $perPage, $perPage)->values();
+        
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $currentItems,
+            $allItems->count(),
+            $perPage,
+            $currentPage,
+            ['path' => request()->url(), 'pageName' => 'page']
+        );
     }
 
 }

@@ -147,9 +147,14 @@ class ProductResource extends Resource
                     ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
                     ->imageResizeTargetWidth('800')
                     ->imageResizeTargetHeight('600')
-                    ->maxSize(3072) // 3MB
+                    ->maxSize(10240) // 10MB (will be compressed)
                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                    ->helperText('Upload satu foto utama untuk thumbnail produk')
+                    ->helperText('Upload satu foto utama untuk thumbnail produk. File akan dikompres otomatis.')
+                    ->saveUploadedFileUsing(function ($file, $record, $set, $get) {
+                        $compressionService = new \App\Services\ImageCompressionService();
+                        $compressedPath = $compressionService->compressAndStore($file, 'product-thumbnails');
+                        return $compressedPath;
+                    })
                     ->nullable(),
                     
                 \Filament\Forms\Components\FileUpload::make('product_photos')
@@ -166,6 +171,11 @@ class ProductResource extends Resource
                     ->maxFiles(10) // Maximum 10 files
                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                     ->helperText('Upload beberapa foto sekaligus untuk galeri produk. Maksimal 10 file, 10MB per file. Foto akan dikompres otomatis.')
+                    ->saveUploadedFileUsing(function ($file) {
+                        $compressionService = new \App\Services\ImageCompressionService();
+                        $compressedPath = $compressionService->compressAndStore($file, 'product-photos');
+                        return $compressedPath;
+                    })
                     ->dehydrated(false) // Don't save to product table
                     ->afterStateUpdated(function ($state, $record) {
                         // This will be handled in the create/update hooks

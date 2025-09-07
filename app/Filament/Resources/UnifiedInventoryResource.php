@@ -103,31 +103,19 @@ class UnifiedInventoryResource extends Resource
     {
         return $table
             ->defaultPaginationPageOption(50)
-            ->modifyQueryUsing(function (Builder $query) {
-                // By default, show no results until form is submitted
-                $selectedProducts = request('selected_products', []);
-                $selectedBundlings = request('selected_bundlings', []);
-                
-                // Only show results if selections are made
-                if (empty($selectedProducts) && empty($selectedBundlings)) {
-                    return $query->whereRaw('1 = 0'); // Return empty result set
-                }
-                
-                // Filter by selected products only
-                if (!empty($selectedProducts)) {
-                    return $query->whereIn('id', $selectedProducts)->with(['items', 'bundlings']);
-                }
-                
-                return $query->whereRaw('1 = 0'); // Return empty if only bundlings selected
-            })
             ->columns([
                 TextColumn::make('item_type')
                     ->label('Type')
                     ->getStateUsing(function ($record) {
-                        return 'Product';
+                        // Check if this is from unified type or regular property
+                        return $record->item_type ?? ($record->unified_type === 'bundling' ? 'Bundle' : 'Product');
                     })
                     ->badge()
-                    ->color('primary'),
+                    ->color(fn(string $state): string => match ($state) {
+                        'Product' => 'success',
+                        'Bundle' => 'warning',
+                        default => 'gray',
+                    }),
 
                 TextColumn::make('name')
                     ->label('Name')
@@ -136,12 +124,23 @@ class UnifiedInventoryResource extends Resource
                     ->weight(FontWeight::SemiBold)
                     ->wrap()
                     ->description(function ($record) {
-                        $bundlings = $record->bundlings ?? collect();
-                        if ($bundlings->isNotEmpty()) {
-                            $bundlingNames = $bundlings->pluck('name')->take(3)->implode(', ');
-                            $remaining = $bundlings->count() - 3;
-                            $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
-                            return "Used in bundles: {$bundlingNames}{$suffix}";
+                        if (isset($record->unified_type) && $record->unified_type === 'bundling') {
+                            // For bundlings, show contained products
+                            if (isset($record->original_bundling)) {
+                                $productNames = $record->original_bundling->products->pluck('name')->take(3)->implode(', ');
+                                $remaining = $record->original_bundling->products->count() - 3;
+                                $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
+                                return "Contains products: {$productNames}{$suffix}";
+                            }
+                        } else {
+                            // For products, show bundlings it's used in
+                            $bundlings = $record->bundlings ?? collect();
+                            if ($bundlings->isNotEmpty()) {
+                                $bundlingNames = $bundlings->pluck('name')->take(3)->implode(', ');
+                                $remaining = $bundlings->count() - 3;
+                                $suffix = $remaining > 0 ? " (+{$remaining} more)" : '';
+                                return "Used in bundles: {$bundlingNames}{$suffix}";
+                            }
                         }
                         return null;
                     }),
@@ -149,13 +148,13 @@ class UnifiedInventoryResource extends Resource
                 TextColumn::make('total_items')
                     ->label('Total Items')
                     ->getStateUsing(function ($record) {
-                        // Check if this is a Product or Bundling
-                        if ($record instanceof \App\Models\Product) {
-                            return $record->items()->count();
+                        if (isset($record->unified_type) && $record->unified_type === 'bundling') {
+                            // For bundlings from unified view
+                            return $record->total_bundle_items ?? 0;
                         }
-                        // For bundlings, show total items across all products
-                        if ($record instanceof \App\Models\Bundling) {
-                            return $record->products()->withSum('items as total_items', 'id')->get()->sum('total_items');
+                        // For products or regular Product instances
+                        if ($record instanceof \App\Models\Product || method_exists($record, 'items')) {
+                            return $record->items()->count();
                         }
                         return 0;
                     })
@@ -173,16 +172,29 @@ class UnifiedInventoryResource extends Resource
                             $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
                         }
 
+                        if (isset($record->unified_type) && $record->unified_type === 'bundling') {
+                            // For bundlings, calculate minimum available items across all products
+                            if (isset($record->original_bundling)) {
+                                $minAvailable = PHP_INT_MAX;
+                                foreach ($record->original_bundling->products as $product) {
+                                    $available = static::getAvailableItemsCount($product->id, $startDate, $endDate);
+                                    $minAvailable = min($minAvailable, $available);
+                                }
+                                return $minAvailable === PHP_INT_MAX ? 0 : $minAvailable;
+                            }
+                            return 0;
+                        }
+
                         return static::getAvailableItemsCount($record->id, $startDate, $endDate);
                     })
                     ->alignCenter()
                     ->color(function ($state, $record) {
-                        // Handle both Product and Bundling models
+                        // Get total items for percentage calculation
                         $total = 0;
-                        if ($record instanceof \App\Models\Product) {
+                        if (isset($record->unified_type) && $record->unified_type === 'bundling') {
+                            $total = $record->total_bundle_items ?? 0;
+                        } else {
                             $total = $record->items()->count();
-                        } elseif ($record instanceof \App\Models\Bundling) {
-                            $total = $record->products()->withSum('items as total_items', 'id')->get()->sum('total_items');
                         }
                         
                         if ($total == 0) return 'gray';
@@ -204,18 +216,31 @@ class UnifiedInventoryResource extends Resource
                             $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
                         }
 
-                        if ($record instanceof \App\Models\Product) {
+                        if (isset($record->unified_type) && $record->unified_type === 'bundling') {
+                            // For bundlings, calculate minimum available percentage
+                            if (isset($record->original_bundling)) {
+                                $minPercentage = 100;
+                                foreach ($record->original_bundling->products as $product) {
+                                    $available = static::getAvailableItemsCount($product->id, $startDate, $endDate);
+                                    $total = $product->items()->count();
+                                    if ($total > 0) {
+                                        $percentage = round(($available / $total) * 100);
+                                        $minPercentage = min($minPercentage, $percentage);
+                                    } else {
+                                        $minPercentage = 0;
+                                    }
+                                }
+                                return "{$minPercentage}%";
+                            }
+                            return '0%';
+                        } else {
+                            // For products
                             $available = static::getAvailableItemsCount($record->id, $startDate, $endDate);
                             $total = $record->items()->count();
-                        } else {
-                            // For bundlings, calculate differently
-                            $total = $record->products()->withSum('items as total_items', 'id')->get()->sum('total_items');
-                            $available = $total; // Simplified for now
+                            if ($total == 0) return '0%';
+                            $percentage = round(($available / $total) * 100);
+                            return "{$percentage}%";
                         }
-
-                        if ($total == 0) return '0%';
-                        $percentage = round(($available / $total) * 100);
-                        return "{$percentage}%";
                     })
                     ->alignCenter()
                     ->color(function ($state) {
@@ -237,6 +262,56 @@ class UnifiedInventoryResource extends Resource
                             $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
                         }
 
+                        if (isset($record->unified_type) && $record->unified_type === 'bundling') {
+                            // For bundlings, get rentals from all contained products
+                            if (isset($record->original_bundling)) {
+                                $allRentals = collect();
+                                foreach ($record->original_bundling->products as $product) {
+                                    $activeRentals = DetailTransactionProductItem::with('detailTransaction.transaction')
+                                        ->whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
+                                            $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                                ->where(function ($q) use ($startDate, $endDate) {
+                                                    $q->whereBetween('start_date', [$startDate, $endDate])
+                                                        ->orWhereBetween('end_date', [$startDate, $endDate])
+                                                        ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                                            $q2->where('start_date', '<=', $startDate)
+                                                                ->where('end_date', '>=', $endDate);
+                                                        });
+                                                });
+                                        })
+                                        ->whereHas('productItem', function ($query) use ($product) {
+                                            $query->where('product_id', $product->id);
+                                        })
+                                        ->get();
+                                    $allRentals = $allRentals->merge($activeRentals);
+                                }
+                                
+                                if ($allRentals->isEmpty()) {
+                                    return 'No active bundle rentals';
+                                }
+                                
+                                // Group by transaction for bundling display
+                                $transactions = $allRentals->groupBy('detailTransaction.transaction.id');
+                                $rentalInfo = [];
+                                foreach ($transactions->take(3) as $transactionRentals) {
+                                    $transaction = $transactionRentals->first()->detailTransaction->transaction;
+                                    $startDate = $transaction->start_date ? $transaction->start_date->format('d/m/Y') : 'N/A';
+                                    $endDate = $transaction->end_date ? $transaction->end_date->format('d/m/Y') : 'N/A';
+                                    $status = ucfirst($transaction->booking_status);
+                                    $rentalInfo[] = "{$startDate} - {$endDate} ({$status})";
+                                }
+                                
+                                $remaining = $transactions->count() - 3;
+                                if ($remaining > 0) {
+                                    $rentalInfo[] = "+{$remaining} more transactions";
+                                }
+                                
+                                return implode('\n', $rentalInfo);
+                            }
+                            return 'No bundle data';
+                        }
+
+                        // For products
                         $activeRentals = DetailTransactionProductItem::with('detailTransaction.transaction')
                             ->whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
                                 $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
@@ -285,6 +360,10 @@ class UnifiedInventoryResource extends Resource
                         if (!$startDate || !$endDate) {
                             $startDate = now()->format('Y-m-d H:i:s');
                             $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
+                        }
+
+                        if (isset($record->unified_type) && $record->unified_type === 'bundling') {
+                            return 'Bundle rentals include all products within the bundle';
                         }
 
                         $activeRentals = DetailTransactionProductItem::with('detailTransaction.transaction')

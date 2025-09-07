@@ -47,6 +47,10 @@ class ProductPhotoRelationManager extends RelationManager
                                     ->maxFiles(10) // Maximum 10 files
                                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                                     ->helperText('Upload multiple photos at once. Maximum 10 files, 10MB each. Photos will be compressed automatically.')
+                                    ->saveUploadedFileUsing(function ($file) {
+                                        $compressionService = new ImageCompressionService();
+                                        return $compressionService->compressAndStore($file, 'product-photos');
+                                    })
                                     ->dehydrated(false),
                             ]),
                         Forms\Components\Tabs\Tab::make('Single Photo')
@@ -64,6 +68,10 @@ class ProductPhotoRelationManager extends RelationManager
                                     ->maxSize(10240) // 10MB (will be compressed)
                                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                                     ->helperText('Upload a single photo. Files will be compressed automatically.')
+                                    ->saveUploadedFileUsing(function ($file) {
+                                        $compressionService = new ImageCompressionService();
+                                        return $compressionService->compressAndStore($file, 'product-photos');
+                                    })
                                     ->required(),
                             ]),
                     ])
