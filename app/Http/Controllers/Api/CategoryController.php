@@ -11,23 +11,40 @@ class CategoryController extends Controller
 {
     public function index()
     {
-        $categories = Category::withCount(['products', 'subCategories'])
-            ->with('subCategories:id,name,slug,category_id')
-            ->get();
-        return CategoryResource::collection($categories);
+        try {
+            $categories = Category::withCount(['products', 'subCategories'])
+                ->with('subCategories:id,name,slug,photo,category_id')
+                ->get();
+            return CategoryResource::collection($categories);
+        } catch (\Exception $e) {
+            \Log::error('Category index error: ' . $e->getMessage());
+            return response()->json(['error' => 'Internal server error'], 500);
+        }
     }
     public function show(Category $category)
     {
-        $category->load([
-            'subCategories',
-            'products.category',
-            'products.brand',
-            'products.subCategory',
-            'products.rentalIncludes.includedProduct',
-            'products.productSpecifications',
-            'products.productPhotos',
-        ]);
-        $category->loadCount(['products', 'subCategories']);
-        return new CategoryResource($category);
+        try {
+            $category->loadCount(['products', 'subCategories']);
+            
+            $category->load([
+                'subCategories:id,name,slug,photo,category_id',
+                'products' => function ($query) {
+                    $query->with([
+                        'category:id,name,slug,photo',
+                        'brand:id,name,slug,logo,premiere',
+                        'subCategory:id,name,slug,photo,category_id',
+                        'rentalIncludes.includedProduct:id,name,slug,thumbnail',
+                        'productSpecifications:id,product_id,name',
+                        'productPhotos:id,product_id,photo',
+                        'items:id,product_id,serial_number,is_available'
+                    ]);
+                }
+            ]);
+            
+            return new CategoryResource($category);
+        } catch (\Exception $e) {
+            \Log::error('Category show error: ' . $e->getMessage());
+            return response()->json(['error' => 'Internal server error'], 500);
+        }
     }
 }

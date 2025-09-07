@@ -53,11 +53,17 @@ class BrandController extends Controller
         $brand->loadCount('products');
 
         $brand->load([
-            'products.category',
-            'products.subCategory',
-            'products.rentalIncludes',
-            'products.productSpecifications',
-            'products.productPhotos',
+            'products' => function ($query) {
+                $query->with([
+                    'category:id,name,slug',
+                    'brand:id,name,slug,logo',
+                    'subCategory:id,name,slug,category_id',
+                    'rentalIncludes.includedProduct:id,name,slug,thumbnail',
+                    'productSpecifications:id,product_id,name',
+                    'productPhotos:id,product_id,photo',
+                    'items:id,product_id,serial_number,is_available'
+                ]);
+            }
         ]);
 
         return new BrandResource($brand);

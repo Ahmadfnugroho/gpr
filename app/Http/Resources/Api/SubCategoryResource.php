@@ -19,7 +19,14 @@ class SubCategoryResource extends JsonResource
             'name' => $this->name,
             'photo' => $this->photo,
             'slug' => $this->slug,
-            'category' => new CategoryResource($this->whenLoaded('category')),
+            'category' => $this->whenLoaded('category', function () {
+                return [
+                    'id' => $this->category->id,
+                    'name' => $this->category->name,
+                    'slug' => $this->category->slug,
+                    'photo' => $this->category->photo,
+                ];
+            }),
             'products_count' => $this->products_count,
             'products' => ProductResource::collection($this->whenLoaded('products')),
         ];

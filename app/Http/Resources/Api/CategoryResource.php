@@ -24,11 +24,21 @@ class CategoryResource extends JsonResource
                 $this->products_count
             ),
             'subcategories_count' => $this->when(
-                $this->subcategories_count !== null,
-                $this->subcategories_count
+                isset($this->sub_categories_count),
+                $this->sub_categories_count
             ),
             'products' => ProductResource::collection($this->whenLoaded('products')),
-            'subCategories' => SubCategoryResource::collection($this->whenLoaded('subCategories')),
+            'subCategories' => $this->whenLoaded('subCategories', function () {
+                return $this->subCategories->map(function ($subCategory) {
+                    return [
+                        'id' => $subCategory->id,
+                        'name' => $subCategory->name,
+                        'photo' => $subCategory->photo,
+                        'slug' => $subCategory->slug,
+                        'products_count' => $subCategory->products_count ?? 0,
+                    ];
+                });
+            }),
         ];
     }
 }
