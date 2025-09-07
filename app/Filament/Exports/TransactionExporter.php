@@ -13,29 +13,28 @@ class TransactionExporter extends Exporter
 {
     protected static ?string $model = Transaction::class;
 
-    // Override to generate raw data with one row per product/bundling
-    public function getRecords(): \Illuminate\Support\Collection
+    // Override resolve to generate expanded raw data
+    protected function resolveRecordQuery(\Illuminate\Database\Eloquent\Builder $query)
     {
-        $transactions = parent::getRecords();
+        // Get base transactions with relationships loaded
+        $transactions = $query->with([
+            'customer',
+            'customer.customerPhoneNumbers',
+            'detailTransactions.product',
+            'detailTransactions.bundling',
+            'promo'
+        ])->get();
+        
         $expandedRows = collect();
-
+        
         foreach ($transactions as $transaction) {
-            // Load relationships
-            $transaction->load([
-                'customer',
-                'customer.customerPhoneNumbers',
-                'detailTransactions.product',
-                'detailTransactions.bundling',
-                'promo'
-            ]);
-
             // Get common transaction data
             $baseData = $this->getBaseTransactionData($transaction);
-
+            
             // If no detail transactions, create one row with empty product/bundling
             if ($transaction->detailTransactions->isEmpty()) {
                 $baseData['product_bundling'] = '';
-                $expandedRows->push($baseData);
+                $expandedRows->push((object) $baseData);
             } else {
                 // Create separate row for each product/bundling
                 foreach ($transaction->detailTransactions as $detail) {
@@ -53,7 +52,7 @@ class TransactionExporter extends Exporter
                 }
             }
         }
-
+        
         return $expandedRows;
     }
 
@@ -94,7 +93,7 @@ class TransactionExporter extends Exporter
         $services = ['fee_1' => [], 'fee_2' => [], 'fee_3' => []];
         $index = 1;
 
-        // Parse new additional_services structure
+        // Parse new additional_services structure (JSON array)
         if ($transaction->additional_services && is_array($transaction->additional_services)) {
             foreach ($transaction->additional_services as $service) {
                 if (is_array($service) && isset($service['name'], $service['amount']) && $index <= 3) {
@@ -107,28 +106,26 @@ class TransactionExporter extends Exporter
             }
         }
 
-        // Parse legacy additional_fee structure (if no new structure)
-        if ($index === 1) {
-            if ($transaction->additional_fee_1_name && $transaction->additional_fee_1_amount) {
-                $services['fee_1'] = [
-                    'name' => $transaction->additional_fee_1_name,
-                    'amount' => $transaction->additional_fee_1_amount
-                ];
-            }
-            if ($transaction->additional_fee_2_name && $transaction->additional_fee_2_amount) {
-                $services['fee_2'] = [
-                    'name' => $transaction->additional_fee_2_name,
-                    'amount' => $transaction->additional_fee_2_amount
-                ];
-            }
-            if ($transaction->additional_fee_3_name && $transaction->additional_fee_3_amount) {
-                $services['fee_3'] = [
-                    'name' => $transaction->additional_fee_3_name,
-                    'amount' => $transaction->additional_fee_3_amount
-                ];
-            }
+        // Parse legacy additional_fee structure (always try as fallback)
+        if (empty($services['fee_1']) && $transaction->additional_fee_1_name && $transaction->additional_fee_1_amount) {
+            $services['fee_1'] = [
+                'name' => $transaction->additional_fee_1_name,
+                'amount' => $transaction->additional_fee_1_amount
+            ];
         }
-
+        if (empty($services['fee_2']) && $transaction->additional_fee_2_name && $transaction->additional_fee_2_amount) {
+            $services['fee_2'] = [
+                'name' => $transaction->additional_fee_2_name,
+                'amount' => $transaction->additional_fee_2_amount
+            ];
+        }
+        if (empty($services['fee_3']) && $transaction->additional_fee_3_name && $transaction->additional_fee_3_amount) {
+            $services['fee_3'] = [
+                'name' => $transaction->additional_fee_3_name,
+                'amount' => $transaction->additional_fee_3_amount
+            ];
+        }
+        
         return $services;
     }
 

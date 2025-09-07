@@ -1724,8 +1724,7 @@ class TransactionResource extends BaseOptimizedResource
                     ->color('success')
                     ->icon('heroicon-m-chat-bubble-left-ellipsis')
                     ->size(TextColumnSize::ExtraSmall)
-                    ->copyable()
-                    ->tooltip('Click to chat on WhatsApp'),
+                    ->tooltip('Click to open WhatsApp chat'),
                 TextColumn::make('product_info')
                     ->label('Product + Serial Numbers')
                     ->size(TextColumnSize::ExtraSmall)
