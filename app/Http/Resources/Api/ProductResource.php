@@ -19,11 +19,12 @@ class ProductResource extends JsonResource
                 return $this->items->count();
             }) ?: 0,
             'price' => $this->price,
-            'thumbnail' => $this->thumbnail,
+            'thumbnail' => $this->thumbnail ? asset('storage/' . ltrim($this->thumbnail, '/')) : null,
             'status' => $this->status,
+            'is_available' => $this->is_available, // From Product model accessor
             'description' => $this->description ?? '',
             'slug' => $this->slug,
-            'premiere' => (int) $this->premiere, // Cast to int to match TypeScript number | boolean
+            'premiere' => (bool) $this->premiere,
 
             // Relationships
             'category' => $this->whenLoaded('category', function () {

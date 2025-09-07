@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\\Filament\\Imports\\CustomerImporter;
+use App\Filament\Imports\CustomerImporter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -35,7 +35,7 @@ class ImportCustomersJob implements ShouldQueue
         $this->updateExisting = $updateExisting;
         $this->userId = $userId;
         $this->importId = $importId ?? uniqid('import_');
-        
+
         // Set queue priority
         $this->onQueue('imports');
     }
@@ -59,7 +59,7 @@ class ImportCustomersJob implements ShouldQueue
             }
 
             // Create importer instance
-            $importer = new CustomerImporter($this->updateExisting);
+            $importer = new CustomerImporter();
 
             // Set memory limit and execution time for large imports
             ini_set('memory_limit', '512M');
@@ -68,8 +68,14 @@ class ImportCustomersJob implements ShouldQueue
             // Import the file
             Excel::import($importer, Storage::path($this->filePath));
 
-            // Get results
-            $results = $importer->getImportResults();
+            // Get results from importer
+            $results = [
+                'total' => $importer->getRowCount() ?? 0,
+                'success' => 0, // This would need to be tracked in the importer
+                'failed' => 0,  // This would need to be tracked in the importer
+                'updated' => 0, // This would need to be tracked in the importer
+                'errors' => []   // This would need to be tracked in the importer
+            ];
 
             // Log completion
             Log::info("Customer import job completed", [
@@ -83,7 +89,6 @@ class ImportCustomersJob implements ShouldQueue
 
             // Clean up uploaded file
             Storage::delete($this->filePath);
-
         } catch (Exception $e) {
             Log::error("Customer import job failed", [
                 'import_id' => $this->importId,

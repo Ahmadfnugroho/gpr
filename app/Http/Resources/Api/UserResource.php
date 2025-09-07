@@ -18,14 +18,9 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
-            'phone' => $this->whenLoaded('phoneNumbers', function () {
-                return $this->phoneNumbers ? $this->phoneNumbers->map(function ($phone) {
-                    return [
-                        'id' => $phone->id,
-                        'phone_number' => $phone->phone_number,
-                    ];
-                }) : [];
-            }),
+            'email_verified_at' => $this->email_verified_at,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }

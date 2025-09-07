@@ -17,6 +17,8 @@ class ProductPhotoResource extends JsonResource
         return [
             'id' => $this->id,
             'photo' => $this->photo,
+            'photo_url' => $this->photo ? asset('storage/' . ltrim($this->photo, '/')) : null,
+            'product_id' => $this->product_id,
         ];
     }
 }

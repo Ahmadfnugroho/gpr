@@ -20,12 +20,13 @@ class ProductController extends Controller
     {
         $query = Product::query()
             ->with([
-                'brand:id,name,slug',
-                'category:id,name,slug',
-                'subCategory:id,name,slug',
+                'brand:id,name,slug,logo,premiere',
+                'category:id,name,slug,photo',
+                'subCategory:id,name,slug,photo,category_id',
                 'productPhotos:id,product_id,photo',
-                'productSpecifications',
-                'rentalIncludes.includedProduct:id,name,slug'
+                'productSpecifications:id,product_id,name',
+                'rentalIncludes.includedProduct:id,name,slug,thumbnail',
+                'items:id,product_id,serial_number,is_available'
             ]);
 
         // 🔍 Search
@@ -103,14 +104,15 @@ class ProductController extends Controller
     }
     public function show(Product $product)
     {
-        $product->load(
+        $product->load([
             'category',
             'brand',
             'subCategory',
-            'rentalIncludes.includedProduct:id,name,slug',
+            'rentalIncludes.includedProduct:id,name,slug,thumbnail',
             'productSpecifications:id,product_id,name',
-            'productPhotos'
-        );
+            'productPhotos:id,product_id,photo',
+            'items:id,product_id,serial_number,is_available'
+        ]);
         return new ProductResource($product);
     }
     public function all(Product $product)
@@ -132,11 +134,13 @@ class ProductController extends Controller
     public function ProductsHome()
     {
         $products = Product::where('premiere', 1)
-            ->with(
-                'category',
-                'brand',
-                'productPhotos'
-            )
+            ->with([
+                'category:id,name,slug',
+                'brand:id,name,slug,logo',
+                'subCategory:id,name,slug',
+                'productPhotos:id,product_id,photo',
+                'items:id,product_id,serial_number,is_available'
+            ])
             ->get();
 
         return ProductResource::collection($products);

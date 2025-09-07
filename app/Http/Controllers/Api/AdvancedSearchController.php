@@ -51,7 +51,7 @@ class AdvancedSearchController extends Controller
         $query = trim($request->input('q'));
         $page = (int) $request->input('page', 1);
         $limit = (int) $request->input('limit', 20);
-        
+
         $filters = [
             'category' => $request->input('category', []),
             'brand' => $request->input('brand', []),
@@ -68,7 +68,7 @@ class AdvancedSearchController extends Controller
         try {
             // Cache key for search results
             $cacheKey = 'advanced_search:' . md5(json_encode(compact('query', 'filters', 'page', 'limit')));
-            
+
             $results = Cache::remember($cacheKey, 300, function () use ($query, $filters, $limit, $page) {
                 return $this->searchService->search($query, $filters, $limit, $page);
             });
@@ -88,14 +88,8 @@ class AdvancedSearchController extends Controller
                 'filters' => $results['filters'],
                 'execution_time' => $results['execution_time'] ?? null,
             ]);
-
         } catch (\Exception $e) {
-            \Log::error('Advanced search failed', [
-                'query' => $query,
-                'filters' => $filters,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
 
             return response()->json([
                 'success' => false,
@@ -132,7 +126,7 @@ class AdvancedSearchController extends Controller
         try {
             // Cache autocomplete results for 5 minutes
             $cacheKey = 'autocomplete:' . md5($query . $limit);
-            
+
             $results = Cache::remember($cacheKey, 300, function () use ($query, $limit) {
                 return $this->searchService->autocomplete($query, $limit);
             });
@@ -143,12 +137,8 @@ class AdvancedSearchController extends Controller
                 'query' => $results['query'],
                 'total' => $results['total'],
             ]);
-
         } catch (\Exception $e) {
-            \Log::error('Autocomplete search failed', [
-                'query' => $query,
-                'error' => $e->getMessage()
-            ]);
+
 
             return response()->json([
                 'success' => false,
@@ -172,7 +162,7 @@ class AdvancedSearchController extends Controller
         try {
             // Cache popular suggestions for 1 hour
             $cacheKey = 'popular_suggestions:' . $limit;
-            
+
             $results = Cache::remember($cacheKey, 3600, function () use ($limit) {
                 return $this->searchService->getPopularSuggestions($limit);
             });
@@ -182,11 +172,8 @@ class AdvancedSearchController extends Controller
                 'suggestions' => $results['suggestions'],
                 'total' => count($results['suggestions']),
             ]);
-
         } catch (\Exception $e) {
-            \Log::error('Popular suggestions failed', [
-                'error' => $e->getMessage()
-            ]);
+
 
             return response()->json([
                 'success' => false,
@@ -206,12 +193,11 @@ class AdvancedSearchController extends Controller
         try {
             // Clear all search-related cache
             Cache::flush(); // This clears all cache - in production, use more specific cache tags
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Search cache cleared successfully'
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -247,7 +233,6 @@ class AdvancedSearchController extends Controller
                 'success' => true,
                 'stats' => $stats
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

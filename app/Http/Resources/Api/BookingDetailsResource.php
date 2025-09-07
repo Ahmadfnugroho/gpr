@@ -16,31 +16,23 @@ class BookingDetailsResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'customer' => $this->whenLoaded('customer', function () {
+                return $this->customer ? new CustomerResource($this->customer) : null;
+            }),
             'user' => $this->whenLoaded('user', function () {
-                return [
-                    'id' => $this->user->id,
-                    'name' => $this->user->name,
-                    'email' => $this->user->email,
-                    'phone' => $this->user->phoneNumbers ? $this->user->phoneNumbers->map(function ($phone) {
-                        return [
-                            'id' => $phone->id,
-                            'phone_number' => $phone->phone_number,
-                        ];
-                    }) : [],
-                ];
+                return $this->user ? new UserResource($this->user) : null;
             }),
             'booking_transaction_id' => $this->booking_transaction_id,
             'grand_total' => $this->grand_total,
-            'status' => $this->status,
+            'booking_status' => $this->booking_status,
             'start_date' => $this->start_date,
             'end_date' => $this->end_date,
             'duration' => $this->duration,
-            'product' => $this->whenLoaded('product', function () {
-                return new ProductResource($this->product);
-            }),
-            'quantity' => $this->quantity,
-            'include' => $this->whenLoaded('rentalInclude', function () {
-                return new RentalIncludeResource($this->rentalInclude);
+            'note' => $this->note,
+            'down_payment' => $this->down_payment,
+            'remaining_payment' => $this->remaining_payment,
+            'detailTransactions' => $this->whenLoaded('detailTransactions', function () {
+                return DetailTransactionResource::collection($this->detailTransactions);
             }),
         ];
     }

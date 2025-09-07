@@ -121,40 +121,42 @@ class TransactionController extends Controller
     private function buildTransactionsQuery(Request $request)
     {
         // Start with base query - using transactions table
-        $query = DB::table('transactions as t')
+        $query = Transaction::query()
             ->select([
-                't.id',
-                't.booking_transaction_id',
-                't.started_at as start_date',
-                't.end_date',
-                't.status as booking_status',
-                't.customer_name',
-                't.created_at',
-                't.updated_at'
-            ]);
+                'id',
+                'booking_transaction_id',
+                'start_date',
+                'end_date',
+                'booking_status',
+                'customer_id',
+                'user_id',
+                'created_at',
+                'updated_at'
+            ])
+            ->with(['customer:id,name,email', 'user:id,name,email']);
 
         // Filter by status
         $status = $request->get('status', 'active');
         if ($status === 'active') {
-            $query->whereIn('t.status', ['booking', 'confirmed', 'active', 'ongoing']);
+            $query->whereIn('booking_status', ['booking', 'paid', 'on_rented']);
         } else {
-            $query->where('t.status', $status);
+            $query->where('booking_status', $status);
         }
 
         // Filter by date range
         if ($request->has('start_date')) {
-            $query->whereDate('t.started_at', '>=', $request->get('start_date'));
+            $query->whereDate('start_date', '>=', $request->get('start_date'));
         }
         
         if ($request->has('end_date')) {
-            $query->whereDate('t.end_date', '<=', $request->get('end_date'));
+            $query->whereDate('end_date', '<=', $request->get('end_date'));
         }
 
         // Only include future and current bookings for availability
-        $query->where('t.end_date', '>=', Carbon::today());
+        $query->where('end_date', '>=', Carbon::today());
 
         // Order by start date
-        $query->orderBy('t.started_at', 'asc');
+        $query->orderBy('start_date', 'asc');
 
         // Limit results
         $limit = min($request->get('limit', 100), 1000);
@@ -169,16 +171,21 @@ class TransactionController extends Controller
     private function transformTransactions($transactions)
     {
         return $transactions->map(function ($transaction) {
-            // For now, create details based on single product per transaction
-            // This matches your current schema where each transaction has one product
-            $details = collect([
-                [
-                    'id' => $transaction->id,
-                    'product_id' => DB::table('transactions')->where('id', $transaction->id)->value('product_id'),
-                    'bundling_id' => null, // No bundling support in current schema
-                    'quantity' => (int) DB::table('transactions')->where('id', $transaction->id)->value('quantity'),
-                ]
-            ]);
+            // Load detail transactions for this transaction
+            $detailTransactions = \App\Models\DetailTransaction::where('transaction_id', $transaction->id)
+                ->with(['product:id,name', 'bundling:id,name'])
+                ->get();
+
+            $details = $detailTransactions->map(function ($detail) {
+                return [
+                    'id' => $detail->id,
+                    'product_id' => $detail->product_id,
+                    'bundling_id' => $detail->bundling_id,
+                    'quantity' => $detail->quantity,
+                    'product_name' => $detail->product?->name,
+                    'bundling_name' => $detail->bundling?->name,
+                ];
+            });
 
             return [
                 'id' => $transaction->id,
@@ -186,7 +193,8 @@ class TransactionController extends Controller
                 'start_date' => $transaction->start_date,
                 'end_date' => $transaction->end_date,
                 'booking_status' => $transaction->booking_status,
-                'customer_name' => $transaction->customer_name ?? 'N/A',
+                'customer_name' => $transaction->customer?->name ?? ($transaction->user?->name ?? 'N/A'),
+                'customer_email' => $transaction->customer?->email ?? ($transaction->user?->email ?? 'N/A'),
                 'details' => $details,
                 'details_count' => $details->count()
             ];

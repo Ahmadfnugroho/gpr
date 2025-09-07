@@ -17,6 +17,8 @@ class BundlingPhotoResource extends JsonResource
         return [
             'id' => $this->id,
             'photo' => $this->photo,
+            'photo_url' => $this->photo ? asset('storage/' . ltrim($this->photo, '/')) : null,
+            'bundling_id' => $this->bundling_id,
         ];
     }
 }

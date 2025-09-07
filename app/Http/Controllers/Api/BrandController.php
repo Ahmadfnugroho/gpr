@@ -40,20 +40,9 @@ class BrandController extends Controller
         $brands = $query
             ->select(['id', 'name', 'slug', 'logo', 'premiere'])
             ->limit($limit)
-            ->get()
-            ->map(function ($b) {
-                return [
-                    'id' => $b->id,
-                    'name' => $b->name,
-                    'slug' => $b->slug,
-                    'logo' => $b->logo ? url('storage/' . ltrim($b->logo, '/')) : null,
+            ->get();
 
-                    'premiere' => (bool) $b->premiere,
-                    'products_count' => $b->products_count,
-                ];
-            });
-
-        return response()->json(['data' => $brands]);
+        return BrandResource::collection($brands);
     }
 
     /**
