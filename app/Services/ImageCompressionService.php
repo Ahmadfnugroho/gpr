@@ -4,7 +4,8 @@ namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Intervention\Image\Facades\Image;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 use Illuminate\Support\Str;
 
 class ImageCompressionService
@@ -49,8 +50,11 @@ class ImageCompressionService
                 throw new \Exception('File is not a valid image');
             }
 
+            // Create image manager instance
+            $manager = new ImageManager(new Driver());
+            
             // Create image instance
-            $image = Image::make($file);
+            $image = $manager->read($file->getPathname());
             
             // Get original dimensions
             $originalWidth = $image->width();
@@ -61,10 +65,7 @@ class ImageCompressionService
             
             // Resize image if needed
             if ($newDimensions['resize']) {
-                $image->resize($newDimensions['width'], $newDimensions['height'], function ($constraint) {
-                    $constraint->aspectRatio();
-                    $constraint->upsize();
-                });
+                $image = $image->resize($newDimensions['width'], $newDimensions['height']);
             }
             
             // Generate unique filename
@@ -167,11 +168,10 @@ class ImageCompressionService
         
         // Convert PNG to JPEG for better compression if it's a photo
         if ($mime === 'image/png') {
-            // Keep PNG for images with transparency, convert others to JPEG
-            $image = Image::make($file);
-            if (!$this->hasTransparency($image)) {
-                return 'jpg';
-            }
+            // For simplicity, convert PNG to JPG for better compression
+            // unless it's likely to have transparency (we'll keep PNG for now)
+            // This is a simplified approach - you could add more sophisticated transparency detection
+            return 'png'; // Keep as PNG to preserve potential transparency
         }
         
         return match($mime) {
@@ -183,13 +183,13 @@ class ImageCompressionService
     }
 
     /**
-     * Check if image has transparency
+     * Check if image has transparency (simplified for v3)
      */
     private function hasTransparency($image): bool
     {
         try {
-            // Simple check - if it's PNG, assume it might have transparency
-            return $image->mime() === 'image/png';
+            // Simple check - assume PNG might have transparency
+            return true;
         } catch (\Exception $e) {
             return false;
         }
@@ -203,16 +203,16 @@ class ImageCompressionService
         switch ($extension) {
             case 'jpg':
             case 'jpeg':
-                return $image->encode('jpg', self::JPEG_QUALITY)->encoded;
+                return $image->toJpeg(self::JPEG_QUALITY)->toString();
                 
             case 'png':
-                return $image->encode('png', self::PNG_QUALITY)->encoded;
+                return $image->toPng()->toString();
                 
             case 'webp':
-                return $image->encode('webp', self::JPEG_QUALITY)->encoded;
+                return $image->toWebp(self::JPEG_QUALITY)->toString();
                 
             default:
-                return $image->encode('jpg', self::JPEG_QUALITY)->encoded;
+                return $image->toJpeg(self::JPEG_QUALITY)->toString();
         }
     }
 
@@ -223,17 +223,30 @@ class ImageCompressionService
     {
         try {
             $fullPath = Storage::disk('public')->path($path);
-            $image = Image::make($fullPath);
+            $manager = new ImageManager(new Driver());
+            $image = $manager->read($fullPath);
             
             // Reduce dimensions by 20%
-            $image->resize((int)($image->width() * 0.8), (int)($image->height() * 0.8), function ($constraint) {
-                $constraint->aspectRatio();
-                $constraint->upsize();
-            });
+            $newWidth = (int)($image->width() * 0.8);
+            $newHeight = (int)($image->height() * 0.8);
+            $image = $image->resize($newWidth, $newHeight);
             
-            // Lower quality
-            $quality = $extension === 'png' ? 6 : 70;
-            $image->save($fullPath, $quality);
+            // Save with lower quality
+            switch ($extension) {
+                case 'jpg':
+                case 'jpeg':
+                    $image->toJpeg(70)->save($fullPath);
+                    break;
+                case 'png':
+                    $image->toPng()->save($fullPath);
+                    break;
+                case 'webp':
+                    $image->toWebp(70)->save($fullPath);
+                    break;
+                default:
+                    $image->toJpeg(70)->save($fullPath);
+                    break;
+            }
             
         } catch (\Exception $e) {
             \Log::warning('Aggressive compression failed: ' . $e->getMessage());

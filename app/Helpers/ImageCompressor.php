@@ -3,7 +3,8 @@
 namespace App\Helpers;
 
 use Illuminate\Support\Facades\Log;
-use Intervention\Image\Image;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 
 class ImageCompressor
 {
@@ -34,13 +35,29 @@ class ImageCompressor
             ]);
             
             // Buat objek Image dari file
-            $image = Image::make($file);
+            $manager = new ImageManager(new Driver());
+            $image = $manager->read($file->getPathname());
             
             // Simpan ke temporary file
             $tempPath = sys_get_temp_dir() . '/' . uniqid('compressed_') . '.' . $file->getClientOriginalExtension();
             
-            // Kompresi dan simpan
-            $image->save($tempPath, $quality);
+            // Kompresi dan simpan berdasarkan format
+            $extension = strtolower($file->getClientOriginalExtension());
+            switch ($extension) {
+                case 'jpg':
+                case 'jpeg':
+                    $image->toJpeg($quality)->save($tempPath);
+                    break;
+                case 'png':
+                    $image->toPng()->save($tempPath);
+                    break;
+                case 'webp':
+                    $image->toWebp($quality)->save($tempPath);
+                    break;
+                default:
+                    $image->toJpeg($quality)->save($tempPath);
+                    break;
+            }
             
             // Buat file baru dari hasil kompresi
             $compressedFile = new \Illuminate\Http\UploadedFile(

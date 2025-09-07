@@ -602,8 +602,8 @@ class RegistrationController extends Controller
             // Check if Imagick is available and create manager with new syntax
             $useImagick = extension_loaded('imagick');
             $manager = $useImagick ? 
-                ImageManager::withDriver(ImagickDriver::class) : 
-                ImageManager::withDriver(GdDriver::class);
+                new ImageManager(new ImagickDriver()) : 
+                new ImageManager(new GdDriver());
 
             $originalSize = filesize($imagePath);
             Log::info('Starting image compression', ['original_size' => $originalSize, 'use_imagick' => $useImagick]);
