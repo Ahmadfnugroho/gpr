@@ -162,10 +162,10 @@ class ProductResource extends Resource
                     ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
                     ->imageResizeTargetWidth('1920')
                     ->imageResizeTargetHeight('1080')
-                    ->maxSize(5120) // 5MB per file
+                    ->maxSize(10240) // 10MB per file (will be compressed)
                     ->maxFiles(10) // Maximum 10 files
                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                    ->helperText('Upload beberapa foto sekaligus untuk galeri produk. Maksimal 10 file, 5MB per file.')
+                    ->helperText('Upload beberapa foto sekaligus untuk galeri produk. Maksimal 10 file, 10MB per file. Foto akan dikompres otomatis.')
                     ->dehydrated(false) // Don't save to product table
                     ->afterStateUpdated(function ($state, $record) {
                         // This will be handled in the create/update hooks

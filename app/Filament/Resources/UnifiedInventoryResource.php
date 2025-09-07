@@ -237,25 +237,88 @@ class UnifiedInventoryResource extends Resource
                             $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
                         }
 
-                        $activeRentals = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
-                            $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-                                ->where(function ($q) use ($startDate, $endDate) {
-                                    $q->whereBetween('start_date', [$startDate, $endDate])
-                                        ->orWhereBetween('end_date', [$startDate, $endDate])
-                                        ->orWhere(function ($q2) use ($startDate, $endDate) {
-                                            $q2->where('start_date', '<=', $startDate)
-                                                ->where('end_date', '>=', $endDate);
-                                        });
-                                });
-                        })->whereHas('productItem', function ($query) use ($record) {
-                            $query->where('product_id', $record->id);
-                        })->count();
+                        $activeRentals = DetailTransactionProductItem::with('detailTransaction.transaction')
+                            ->whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
+                                $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                    ->where(function ($q) use ($startDate, $endDate) {
+                                        $q->whereBetween('start_date', [$startDate, $endDate])
+                                            ->orWhereBetween('end_date', [$startDate, $endDate])
+                                            ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                                $q2->where('start_date', '<=', $startDate)
+                                                    ->where('end_date', '>=', $endDate);
+                                            });
+                                    });
+                            })
+                            ->whereHas('productItem', function ($query) use ($record) {
+                                $query->where('product_id', $record->id);
+                            })
+                            ->get();
 
-                        return $activeRentals;
+                        if ($activeRentals->isEmpty()) {
+                            return 'No active rentals';
+                        }
+
+                        $rentalInfo = [];
+                        foreach ($activeRentals->take(3) as $rental) {
+                            $transaction = $rental->detailTransaction->transaction;
+                            $startDate = $transaction->start_date ? $transaction->start_date->format('d/m/Y') : 'N/A';
+                            $endDate = $transaction->end_date ? $transaction->end_date->format('d/m/Y') : 'N/A';
+                            $status = ucfirst($transaction->booking_status);
+                            $rentalInfo[] = "{$startDate} - {$endDate} ({$status})";
+                        }
+
+                        $remaining = $activeRentals->count() - 3;
+                        if ($remaining > 0) {
+                            $rentalInfo[] = "+{$remaining} more";
+                        }
+
+                        return implode('\n', $rentalInfo);
                     })
-                    ->alignCenter()
+                    ->wrap()
+                    ->lineClamp(4)
                     ->color('warning')
-                    ->icon('heroicon-o-clock'),
+                    ->icon('heroicon-o-clock')
+                    ->tooltip(function ($record) {
+                        $startDate = request('start_date');
+                        $endDate = request('end_date');
+
+                        if (!$startDate || !$endDate) {
+                            $startDate = now()->format('Y-m-d H:i:s');
+                            $endDate = now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s');
+                        }
+
+                        $activeRentals = DetailTransactionProductItem::with('detailTransaction.transaction')
+                            ->whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate) {
+                                $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                    ->where(function ($q) use ($startDate, $endDate) {
+                                        $q->whereBetween('start_date', [$startDate, $endDate])
+                                            ->orWhereBetween('end_date', [$startDate, $endDate])
+                                            ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                                $q2->where('start_date', '<=', $startDate)
+                                                    ->where('end_date', '>=', $endDate);
+                                            });
+                                    });
+                            })
+                            ->whereHas('productItem', function ($query) use ($record) {
+                                $query->where('product_id', $record->id);
+                            })
+                            ->get();
+
+                        if ($activeRentals->isEmpty()) {
+                            return 'No active rentals in selected period';
+                        }
+
+                        $tooltipInfo = [];
+                        foreach ($activeRentals as $rental) {
+                            $transaction = $rental->detailTransaction->transaction;
+                            $startDate = $transaction->start_date ? $transaction->start_date->format('d M Y H:i') : 'N/A';
+                            $endDate = $transaction->end_date ? $transaction->end_date->format('d M Y H:i') : 'N/A';
+                            $status = ucfirst($transaction->booking_status);
+                            $tooltipInfo[] = "• {$startDate} - {$endDate} ({$status})";
+                        }
+
+                        return implode('\n', $tooltipInfo);
+                    }),
             ])
             ->filters([
                 SelectFilter::make('availability_status')

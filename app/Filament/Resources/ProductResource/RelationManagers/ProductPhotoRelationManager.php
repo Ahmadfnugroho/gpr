@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ProductResource\RelationManagers;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Components;
+use App\Services\ImageCompressionService;
 use Filament\Forms\Components\FileUpload;
 use Filament\Resources\RelationManagers\RelationManager;
 use App\Models\ProductPhoto;
@@ -42,10 +43,10 @@ class ProductPhotoRelationManager extends RelationManager
                                     ->imageCropAspectRatio('16:9')
                                     ->imageResizeTargetWidth('1920')
                                     ->imageResizeTargetHeight('1080')
-                                    ->maxSize(5120) // 5MB per file
+                                    ->maxSize(10240) // 10MB per file (will be compressed)
                                     ->maxFiles(10) // Maximum 10 files
                                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                                    ->helperText('Upload multiple photos at once. Maximum 10 files, 5MB each.')
+                                    ->helperText('Upload multiple photos at once. Maximum 10 files, 10MB each. Photos will be compressed automatically.')
                                     ->dehydrated(false),
                             ]),
                         Forms\Components\Tabs\Tab::make('Single Photo')
@@ -60,9 +61,9 @@ class ProductPhotoRelationManager extends RelationManager
                                     ->imageCropAspectRatio('16:9')
                                     ->imageResizeTargetWidth('1920')
                                     ->imageResizeTargetHeight('1080')
-                                    ->maxSize(5120) // 5MB
+                                    ->maxSize(10240) // 10MB (will be compressed)
                                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                                    ->helperText('Upload a single photo.')
+                                    ->helperText('Upload a single photo. Files will be compressed automatically.')
                                     ->required(),
                             ]),
                     ])
@@ -135,7 +136,9 @@ class ProductPhotoRelationManager extends RelationManager
                     })
                     ->using(function (array $data, string $model): Model {
                         $product = $this->ownerRecord;
+                        $compressionService = new ImageCompressionService();
                         $uploadedCount = 0;
+                        $compressedCount = 0;
                         $createdRecords = [];
                         
                         // Handle multiple photos
@@ -147,6 +150,12 @@ class ProductPhotoRelationManager extends RelationManager
                                 ]);
                                 $createdRecords[] = $record;
                                 $uploadedCount++;
+                                
+                                // Check if file was compressed
+                                $fullPath = storage_path('app/public/' . $photo);
+                                if (file_exists($fullPath) && filesize($fullPath) < 2097152) {
+                                    $compressedCount++;
+                                }
                             }
                         }
                         
@@ -158,7 +167,16 @@ class ProductPhotoRelationManager extends RelationManager
                             ]);
                             $createdRecords[] = $record;
                             $uploadedCount++;
+                            
+                            // Check if file was compressed
+                            $fullPath = storage_path('app/public/' . $data['photo']);
+                            if (file_exists($fullPath) && filesize($fullPath) < 2097152) {
+                                $compressedCount++;
+                            }
                         }
+                        
+                        // Store compression info for notification
+                        session(['compressed_photos_count' => $compressedCount]);
                         
                         // Return the last created record or a new model instance
                         return end($createdRecords) ?: new $model();
@@ -167,7 +185,17 @@ class ProductPhotoRelationManager extends RelationManager
                         $multiCount = count($data['photos'] ?? []);
                         $singleCount = !empty($data['photo']) ? 1 : 0;
                         $totalCount = $multiCount + $singleCount;
-                        return "Successfully uploaded {$totalCount} photo(s)";
+                        $compressedCount = session('compressed_photos_count', 0);
+                        
+                        $message = "Successfully uploaded {$totalCount} photo(s)";
+                        if ($compressedCount > 0) {
+                            $message .= ". {$compressedCount} photo(s) were compressed to optimize file size.";
+                        }
+                        
+                        // Clear session data
+                        session()->forget('compressed_photos_count');
+                        
+                        return $message;
                     }),
                     
                 ImportAction::make()
