@@ -1,6 +1,3 @@
-cd /var/www/gpr
-
-cat > gpr-deploy.sh << 'EOF'
 #!/bin/bash
 
 echo "🐧 Setting up Queue Worker for GPR..."
@@ -52,6 +49,3 @@ chmod -R 775 /var/www/gpr/storage
 
 echo "✅ Done! Checking status..."
 systemctl status laravel-queue
-EOF
-
-chmod +x gpr-deploy.sh
