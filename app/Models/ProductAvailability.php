@@ -162,7 +162,11 @@ class ProductAvailability extends Model
     {
         try {
             if ($this->type === 'product' && $this->product_model) {
-                return $this->product_model->items()->count();
+                // Ensure we have a proper model instance
+                if (method_exists($this->product_model, 'items')) {
+                    return $this->product_model->items()->count();
+                }
+                return 0;
             } elseif ($this->type === 'bundling' && $this->bundling_model) {
                 // Calculate minimum bundles possible
                 $products = $this->bundling_model->products ?? null;
@@ -202,7 +206,11 @@ class ProductAvailability extends Model
     {
         try {
             if ($this->type === 'product' && $this->product_model) {
-                return $this->getAvailableProductItems($this->product_model->id, $startDate, $endDate);
+                // Ensure we have a proper model with id property
+                if (isset($this->product_model->id)) {
+                    return $this->getAvailableProductItems($this->product_model->id, $startDate, $endDate);
+                }
+                return 0;
             } elseif ($this->type === 'bundling' && $this->bundling_model) {
                 if (method_exists($this->bundling_model, 'getAvailableQuantityForPeriod')) {
                     return $this->bundling_model->getAvailableQuantityForPeriod(

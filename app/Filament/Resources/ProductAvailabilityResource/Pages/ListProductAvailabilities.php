@@ -6,6 +6,8 @@ use App\Filament\Resources\ProductAvailabilityResource;
 use App\Models\ProductAvailability;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,11 +15,61 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator as PaginatorAlias;
+use Filament\Notifications\Notification;
 
-class ListProductAvailabilities extends ListRecords
+class ListProductAvailabilities extends ListRecords implements HasForms
 {
-    protected static string $resource = ProductAvailabilityResource::class;
+    use InteractsWithForms;
 
+    protected static string $resource = ProductAvailabilityResource::class;
+    
+    public ?array $data = [];
+    
+    public function mount(): void
+    {
+        parent::mount();
+        
+        // Pre-populate form from URL parameters (from widget)
+        $selectedItems = [];
+        
+        // Handle products from URL
+        $selectedProducts = request('selected_products', []);
+        if (is_array($selectedProducts) && !empty($selectedProducts)) {
+            foreach ($selectedProducts as $productId) {
+                $selectedItems[] = "product-{$productId}";
+            }
+        }
+        
+        // Handle bundlings from URL
+        $selectedBundlings = request('selected_bundlings', []);
+        if (is_array($selectedBundlings) && !empty($selectedBundlings)) {
+            foreach ($selectedBundlings as $bundlingId) {
+                $selectedItems[] = "bundling-{$bundlingId}";
+            }
+        }
+        
+        // Initialize form data
+        $this->data = [
+            'selected_items' => $selectedItems,
+            'start_date' => request('start_date', now()->format('Y-m-d H:i:s')),
+            'end_date' => request('end_date', now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s')),
+        ];
+        
+        // Fill the form with data
+        $this->form->fill($this->data);
+    }
+    
+    public function form(\Filament\Forms\Form $form): \Filament\Forms\Form
+    {
+        return ProductAvailabilityResource::form($form)->statePath('data');
+    }
+    
+    protected function getViewData(): array
+    {
+        return array_merge(parent::getViewData(), [
+            'form' => $this->form,
+        ]);
+    }
     protected function getHeaderActions(): array
     {
         return [
@@ -205,5 +257,83 @@ class ListProductAvailabilities extends ListRecords
         
         // If no selection at all, return empty collection to show empty state
         return collect();
+    }
+    
+    /**
+     * Handle search action from the form
+     */
+    public function searchAction(): void
+    {
+        try {
+            // Get form data
+            $data = $this->form->getState();
+            
+            // Process the form data
+            $selectedProducts = [];
+            $selectedBundlings = [];
+            
+            if (!empty($data['selected_items'])) {
+                foreach ($data['selected_items'] as $item) {
+                    if (str_starts_with($item, 'product-')) {
+                        $selectedProducts[] = str_replace('product-', '', $item);
+                    } elseif (str_starts_with($item, 'bundling-')) {
+                        $selectedBundlings[] = str_replace('bundling-', '', $item);
+                    }
+                }
+            }
+            
+            // Build parameters
+            $params = [];
+            if (!empty($selectedProducts)) {
+                $params['selected_products'] = $selectedProducts;
+            }
+            if (!empty($selectedBundlings)) {
+                $params['selected_bundlings'] = $selectedBundlings;
+            }
+            if (!empty($data['start_date'])) {
+                $params['start_date'] = $data['start_date'];
+            }
+            if (!empty($data['end_date'])) {
+                $params['end_date'] = $data['end_date'];
+            }
+            
+            // Show success notification
+            $productCount = count($selectedProducts);
+            $bundlingCount = count($selectedBundlings);
+            $totalCount = $productCount + $bundlingCount;
+            
+            if ($totalCount > 0) {
+                Notification::make()
+                    ->title('✅ Search Completed')
+                    ->body("Showing availability for {$productCount} products and {$bundlingCount} bundlings.")
+                    ->success()
+                    ->send();
+            } else {
+                Notification::make()
+                    ->title('⚠️ No Items Selected')
+                    ->body('Please select at least one product or bundling to check availability.')
+                    ->warning()
+                    ->send();
+                return;
+            }
+            
+            // Build URL with parameters
+            $url = route('filament.admin.resources.product-availability.index');
+            if (!empty($params)) {
+                $url .= '?' . http_build_query($params);
+            }
+            
+            // Redirect with parameters
+            $this->redirect($url);
+            
+        } catch (\Exception $e) {
+            Notification::make()
+                ->title('❌ Search Failed')
+                ->body('An error occurred while processing your search. Please try again.')
+                ->danger()
+                ->send();
+                
+            \Log::error('ProductAvailability search error: ' . $e->getMessage());
+        }
     }
 }

@@ -63,7 +63,75 @@ class ProductAvailabilityResource extends Resource
     {
         return $form
             ->schema([
-                // This resource is read-only, no form needed
+                Section::make('🔍 Product & Bundling Availability Search')
+                    ->description('Select products/bundlings and set date range to check their availability')
+                    ->schema([
+                        Grid::make(1)
+                            ->schema([
+                                Select::make('selected_items')
+                                    ->label('🛍️📦 Select Products/Bundlings')
+                                    ->multiple()
+                                    ->searchable()
+                                    ->options(function () {
+                                        $products = Product::where('status', '!=', 'deleted')
+                                            ->orderBy('name')
+                                            ->pluck('name', 'id')
+                                            ->mapWithKeys(function($name, $id) {
+                                                return ["product-{$id}" => "🛍️ {$name}"];
+                                            });
+                                            
+                                        $bundlings = Bundling::orderBy('name')
+                                            ->pluck('name', 'id')
+                                            ->mapWithKeys(function($name, $id) {
+                                                return ["bundling-{$id}" => "📦 {$name}"];
+                                            });
+                                            
+                                        return $products->merge($bundlings)->toArray();
+                                    })
+                                    ->placeholder('Type to search products or bundlings...')
+                                    ->helperText('💡 Select one or more items to check availability')
+                                    ->columnSpanFull(),
+                            ]),
+                            
+                        Grid::make(2)
+                            ->schema([
+                                DateTimePicker::make('start_date')
+                                    ->label('📅 Start Date & Time')
+                                    ->default(request('start_date', now()))
+                                    ->native(false)
+                                    ->displayFormat('d M Y H:i')
+                                    ->helperText('Start of availability check period')
+                                    ->required(),
+                                    
+                                DateTimePicker::make('end_date')
+                                    ->label('📅 End Date & Time')
+                                    ->default(request('end_date', now()->addDays(7)->endOfDay()))
+                                    ->after('start_date')
+                                    ->native(false)
+                                    ->displayFormat('d M Y H:i')
+                                    ->helperText('End of availability check period')
+                                    ->required(),
+                            ]),
+                            
+                        Actions::make([
+                            FormAction::make('search')
+                                ->label('🔍 Search Availability')
+                                ->icon('heroicon-o-magnifying-glass')
+                                ->color('primary')
+                                ->size('lg')
+                                ->action('searchAction'),
+                                
+                            FormAction::make('clear')
+                                ->label('🔄 Clear Filters')
+                                ->icon('heroicon-o-arrow-path')
+                                ->color('gray')
+                                ->url(route('filament.admin.resources.product-availability.index')),
+                        ])
+                        ->alignment('center')
+                        ->columnSpanFull(),
+                    ])
+                    ->collapsible()
+                    ->persistCollapsed(false),
             ]);
     }
 
@@ -298,113 +366,6 @@ class ProductAvailabilityResource extends Resource
                     ->visible(fn($record) => $record->type === 'product' || $record->type === 'bundling'),
             ])
             ->headerActions([
-                Action::make('search_availability')
-                    ->label('🔍 Search Availability')
-                    ->icon('heroicon-o-magnifying-glass')
-                    ->color('primary')
-                    ->modalHeading('🔍 Product & Bundling Availability Search')
-                    ->modalSubheading('Select products/bundlings and set date range to check availability')
-                    ->modalWidth('4xl')
-                    ->form([
-                        Section::make('📦 Item Selection')
-                            ->schema([
-                                Select::make('selected_items')
-                                    ->label('🛍️📦 Select Products/Bundlings')
-                                    ->multiple()
-                                    ->searchable()
-                                    ->options(function () {
-                                        $products = Product::where('status', '!=', 'deleted')
-                                            ->orderBy('name')
-                                            ->pluck('name', 'id')
-                                            ->mapWithKeys(function($name, $id) {
-                                                return ["product-{$id}" => "🛍️ {$name}"];
-                                            });
-                                            
-                                        $bundlings = Bundling::orderBy('name')
-                                            ->pluck('name', 'id')
-                                            ->mapWithKeys(function($name, $id) {
-                                                return ["bundling-{$id}" => "📦 {$name}"];
-                                            });
-                                            
-                                        return $products->merge($bundlings)->toArray();
-                                    })
-                                    ->placeholder('Type to search products or bundlings...')
-                                    ->helperText('💡 Select one or more items to check availability')
-                                    ->required()
-                                    ->minItems(1)
-                                    ->columnSpanFull(),
-                            ])
-                            ->columns(1),
-                            
-                        Section::make('📅 Date Range')
-                            ->schema([
-                                Grid::make(2)
-                                    ->schema([
-                                        DateTimePicker::make('start_date')
-                                            ->label('📅 Start Date & Time')
-                                            ->default(request('start_date', now()))
-                                            ->maxDate(now()->addYear())
-                                            ->native(false)
-                                            ->displayFormat('d M Y H:i')
-                                            ->helperText('Start of availability check period')
-                                            ->required(),
-                                            
-                                        DateTimePicker::make('end_date')
-                                            ->label('📅 End Date & Time')
-                                            ->default(request('end_date', now()->addDays(7)->endOfDay()))
-                                            ->after('start_date')
-                                            ->maxDate(now()->addYear())
-                                            ->native(false)
-                                            ->displayFormat('d M Y H:i')
-                                            ->helperText('End of availability check period')
-                                            ->required(),
-                                    ]),
-                            ]),
-                    ])
-                    ->action(function (array $data) {
-                        // Process the form data and redirect with parameters
-                        $selectedProducts = [];
-                        $selectedBundlings = [];
-                        
-                        foreach ($data['selected_items'] as $item) {
-                            if (str_starts_with($item, 'product-')) {
-                                $selectedProducts[] = str_replace('product-', '', $item);
-                            } elseif (str_starts_with($item, 'bundling-')) {
-                                $selectedBundlings[] = str_replace('bundling-', '', $item);
-                            }
-                        }
-                        
-                        $params = [];
-                        if (!empty($selectedProducts)) {
-                            $params['selected_products'] = $selectedProducts;
-                        }
-                        if (!empty($selectedBundlings)) {
-                            $params['selected_bundlings'] = $selectedBundlings;
-                        }
-                        if (isset($data['start_date'])) {
-                            $params['start_date'] = $data['start_date'];
-                        }
-                        if (isset($data['end_date'])) {
-                            $params['end_date'] = $data['end_date'];
-                        }
-                        
-                        $url = route('filament.admin.resources.product-availability.index');
-                        if (!empty($params)) {
-                            $url .= '?' . http_build_query($params);
-                        }
-                        
-                        return redirect($url);
-                    })
-                    ->modalSubmitActionLabel('🔍 Search Now')
-                    ->modalCancelActionLabel('Cancel'),
-                    
-                Action::make('clear_filters')
-                    ->label('🔄 Clear Filters')
-                    ->icon('heroicon-o-arrow-path')
-                    ->color('gray')
-                    ->url(route('filament.admin.resources.product-availability.index'))
-                    ->visible(fn () => request()->hasAny(['selected_products', 'selected_bundlings', 'start_date', 'end_date'])),
-                    
                 Action::make('help')
                     ->label('❓ Help')
                     ->icon('heroicon-o-question-mark-circle')
@@ -416,10 +377,10 @@ class ProductAvailabilityResource extends Resource
                             <div>
                                 <h3 class="font-semibold text-lg">📝 How to Search:</h3>
                                 <ol class="list-decimal ml-6 space-y-2 mt-2">
-                                    <li>Click <strong>"🔍 Search Availability"</strong> button</li>
-                                    <li>Select products/bundlings you want to check</li>
+                                    <li>Fill the form above to select products/bundlings</li>
                                     <li>Set the date range for availability check</li>
-                                    <li>Click <strong>"🔍 Search Now"</strong> to see results</li>
+                                    <li>Click <strong>"🔍 Search Availability"</strong> button</li>
+                                    <li>View results in the table below</li>
                                 </ol>
                             </div>
                             <div>
