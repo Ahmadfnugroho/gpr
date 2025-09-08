@@ -2293,16 +2293,43 @@ class TransactionResource extends BaseOptimizedResource
     protected function beforeSave(): void
     {
         $detailTransactions = $this->data['detailTransactions'] ?? [];
+        $startDate = Carbon::parse($this->data['start_date'] ?? now());
+        $endDate = Carbon::parse($this->data['end_date'] ?? now());
 
         foreach ($detailTransactions as $i => $detail) {
             $hasProduct = !empty($detail['product_id']);
             $hasBundling = !empty($detail['bundling_id']);
             $hasItems = !empty($detail['productItems'] ?? []);
 
-            if ($hasProduct && !$hasBundling && !$hasItems) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    "detailTransactions.$i.productItems" => "Produk ini harus memiliki item (serial number) atau masuk dalam bundling.",
-                ]);
+            if ($hasProduct && !$hasBundling) {
+                // Validasi ketersediaan item untuk produk individual
+                if (!$hasItems) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "detailTransactions.$i.productItems" => "Produk ini harus memiliki item (serial number) atau masuk dalam bundling.",
+                    ]);
+                }
+
+                // Validasi ketersediaan item pada rentang waktu yang diminta
+                $availableItems = ProductItem::where('product_id', $detail['product_id'])
+                    ->whereDoesntHave('detailTransactions.transaction', function ($query) use ($startDate, $endDate) {
+                        $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                            ->where(function ($q) use ($startDate, $endDate) {
+                                $q->whereBetween('start_date', [$startDate, $endDate])
+                                    ->orWhereBetween('end_date', [$startDate, $endDate])
+                                    ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                        $q2->where('start_date', '<=', $startDate)
+                                            ->where('end_date', '>=', $endDate);
+                                    });
+                            });
+                    })
+                    ->whereIn('id', $detail['productItems'])
+                    ->count();
+
+                if ($availableItems < count($detail['productItems'])) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "detailTransactions.$i.productItems" => "Beberapa item yang dipilih tidak tersedia pada rentang waktu yang diminta.",
+                    ]);
+                }
             }
         }
     }
