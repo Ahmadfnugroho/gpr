@@ -120,6 +120,8 @@ class DetailTransaction extends Model
             ->toArray();
     }
 
+    public $available_items;
+
     public static function boot()
     {
         parent::boot();
@@ -136,7 +138,6 @@ class DetailTransaction extends Model
                     throw new \Exception("Tidak cukup product items yang tersedia");
                 }
 
-                // Simpan sebagai property biasa, bukan ke database
                 $detail->available_items = $availableItems->pluck('id')->toArray();
             }
         });
@@ -144,8 +145,7 @@ class DetailTransaction extends Model
         static::created(function ($detail) {
             // Hanya untuk produk individual
             if ($detail->product_id && !$detail->bundling_id) {
-                // Gunakan items yang sudah divalidasi
-                if (isset($detail->available_items)) {
+                if (!empty($detail->available_items)) {
                     $detail->productItems()->sync($detail->available_items);
                 }
             }
