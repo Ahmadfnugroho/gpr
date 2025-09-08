@@ -2290,6 +2290,22 @@ class TransactionResource extends BaseOptimizedResource
                 ]),
             ]);
     }
+    protected function beforeSave(): void
+    {
+        $detailTransactions = $this->data['detailTransactions'] ?? [];
+
+        foreach ($detailTransactions as $i => $detail) {
+            $hasProduct = !empty($detail['product_id']);
+            $hasBundling = !empty($detail['bundling_id']);
+            $hasItems = !empty($detail['productItems'] ?? []);
+
+            if ($hasProduct && !$hasBundling && !$hasItems) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "detailTransactions.$i.productItems" => "Produk ini harus memiliki item (serial number) atau masuk dalam bundling.",
+                ]);
+            }
+        }
+    }
 
 
     public static function getPages(): array
