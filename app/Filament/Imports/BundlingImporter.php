@@ -63,7 +63,6 @@ class BundlingImporter extends Importer
             $bundling->price = (int)$this->data['price'];
             $bundling->save();
 
-            Log::info("Processing bundling: {$bundling->name} (ID: {$bundling->id})");
 
             // Handle product association
             if (!empty($this->data['product_name']) && !empty($this->data['quantity'])) {
@@ -76,33 +75,25 @@ class BundlingImporter extends Importer
                 if ($product) {
                     // Check if this product is already attached to this bundling
                     $existingPivot = $bundling->products()->where('product_id', $product->id)->first();
-                    
+
                     if ($existingPivot) {
                         // Update quantity if product already exists
                         $bundling->products()->updateExistingPivot($product->id, ['quantity' => $quantity]);
-                        Log::info("Updated product '{$product->name}' quantity to {$quantity} in bundling '{$bundling->name}'");
                     } else {
                         // Attach new product
                         $bundling->products()->attach($product->id, ['quantity' => $quantity]);
-                        Log::info("Added product '{$product->name}' with quantity {$quantity} to bundling '{$bundling->name}'");
                     }
                 } else {
                     $availableProducts = Product::pluck('name')->implode(', ');
-                    Log::warning("Product not found: '{$productName}'. Available products: {$availableProducts}");
                     throw new Exception("Product '{$productName}' not found. Please check product name.");
                 }
             }
 
             DB::commit();
             return $bundling;
-
         } catch (Exception $e) {
             DB::rollBack();
-            Log::error("Bundling import failed: " . $e->getMessage(), [
-                'data' => $this->data,
-                'line' => $this->getRecord()?->getKey() ?? 'unknown'
-            ]);
-            
+
             // Re-throw to make import fail visibly
             throw new Exception("Import failed for bundling '{$this->data['name']}': " . $e->getMessage());
         }
