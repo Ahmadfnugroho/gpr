@@ -62,6 +62,9 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\Section as InfoSection;
 use Filament\Infolists\Components\Grid as InfoGrid;
 
+/**
+ * @property array $data
+ */
 class TransactionResource extends BaseOptimizedResource
 {
     protected static ?string $model = Transaction::class;
@@ -1286,12 +1289,12 @@ class TransactionResource extends BaseOptimizedResource
                                             }
                                         }
                                     }
-                                    
+
                                     // Legacy support for old structure
                                     $additionalFees += (int)($get('additional_fee_1_amount') ?? 0);
                                     $additionalFees += (int)($get('additional_fee_2_amount') ?? 0);
                                     $additionalFees += (int)($get('additional_fee_3_amount') ?? 0);
-                                    
+
                                     return "Rp " . number_format($additionalFees, 0, ',', '.');
                                 })
                                 ->reactive()
@@ -1706,10 +1709,10 @@ class TransactionResource extends BaseOptimizedResource
                     ->formatStateUsing(function ($state, $record) {
                         // Get phone number from customer relationship
                         $phoneNumber = $record->customer->customerPhoneNumbers->first()->phone_number ?? $record->customer->phone_number ?? $state;
-                        
+
                         // Clean and format phone number
                         $cleanNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
-                        
+
                         // Handle different formats
                         if (str_starts_with($cleanNumber, '62')) {
                             // Already has country code
@@ -1721,16 +1724,16 @@ class TransactionResource extends BaseOptimizedResource
                             // No country code or leading 0, add +62
                             $formattedNumber = '+62' . $cleanNumber;
                         }
-                        
+
                         return $formattedNumber;
                     })
                     ->url(function ($record) {
                         // Get phone number from customer relationship
                         $phoneNumber = $record->customer->customerPhoneNumbers->first()->phone_number ?? $record->customer->phone_number ?? '';
-                        
+
                         // Clean phone number (remove non-digits)
                         $cleanNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
-                        
+
                         // Handle different formats for WhatsApp URL
                         if (str_starts_with($cleanNumber, '62')) {
                             // Already has country code 62
@@ -1742,7 +1745,7 @@ class TransactionResource extends BaseOptimizedResource
                             // No country code, add 62
                             $waNumber = '62' . $cleanNumber;
                         }
-                        
+
                         return 'https://wa.me/' . $waNumber;
                     })
                     ->openUrlInNewTab()
@@ -2286,6 +2289,26 @@ class TransactionResource extends BaseOptimizedResource
 
                 ]),
             ]);
+    }
+    protected function beforeSave(): void
+    {
+        // Validate serial assignments sebelum save
+        $detailTransactions = $this->data['detailTransactions'] ?? [];
+
+        foreach ($detailTransactions as $detail) {
+            if (!empty($detail['product_id']) && empty($detail['productItems'])) {
+                // Auto-assign jika kosong
+                $availableItems = \App\Models\ProductItem::where('product_id', $detail['product_id'])
+                    ->where('is_available', true)
+                    ->limit($detail['quantity'] ?? 1)
+                    ->pluck('id')
+                    ->toArray();
+
+                if (count($availableItems) >= ($detail['quantity'] ?? 1)) {
+                    $this->data['detailTransactions'][array_search($detail, $detailTransactions)]['productItems'] = $availableItems;
+                }
+            }
+        }
     }
 
 

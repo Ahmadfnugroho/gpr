@@ -125,56 +125,23 @@ class DetailTransaction extends Model
         static::saved(function ($detail) {
             // HANYA untuk produk individual (bukan bundling)
             if ($detail->product_id && !$detail->bundling_id) {
-                
-                // Handle productItems from form data (array of IDs)
-                $productItemIds = null;
-                
-                // Check if productItems is set in attributes (from form)
-                if (isset($detail->attributes['productItems'])) {
-                    $productItemIds = $detail->attributes['productItems'];
-                }
-                // Legacy support
-                elseif (isset($detail->product_item_ids) && is_array($detail->product_item_ids)) {
-                    $productItemIds = $detail->product_item_ids;
-                }
-                // Check if productItems relationship is loaded and has data
-                elseif ($detail->relationLoaded('productItems') && is_array($detail->productItems)) {
-                    $productItemIds = $detail->productItems;
-                }
-                
-                // Sync the relationship if we have product item IDs
-                if (is_array($productItemIds) && !empty($productItemIds)) {
-                    $detail->productItems()->sync($productItemIds);
-                } else {
-                    // FALLBACK: Auto-assign jika tidak ada data dari form
-                    $existingCount = $detail->productItems()->count();
-                    
-                    // Jika belum ada pivot entries dan quantity > 0, auto-assign
-                    if ($existingCount == 0 && $detail->quantity > 0) {
-                        \Log::info("Auto-assigning serial numbers for detail transaction {$detail->id}");
-                        
-                        // Auto-assign available product items
-                        $availableItems = \App\Models\ProductItem::where('product_id', $detail->product_id)
-                            ->where('is_available', true)
-                            ->actuallyAvailableForPeriod(
-                                $detail->transaction->start_date,
-                                $detail->transaction->end_date
-                            )
-                            ->limit($detail->quantity)
-                            ->pluck('id')
-                            ->toArray();
-                        
-                        if (count($availableItems) >= $detail->quantity) {
-                            $detail->productItems()->sync($availableItems);
-                            \Log::info("Successfully auto-assigned " . count($availableItems) . " items for product {$detail->product->name}");
-                        } else {
-                            \Log::warning("Insufficient items for auto-assignment", [
-                                'detail_id' => $detail->id,
-                                'product_name' => $detail->product->name ?? 'Unknown',
-                                'required' => $detail->quantity,
-                                'available' => count($availableItems)
-                            ]);
-                        }
+
+                // Cek apakah sudah ada pivot entries
+                $existingCount = $detail->productItems()->count();
+
+                // Jika belum ada dan quantity > 0, auto-assign
+                if ($existingCount == 0 && $detail->quantity > 0) {
+
+                    // Auto-assign available product items
+                    $availableItems = \App\Models\ProductItem::where('product_id', $detail->product_id)
+                        ->where('is_available', true)
+                        ->limit($detail->quantity)
+                        ->pluck('id')
+                        ->toArray();
+
+                    if (count($availableItems) >= $detail->quantity) {
+                        $detail->productItems()->sync($availableItems);
+                    } else {
                     }
                 }
             }

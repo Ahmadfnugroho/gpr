@@ -16,6 +16,9 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule)
     {
         $schedule->command('transactions:update-expired')->daily();
+        $schedule->command('monitor:serials')
+            ->hourly()
+            ->withoutOverlapping();
     }
 
     /**
