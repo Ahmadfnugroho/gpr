@@ -52,7 +52,7 @@ class AvailabilityController extends Controller
         try {
             // Cache key for availability check
             $cacheKey = "availability:{$type}:{$id}:{$startDate->toDateString()}:{$endDate->toDateString()}:{$quantity}";
-            
+
             $result = Cache::remember($cacheKey, 300, function () use ($type, $id, $startDate, $endDate, $quantity) {
                 return $this->availabilityService->checkAvailability($type, $id, $startDate, $endDate, $quantity);
             });
@@ -62,16 +62,7 @@ class AvailabilityController extends Controller
                 'data' => $result,
                 'cached' => Cache::has($cacheKey)
             ]);
-
         } catch (\Exception $e) {
-            \Log::error('Availability check failed', [
-                'type' => $type,
-                'id' => $id,
-                'start_date' => $startDate->toDateString(),
-                'end_date' => $endDate->toDateString(),
-                'quantity' => $quantity,
-                'error' => $e->getMessage()
-            ]);
 
             return response()->json([
                 'success' => false,
@@ -120,12 +111,7 @@ class AvailabilityController extends Controller
                     'unavailable_items' => count(array_filter($results, fn($r) => !$r['available'])),
                 ]
             ]);
-
         } catch (\Exception $e) {
-            \Log::error('Multiple availability check failed', [
-                'checks_count' => count($checks),
-                'error' => $e->getMessage()
-            ]);
 
             return response()->json([
                 'success' => false,
@@ -165,10 +151,10 @@ class AvailabilityController extends Controller
 
         try {
             // Cache key for unavailable dates
-            $cacheKey = "unavailable_dates:{$type}:{$id}:" . 
-                       ($startDate ? $startDate->toDateString() : 'null') . ':' . 
-                       ($endDate ? $endDate->toDateString() : 'null');
-            
+            $cacheKey = "unavailable_dates:{$type}:{$id}:" .
+                ($startDate ? $startDate->toDateString() : 'null') . ':' .
+                ($endDate ? $endDate->toDateString() : 'null');
+
             $unavailableDates = Cache::remember($cacheKey, 600, function () use ($type, $id, $startDate, $endDate) {
                 return $this->availabilityService->getUnavailableDates($type, $id, $startDate, $endDate);
             });
@@ -188,13 +174,7 @@ class AvailabilityController extends Controller
                     ]
                 ]
             ]);
-
         } catch (\Exception $e) {
-            \Log::error('Get unavailable dates failed', [
-                'type' => $type,
-                'id' => $id,
-                'error' => $e->getMessage()
-            ]);
 
             return response()->json([
                 'success' => false,
@@ -250,7 +230,6 @@ class AvailabilityController extends Controller
                     ]
                 ]
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -297,12 +276,7 @@ class AvailabilityController extends Controller
                 'data' => $results,
                 'ready_for_checkout' => $results['all_available']
             ]);
-
         } catch (\Exception $e) {
-            \Log::error('Cart availability check failed', [
-                'items_count' => count($cartItems),
-                'error' => $e->getMessage()
-            ]);
 
             return response()->json([
                 'success' => false,
@@ -327,7 +301,6 @@ class AvailabilityController extends Controller
                 'data' => $stats,
                 'generated_at' => now()->toISOString()
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -347,12 +320,11 @@ class AvailabilityController extends Controller
         try {
             // Clear availability-related cache patterns
             Cache::flush(); // In production, use more specific cache tags
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Availability cache cleared successfully'
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

@@ -138,13 +138,13 @@ class DetailTransaction extends Model
                     throw new \Exception("Tidak cukup product items yang tersedia");
                 }
 
-                // Store IDs as protected property
-                $detail->available_items = $availableItems->pluck('id')->toArray();
+                // Simpan IDs ke variable temporary dalam function scope
+                $itemIds = $availableItems->pluck('id')->toArray();
 
                 // Sync items immediately to satisfy trigger constraint
-                DB::transaction(function () use ($detail) {
-                    $detail->saveQuietly();
-                    $detail->productItems()->sync($detail->available_items);
+                DB::transaction(function () use ($detail, $itemIds) {
+                    $detail->save();
+                    $detail->productItems()->sync($itemIds);
                     return false; // Prevent further save
                 });
             }
