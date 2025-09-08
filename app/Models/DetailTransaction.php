@@ -120,8 +120,6 @@ class DetailTransaction extends Model
             ->toArray();
     }
 
-    public $available_items;
-
     public static function boot()
     {
         parent::boot();
@@ -138,17 +136,24 @@ class DetailTransaction extends Model
                     throw new \Exception("Tidak cukup product items yang tersedia");
                 }
 
+                // Store IDs for use after create
                 $detail->available_items = $availableItems->pluck('id')->toArray();
             }
         });
 
-        static::created(function ($detail) {
-            // Hanya untuk produk individual
-            if ($detail->product_id && !$detail->bundling_id) {
-                if (!empty($detail->available_items)) {
-                    $detail->productItems()->sync($detail->available_items);
+        static::creating(function ($detail) {
+            // Wrap creation in transaction
+            return DB::transaction(function () use ($detail) {
+                if ($detail->product_id && !$detail->bundling_id) {
+                    if (!empty($detail->available_items)) {
+                        // Create detail transaction and sync items in one transaction
+                        $detail->saveQuietly();
+                        $detail->productItems()->sync($detail->available_items);
+                        return false; // Prevent double save
+                    }
                 }
-            }
+                return true;
+            });
         });
     }
 }
