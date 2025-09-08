@@ -124,7 +124,6 @@ class DetailTransaction extends Model
     {
         parent::boot();
 
-        // Validasi sebelum create
         static::creating(function ($detail) {
             // Hanya untuk produk individual
             if ($detail->product_id && !$detail->bundling_id && $detail->quantity > 0) {
@@ -137,19 +136,17 @@ class DetailTransaction extends Model
                     throw new \Exception("Tidak cukup product items yang tersedia");
                 }
 
-                // Simpan temporary untuk digunakan di saved event
-                $detail->temp_product_items = $availableItems->pluck('id')->toArray();
+                // Simpan sebagai property biasa, bukan ke database
+                $detail->available_items = $availableItems->pluck('id')->toArray();
             }
         });
 
-        // Simpan product items setelah create/update
-        static::saved(function ($detail) {
+        static::created(function ($detail) {
             // Hanya untuk produk individual
             if ($detail->product_id && !$detail->bundling_id) {
-                // Gunakan items yang sudah divalidasi dari creating event
-                if (isset($detail->temp_product_items)) {
-                    $detail->productItems()->sync($detail->temp_product_items);
-                    unset($detail->temp_product_items);
+                // Gunakan items yang sudah divalidasi
+                if (isset($detail->available_items)) {
+                    $detail->productItems()->sync($detail->available_items);
                 }
             }
         });
