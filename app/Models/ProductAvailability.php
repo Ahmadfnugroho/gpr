@@ -224,7 +224,7 @@ class ProductAvailability extends Model
             ->count();
 
         // Get unique product items that are used in transactions during the period
-        $usedItemIds = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($start, $end) {
+        $usedItemIds = \App\Models\DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($start, $end) {
             $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
                 ->where(function ($q) use ($start, $end) {
                     // Check for overlapping rental periods
@@ -397,10 +397,8 @@ class ProductAvailability extends Model
         // Get transactions for this product with booking, paid, or on_rented status
         // that overlap with the selected date range or are currently active
         $transactions = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-            ->whereHas('detailTransactions', function ($query) use ($productId) {
-                $query->whereHas('detailTransactionProductItems.productItem', function ($q) use ($productId) {
-                    $q->where('product_id', $productId);
-                });
+            ->whereHas('detailTransactions.productItems', function ($query) use ($productId) {
+                $query->where('product_id', $productId);
             })
             ->where(function ($query) use ($start, $end) {
                 // Include transactions that overlap with the selected period

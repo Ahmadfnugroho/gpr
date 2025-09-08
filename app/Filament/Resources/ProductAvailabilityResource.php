@@ -180,7 +180,7 @@ class ProductAvailabilityResource extends Resource
                             // Get first active transaction for this item
                             if ($record->type === 'product' && $record->product_model) {
                                 $transaction = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-                                    ->whereHas('detailTransactions.detailTransactionProductItems.productItem', function ($query) use ($record) {
+                                    ->whereHas('detailTransactions.productItems', function ($query) use ($record) {
                                         $query->where('product_id', $record->product_model->id);
                                     })
                                     ->orderBy('start_date', 'desc')
@@ -210,7 +210,7 @@ class ProductAvailabilityResource extends Resource
                             // Show tooltip with transaction count
                             if ($record->type === 'product' && $record->product_model) {
                                 $count = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-                                    ->whereHas('detailTransactions.detailTransactionProductItems.productItem', function ($query) use ($record) {
+                                    ->whereHas('detailTransactions.productItems', function ($query) use ($record) {
                                         $query->where('product_id', $record->product_model->id);
                                     })
                                     ->count();
@@ -238,7 +238,7 @@ class ProductAvailabilityResource extends Resource
                             // Only show if there are active transactions
                             if ($record->type === 'product' && $record->product_model) {
                                 $count = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-                                    ->whereHas('detailTransactions.detailTransactionProductItems.productItem', function ($query) use ($record) {
+                                    ->whereHas('detailTransactions.productItems', function ($query) use ($record) {
                                         $query->where('product_id', $record->product_model->id);
                                     })
                                     ->count();
