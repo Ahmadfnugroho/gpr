@@ -1273,6 +1273,31 @@ class TransactionResource extends BaseOptimizedResource
                                 ->columnSpan(1),
 
 
+                            Placeholder::make('additional_services_total')
+                                ->label('Total Additional Services')
+                                ->content(function (Get $get) {
+                                    // Calculate additional services fees from repeater
+                                    $additionalFees = 0;
+                                    $additionalServices = $get('additional_services') ?? [];
+                                    if (is_array($additionalServices)) {
+                                        foreach ($additionalServices as $service) {
+                                            if (is_array($service) && isset($service['amount'])) {
+                                                $additionalFees += (int)($service['amount'] ?? 0);
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Legacy support for old structure
+                                    $additionalFees += (int)($get('additional_fee_1_amount') ?? 0);
+                                    $additionalFees += (int)($get('additional_fee_2_amount') ?? 0);
+                                    $additionalFees += (int)($get('additional_fee_3_amount') ?? 0);
+                                    
+                                    return "Rp " . number_format($additionalFees, 0, ',', '.');
+                                })
+                                ->reactive()
+                                ->extraAttributes(['class' => 'text-lg font-medium text-blue-600'])
+                                ->columnSpan(1),
+
                             Placeholder::make('grand_total_display')
                                 ->label('Grand Total')
                                 ->live(debounce: 500)

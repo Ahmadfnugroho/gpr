@@ -578,6 +578,40 @@
               Rp{{ number_format($diskon, 0, ',', '.') }}
             </td>
           </tr>
+          @if($record->additional_services && is_array($record->additional_services) && count($record->additional_services) > 0)
+          @foreach($record->additional_services as $service)
+          @if(isset($service['name']) && isset($service['amount']) && $service['amount'] > 0)
+          <tr>
+            <td class="summary-label">{{ $service['name'] }}:</td>
+            <td class="summary-value">Rp{{ number_format($service['amount'], 0, ',', '.') }}</td>
+          </tr>
+          @endif
+          @endforeach
+          @endif
+          
+          @php
+          $totalAdditionalServices = 0;
+          if ($record->additional_services && is_array($record->additional_services)) {
+              foreach ($record->additional_services as $service) {
+                  if (isset($service['amount']) && $service['amount'] > 0) {
+                      $totalAdditionalServices += $service['amount'];
+                  }
+              }
+          }
+          
+          // Legacy support for old structure
+          $totalAdditionalServices += ($record->additional_fee_1_amount ?? 0);
+          $totalAdditionalServices += ($record->additional_fee_2_amount ?? 0);
+          $totalAdditionalServices += ($record->additional_fee_3_amount ?? 0);
+          @endphp
+          
+          @if($totalAdditionalServices > 0)
+          <tr style="background-color: #e8f4fd; color: #1e40af;">
+            <td class="summary-label font-semibold">Total Additional Services:</td>
+            <td class="summary-value font-semibold">Rp{{ number_format($totalAdditionalServices, 0, ',', '.') }}</td>
+          </tr>
+          @endif
+          
           @if($record->booking_status === 'cancel' && $record->cancellation_fee && $record->cancellation_fee > 0)
           <tr style="background-color: #ffe6e6; color: #d63031;">
             <td class="summary-label font-semibold">Biaya Pembatalan (50%):</td>

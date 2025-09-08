@@ -219,23 +219,35 @@ class ProductAvailability extends Model
             return 0;
         }
 
-        $totalItems = ProductItem::where('product_id', $productId)->count();
+        $totalItems = ProductItem::where('product_id', $productId)
+            ->where('is_available', true)
+            ->count();
 
-        $usedItems = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($start, $end) {
+        // Get unique product items that are used in transactions during the period
+        $usedItemIds = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($start, $end) {
             $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
                 ->where(function ($q) use ($start, $end) {
-                    $q->whereBetween('start_date', [$start, $end])
-                        ->orWhereBetween('end_date', [$start, $end])
-                        ->orWhere(function ($q2) use ($start, $end) {
-                            $q2->where('start_date', '<=', $start)
-                                ->where('end_date', '>=', $end);
-                        });
+                    // Check for overlapping rental periods
+                    $q->where(function ($overlap) use ($start, $end) {
+                        $overlap->whereBetween('start_date', [$start, $end])
+                            ->orWhereBetween('end_date', [$start, $end])
+                            ->orWhere(function ($contains) use ($start, $end) {
+                                $contains->where('start_date', '<=', $start)
+                                    ->where('end_date', '>=', $end);
+                            });
+                    });
                 });
-        })->whereHas('productItem', function ($query) use ($productId) {
-            $query->where('product_id', $productId);
-        })->count();
+        })
+        ->whereHas('productItem', function ($query) use ($productId) {
+            $query->where('product_id', $productId)
+                ->where('is_available', true);
+        })
+        ->distinct()
+        ->pluck('product_item_id')
+        ->unique()
+        ->count();
 
-        return max(0, $totalItems - $usedItems);
+        return max(0, $totalItems - $usedItemIds);
     }
     
     /**
@@ -382,10 +394,29 @@ class ProductAvailability extends Model
      */
     private function getProductRentalPeriods($productId, $start, $end)
     {
-        // Get ALL transactions for this product with booking, paid, or on_rented status
+        // Get transactions for this product with booking, paid, or on_rented status
+        // that overlap with the selected date range or are currently active
         $transactions = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-            ->whereHas('detailTransactions.detailTransactionProductItems.productItem', function ($query) use ($productId) {
-                $query->where('product_id', $productId);
+            ->whereHas('detailTransactions', function ($query) use ($productId) {
+                $query->whereHas('detailTransactionProductItems.productItem', function ($q) use ($productId) {
+                    $q->where('product_id', $productId);
+                });
+            })
+            ->where(function ($query) use ($start, $end) {
+                // Include transactions that overlap with the selected period
+                $query->where(function ($q) use ($start, $end) {
+                    $q->whereBetween('start_date', [$start, $end])
+                        ->orWhereBetween('end_date', [$start, $end])
+                        ->orWhere(function ($q2) use ($start, $end) {
+                            $q2->where('start_date', '<=', $start)
+                                ->where('end_date', '>=', $end);
+                        });
+                })
+                // Also include currently active transactions (not yet ended)
+                ->orWhere(function ($q) {
+                    $q->where('end_date', '>=', now())
+                        ->where('start_date', '<=', now());
+                });
             })
             ->with(['customer'])
             ->orderBy('start_date', 'desc')
@@ -399,10 +430,27 @@ class ProductAvailability extends Model
      */
     private function getBundlingRentalPeriods($bundlingId, $start, $end)
     {
-        // Get ALL transactions for this bundling with booking, paid, or on_rented status
+        // Get transactions for this bundling with booking, paid, or on_rented status
+        // that overlap with the selected date range or are currently active
         $transactions = \App\Models\Transaction::whereIn('booking_status', ['booking', 'paid', 'on_rented'])
             ->whereHas('detailTransactions', function ($query) use ($bundlingId) {
                 $query->where('bundling_id', $bundlingId);
+            })
+            ->where(function ($query) use ($start, $end) {
+                // Include transactions that overlap with the selected period
+                $query->where(function ($q) use ($start, $end) {
+                    $q->whereBetween('start_date', [$start, $end])
+                        ->orWhereBetween('end_date', [$start, $end])
+                        ->orWhere(function ($q2) use ($start, $end) {
+                            $q2->where('start_date', '<=', $start)
+                                ->where('end_date', '>=', $end);
+                        });
+                })
+                // Also include currently active transactions (not yet ended)
+                ->orWhere(function ($q) {
+                    $q->where('end_date', '>=', now())
+                        ->where('start_date', '<=', now());
+                });
             })
             ->with(['customer'])
             ->orderBy('start_date', 'desc')
@@ -417,7 +465,7 @@ class ProductAvailability extends Model
     private function formatRentalPeriods($transactions)
     {
         if ($transactions->isEmpty()) {
-            return '<span class="text-gray-500 text-sm">No transactions</span>';
+            return '<span class="text-gray-500 text-sm">No active rentals</span>';
         }
         
         if ($transactions->count() == 1) {
