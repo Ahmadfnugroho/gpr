@@ -122,32 +122,94 @@ class DetailTransaction extends Model
             ->toArray();
     }
 
-    // public static function boot()
-    // {
-    //     parent::boot();
+    public static function boot()
+    {
+        parent::boot();
 
-    //     static::creating(function ($detail) {
-    //         // Hanya untuk produk individual
-    //         if ($detail->product_id && !$detail->bundling_id && $detail->quantity > 0) {
-    //             $availableItems = ProductItem::where('product_id', $detail->product_id)
-    //                 ->where('is_available', true)
-    //                 ->limit($detail->quantity)
-    //                 ->get();
+        static::creating(function ($detail) {
+            // Hanya untuk produk individual (non-bundling)
+            if ($detail->product_id && !$detail->bundling_id && $detail->quantity > 0) {
+                DB::transaction(function () use ($detail) {
+                    try {
+                        Log::info("Processing DetailTransaction creation", [
+                            'product_id' => $detail->product_id,
+                            'quantity' => $detail->quantity
+                        ]);
 
-    //             if ($availableItems->count() < $detail->quantity) {
-    //                 throw new \Exception("Tidak cukup product items yang tersedia");
-    //             }
+                        // Get transaction dates
+                        $transaction = Transaction::findOrFail($detail->transaction_id);
+                        $startDate = $transaction->start_date;
+                        $endDate = $transaction->end_date;
 
-    //             // Simpan IDs ke variable temporary dalam function scope
-    //             $itemIds = $availableItems->pluck('id')->toArray();
+                        // Check availability with date range
+                        $availableItems = ProductItem::where('product_id', $detail->product_id)
+                            ->whereDoesntHave('detailTransactions.transaction', function ($query) use ($startDate, $endDate) {
+                                $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                    ->where(function ($q) use ($startDate, $endDate) {
+                                        $q->whereBetween('start_date', [$startDate, $endDate])
+                                            ->orWhereBetween('end_date', [$startDate, $endDate])
+                                            ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                                $q2->where('start_date', '<=', $startDate)
+                                                    ->where('end_date', '>=', $endDate);
+                                            });
+                                    });
+                            })
+                            ->take($detail->quantity)
+                            ->get();
 
-    //             // Sync items immediately to satisfy trigger constraint
-    //             DB::transaction(function () use ($detail, $itemIds) {
-    //                 $detail->save();
-    //                 $detail->productItems()->sync($itemIds);
-    //                 return false; // Prevent further save
-    //             });
-    //         }
-    //     });
-    // }
+                        if ($availableItems->count() < $detail->quantity) {
+                            throw new \Exception("Tidak cukup item yang tersedia untuk periode sewa yang dipilih");
+                        }
+
+                        Log::info("Found available items", [
+                            'items' => $availableItems->pluck('id')->toArray()
+                        ]);
+
+                        // Save detail transaction
+                        $detail->save();
+
+                        // Sync items dengan atomic operation
+                        $itemIds = $availableItems->pluck('id')->toArray();
+                        $detail->productItems()->sync($itemIds);
+
+                        Log::info("Successfully synced items", [
+                            'detail_transaction_id' => $detail->id,
+                            'item_ids' => $itemIds
+                        ]);
+
+                        return true;
+                    } catch (\Exception $e) {
+                        Log::error("Error in DetailTransaction creation", [
+                            'error' => $e->getMessage(),
+                            'product_id' => $detail->product_id
+                        ]);
+                        throw $e;
+                    }
+                });
+
+                return false; // Prevent additional save
+            }
+        });
+
+        // Handle status changes
+        static::updated(function ($detail) {
+            if ($detail->transaction && $detail->transaction->wasChanged('booking_status')) {
+                $newStatus = $detail->transaction->booking_status;
+
+                Log::info("Transaction status changed", [
+                    'detail_transaction_id' => $detail->id,
+                    'new_status' => $newStatus
+                ]);
+
+                // Update product items status based on transaction status
+                if (in_array($newStatus, ['done', 'cancel'])) {
+                    // Mark items as available when transaction is completed or cancelled
+                    $detail->productItems()->update(['is_available' => true]);
+                } elseif (in_array($newStatus, ['booking', 'paid', 'on_rented'])) {
+                    // Mark items as unavailable when transaction is active
+                    $detail->productItems()->update(['is_available' => false]);
+                }
+            }
+        });
+    }
 }

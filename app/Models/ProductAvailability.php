@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Bundling;
 use App\Models\ProductItem;
 use App\Models\DetailTransactionProductItem;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Virtual model for Product Availability functionality
@@ -213,39 +214,61 @@ class ProductAvailability extends Model
         try {
             $start = Carbon::parse($startDate);
             $end = Carbon::parse($endDate);
+
+            Log::info("Calculating availability for Product #{$productId}", [
+                'start_date' => $start->format('Y-m-d H:i:s'),
+                'end_date' => $end->format('Y-m-d H:i:s')
+            ]);
+
+            // 1. Get total items (tanpa filter is_available)
+            $totalItems = ProductItem::where('product_id', $productId)->count();
+
+            Log::info("Total items for Product #{$productId}: {$totalItems}");
+
+            // 2. Get items that are currently in active transactions
+            $usedItemsQuery = \App\Models\DetailTransactionProductItem::whereHas(
+                'detailTransaction.transaction',
+                function ($query) use ($start, $end) {
+                    $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                        ->where(function ($q) use ($start, $end) {
+                            $q->whereBetween('start_date', [$start, $end])
+                                ->orWhereBetween('end_date', [$start, $end])
+                                ->orWhere(function ($q2) use ($start, $end) {
+                                    $q2->where('start_date', '<=', $start)
+                                        ->where('end_date', '>=', $end);
+                                });
+                        });
+                }
+            )
+                ->whereHas('productItem', function ($query) use ($productId) {
+                    $query->where('product_id', $productId);
+                    // Removed is_available filter
+                })
+                ->distinct('product_item_id');
+
+            // Log the generated SQL query for debugging
+            Log::info("Used items query:", [
+                'sql' => $usedItemsQuery->toSql(),
+                'bindings' => $usedItemsQuery->getBindings()
+            ]);
+
+            $usedItemIds = $usedItemsQuery->count();
+
+            Log::info("Used items for Product #{$productId}: {$usedItemIds}");
+
+            $available = max(0, $totalItems - $usedItemIds);
+
+            Log::info("Final availability for Product #{$productId}: {$available}", [
+                'calculation' => "{$totalItems} - {$usedItemIds} = {$available}"
+            ]);
+
+            return $available;
         } catch (\Exception $e) {
+            Log::error("Error calculating availability for Product #{$productId}: " . $e->getMessage(), [
+                'exception' => $e
+            ]);
             return 0;
         }
-
-        $totalItems = ProductItem::where('product_id', $productId)
-            ->where('is_available', true)
-            ->count();
-
-        // Get unique product items that are used in transactions during the period
-        $usedItemIds = \App\Models\DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($start, $end) {
-            $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-                ->where(function ($q) use ($start, $end) {
-                    // Check for overlapping rental periods
-                    $q->where(function ($overlap) use ($start, $end) {
-                        $overlap->whereBetween('start_date', [$start, $end])
-                            ->orWhereBetween('end_date', [$start, $end])
-                            ->orWhere(function ($contains) use ($start, $end) {
-                                $contains->where('start_date', '<=', $start)
-                                    ->where('end_date', '>=', $end);
-                            });
-                    });
-                });
-        })
-            ->whereHas('productItem', function ($query) use ($productId) {
-                $query->where('product_id', $productId)
-                    ->where('is_available', true);
-            })
-            ->distinct()
-            ->pluck('product_item_id')
-            ->unique()
-            ->count();
-
-        return max(0, $totalItems - $usedItemIds);
     }
 
     /**
