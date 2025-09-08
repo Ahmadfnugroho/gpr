@@ -2292,21 +2292,17 @@ class TransactionResource extends BaseOptimizedResource
     }
     protected function beforeSave(): void
     {
-        // Validate serial assignments sebelum save
         $detailTransactions = $this->data['detailTransactions'] ?? [];
 
-        foreach ($detailTransactions as $detail) {
-            if (!empty($detail['product_id']) && empty($detail['productItems'])) {
-                // Auto-assign jika kosong
-                $availableItems = \App\Models\ProductItem::where('product_id', $detail['product_id'])
-                    ->where('is_available', true)
-                    ->limit($detail['quantity'] ?? 1)
-                    ->pluck('id')
-                    ->toArray();
+        foreach ($detailTransactions as $i => $detail) {
+            $hasProduct = !empty($detail['product_id']);
+            $hasBundling = !empty($detail['bundling_id']);
+            $hasItems = !empty($detail['productItems'] ?? []);
 
-                if (count($availableItems) >= ($detail['quantity'] ?? 1)) {
-                    $this->data['detailTransactions'][array_search($detail, $detailTransactions)]['productItems'] = $availableItems;
-                }
+            if ($hasProduct && !$hasBundling && !$hasItems) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "detailTransactions.$i.productItems" => "Produk ini harus memiliki item (serial number) atau masuk dalam bundling.",
+                ]);
             }
         }
     }

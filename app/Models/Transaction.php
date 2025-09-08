@@ -113,6 +113,7 @@ class Transaction extends Model
             }
         });
 
+
         // Event listeners for notifications
         static::created(function ($transaction) {
             // Send notification after transaction is created
@@ -207,7 +208,7 @@ class Transaction extends Model
         $fee1 = $this->additional_fee_1_amount ?? 0;
         $fee2 = $this->additional_fee_2_amount ?? 0;
         $fee3 = $this->additional_fee_3_amount ?? 0;
-        
+
         return (int) ($fee1 + $fee2 + $fee3);
     }
 
