@@ -32,23 +32,25 @@ class DetailTransaction extends Model
         'price' => 'float',
         'total_price' => 'float',
     ];
-    private static function saveProductItems($detailTransaction)
-    {
-        $productItemIds = $detailTransaction->product_item_ids;
 
-        if (!empty($productItemIds)) {
-            // Hapus data lama di pivot table
-            $detailTransaction->productItems()->detach();
 
-            // Simpan data baru ke pivot table
-            foreach ($productItemIds as $productItemId) {
-                DetailTransactionProductItem::create([
-                    'detail_transaction_id' => $detailTransaction->id,
-                    'product_item_id' => $productItemId,
-                ]);
-            }
-        }
-    }
+    // private static function saveProductItems($detailTransaction)
+    // {
+    //     $productItemIds = $detailTransaction->product_item_ids;
+
+    //     if (!empty($productItemIds)) {
+    //         // Hapus data lama di pivot table
+    //         $detailTransaction->productItems()->detach();
+
+    //         // Simpan data baru ke pivot table
+    //         foreach ($productItemIds as $productItemId) {
+    //             DetailTransactionProductItem::create([
+    //                 'detail_transaction_id' => $detailTransaction->id,
+    //                 'product_item_id' => $productItemId,
+    //             ]);
+    //         }
+    //     }
+    // }
     public function getBundlingSerialNumbersAttribute()
     {
         $value = $this->getAttributeFromArray('bundling_serial_numbers');
@@ -122,27 +124,32 @@ class DetailTransaction extends Model
     {
         parent::boot();
 
+        // Validasi sebelum create
+        static::creating(function ($detail) {
+            // Hanya untuk produk individual
+            if ($detail->product_id && !$detail->bundling_id && $detail->quantity > 0) {
+                $availableItems = ProductItem::where('product_id', $detail->product_id)
+                    ->where('is_available', true)
+                    ->limit($detail->quantity)
+                    ->get();
+
+                if ($availableItems->count() < $detail->quantity) {
+                    throw new \Exception("Tidak cukup product items yang tersedia");
+                }
+
+                // Simpan temporary untuk digunakan di saved event
+                $detail->temp_product_items = $availableItems->pluck('id')->toArray();
+            }
+        });
+
+        // Simpan product items setelah create/update
         static::saved(function ($detail) {
-            // HANYA untuk produk individual (bukan bundling)
+            // Hanya untuk produk individual
             if ($detail->product_id && !$detail->bundling_id) {
-
-                // Cek apakah sudah ada pivot entries
-                $existingCount = $detail->productItems()->count();
-
-                // Jika belum ada dan quantity > 0, auto-assign
-                if ($existingCount == 0 && $detail->quantity > 0) {
-
-                    // Auto-assign available product items
-                    $availableItems = \App\Models\ProductItem::where('product_id', $detail->product_id)
-                        ->where('is_available', true)
-                        ->limit($detail->quantity)
-                        ->pluck('id')
-                        ->toArray();
-
-                    if (count($availableItems) >= $detail->quantity) {
-                        $detail->productItems()->sync($availableItems);
-                    } else {
-                    }
+                // Gunakan items yang sudah divalidasi dari creating event
+                if (isset($detail->temp_product_items)) {
+                    $detail->productItems()->sync($detail->temp_product_items);
+                    unset($detail->temp_product_items);
                 }
             }
         });
