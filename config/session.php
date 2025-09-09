@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'database'),
+    'driver' => env('SESSION_DRIVER', 'file'),
 
     /*
     |--------------------------------------------------------------------------
@@ -99,6 +99,7 @@ return [
     |
     | Affects: "apc", "dynamodb", "memcached", "redis"
     |
+    |
     */
 
     'store' => env('SESSION_STORE'),
@@ -114,7 +115,7 @@ return [
     |
     */
 
-    'lottery' => [2, 100],
+    'lottery' => [5, 100], // Increased probability for better garbage collection
 
     /*
     |--------------------------------------------------------------------------

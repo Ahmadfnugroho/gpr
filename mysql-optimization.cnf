@@ -25,7 +25,7 @@ myisam_sort_buffer_size = 32M
 key_buffer_size = 128M
 
 # Transaction Settings
-innodb_lock_wait_timeout = 50
+innodb_lock_wait_timeout = 120
 innodb_rollback_on_timeout = ON
 
 # Memory Settings

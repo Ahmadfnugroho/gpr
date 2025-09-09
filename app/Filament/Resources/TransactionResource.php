@@ -164,70 +164,127 @@ class TransactionResource extends BaseOptimizedResource
 
         $startDate = $get('../../start_date') ? Carbon::parse($get('../../start_date')) : now();
         $endDate = $get('../../end_date') ? Carbon::parse($get('../../end_date')) : now();
-        $allDetailTransactions = $get('../../detailTransactions') ?? [];
         $currentTransactionId = $get('../../id'); // Get current transaction ID when editing
 
         if (!$productId || !$currentUuid) {
             return [];
         }
+        
+        // Batasi jumlah detail transaksi yang diproses untuk menghemat memori
+        $allDetailTransactions = $get('../../detailTransactions') ?? [];
+        if (is_array($allDetailTransactions) && count($allDetailTransactions) > 20) {
+            // Jika terlalu banyak, ambil hanya 20 item terakhir untuk diproses
+            $allDetailTransactions = array_slice($allDetailTransactions, -20);
+        }
 
         // Ambil product_item_id dari tabel pivot yang sudah digunakan dalam repeater saat ini
-        $usedInCurrentRepeater = collect($allDetailTransactions)
-            ->filter(fn($row) => is_array($row) && isset($row['uuid']) && $row['uuid'] !== $currentUuid)
-            ->flatMap(fn($row) => is_array($row['productItems'] ?? null) ? $row['productItems'] : [])
-            ->unique()
-            ->values()
-            ->all();
-
+        // Gunakan pendekatan yang lebih hemat memori
+        $usedInCurrentRepeater = [];
+        foreach ($allDetailTransactions as $row) {
+            if (is_array($row) && isset($row['uuid']) && $row['uuid'] !== $currentUuid && isset($row['productItems'])) {
+                if (is_array($row['productItems'])) {
+                    foreach ($row['productItems'] as $itemId) {
+                        $usedInCurrentRepeater[] = $itemId;
+                    }
+                }
+            }
+        }
+        $usedInCurrentRepeater = array_unique($usedInCurrentRepeater);
 
         // Ambil product_item_id dari transaksi lain yang aktif (EXCLUDE current transaction when editing)
-        $usedInOtherTransactions = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate, $currentTransactionId) {
-            $query->where(function ($q) use ($startDate, $endDate) {
-                // Periksa apakah rentang tanggal tumpang tindih
-                $q->whereBetween('start_date', [$startDate, $endDate]) // Rentang mulai di dalam rentang target
-                    ->orWhereBetween('end_date', [$startDate, $endDate]) // Rentang akhir di dalam rentang target
-                    ->orWhere(function ($q2) use ($startDate, $endDate) {
-                        // Rentang target sepenuhnya berada di dalam rentang transaksi
-                        $q2->where('start_date', '<=', $startDate)
-                            ->where('end_date', '>=', $endDate);
-                    });
-            })
-                // EXCLUDE current transaction when editing to avoid false "unavailable" status
-                ->when($currentTransactionId, function ($q) use ($currentTransactionId) {
-                    $q->where('id', '!=', $currentTransactionId);
-                });
-        })
+        // Gunakan query yang lebih efisien dengan select dan limit
+        $usedInOtherTransactionsQuery = DB::table('detail_transaction_product_item')
+            ->join('detail_transactions', 'detail_transaction_product_item.detail_transaction_id', '=', 'detail_transactions.id')
+            ->join('transactions', 'detail_transactions.transaction_id', '=', 'transactions.id')
+            ->whereIn('transactions.booking_status', ['booking', 'paid', 'on_rented'])
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->whereBetween('transactions.start_date', [$startDate, $endDate])
+                  ->orWhereBetween('transactions.end_date', [$startDate, $endDate])
+                  ->orWhere(function ($q2) use ($startDate, $endDate) {
+                      $q2->where('transactions.start_date', '<=', $startDate)
+                         ->where('transactions.end_date', '>=', $endDate);
+                  });
+            });
+            
+        // EXCLUDE current transaction when editing
+        if ($currentTransactionId) {
+            $usedInOtherTransactionsQuery->where('transactions.id', '!=', $currentTransactionId);
+        }
+        
+        // Batasi jumlah hasil untuk menghemat memori
+        $usedInOtherTransactions = $usedInOtherTransactionsQuery
+            ->select('detail_transaction_product_item.product_item_id')
+            ->limit(1000) // Batasi jumlah maksimum item yang diambil
             ->pluck('product_item_id')
             ->toArray();
 
-
-        // Gabungkan semua ID yang harus dikeluarkan
+        // Gabungkan semua ID yang harus dikeluarkan dengan cara yang lebih efisien
         $excludedIds = array_unique(array_merge($usedInCurrentRepeater, $usedInOtherTransactions));
-
 
         // Get currently assigned items to this detail transaction (for editing)
         $currentlyAssignedIds = [];
         $currentDetailTransactionId = $get('id');
         if ($currentDetailTransactionId) {
-            $currentlyAssignedIds = DetailTransactionProductItem::where('detail_transaction_id', $currentDetailTransactionId)
-                ->whereHas('productItem', function ($q) use ($productId) {
-                    $q->where('product_id', $productId);
-                })
+            $currentlyAssignedIds = DB::table('detail_transaction_product_item')
+                ->join('product_items', 'detail_transaction_product_item.product_item_id', '=', 'product_items.id')
+                ->where('detail_transaction_product_item.detail_transaction_id', $currentDetailTransactionId)
+                ->where('product_items.product_id', $productId)
+                ->select('detail_transaction_product_item.product_item_id')
                 ->pluck('product_item_id')
                 ->toArray();
         }
 
-        // Ambil serial number yang tersedia (including currently assigned ones for editing)
-        $availableIds = ProductItem::query()
-            ->where('product_id', $productId)
-            ->where(function ($query) use ($excludedIds, $currentlyAssignedIds) {
-                // Include items that are not excluded OR currently assigned to this transaction
-                $query->whereNotIn('id', $excludedIds)
-                    ->orWhereIn('id', $currentlyAssignedIds);
-            })
-            ->limit($quantity + count($currentlyAssignedIds)) // Allow more to include currently assigned
-            ->pluck('id')
-            ->toArray();
+        // Ambil serial number yang tersedia dengan query yang lebih efisien
+        // Gunakan raw query untuk performa lebih baik jika array excludedIds terlalu besar
+        if (count($excludedIds) > 1000) {
+            // Jika terlalu banyak ID yang diexclude, gunakan pendekatan alternatif
+            // yang lebih hemat memori dengan hanya mengambil item yang tersedia
+            $availableIds = DB::table('product_items')
+                ->where('product_id', $productId)
+                ->whereNotIn('id', function($query) use ($startDate, $endDate, $currentTransactionId) {
+                    $query->select('product_item_id')
+                        ->from('detail_transaction_product_item')
+                        ->join('detail_transactions', 'detail_transaction_product_item.detail_transaction_id', '=', 'detail_transactions.id')
+                        ->join('transactions', 'detail_transactions.transaction_id', '=', 'transactions.id')
+                        ->whereIn('transactions.booking_status', ['booking', 'paid', 'on_rented'])
+                        ->where(function ($q) use ($startDate, $endDate) {
+                            $q->whereBetween('transactions.start_date', [$startDate, $endDate])
+                              ->orWhereBetween('transactions.end_date', [$startDate, $endDate])
+                              ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                  $q2->where('transactions.start_date', '<=', $startDate)
+                                     ->where('transactions.end_date', '>=', $endDate);
+                              });
+                        })
+                        ->when($currentTransactionId, function ($q) use ($currentTransactionId) {
+                            $q->where('transactions.id', '!=', $currentTransactionId);
+                        });
+                })
+                ->limit($quantity + count($currentlyAssignedIds))
+                ->pluck('id')
+                ->toArray();
+                
+            // Tambahkan item yang saat ini sudah di-assign
+            if (!empty($currentlyAssignedIds)) {
+                $availableIds = array_unique(array_merge($availableIds, $currentlyAssignedIds));
+            }
+        } else {
+            // Gunakan pendekatan normal jika jumlah ID yang diexclude masih dalam batas wajar
+            $query = DB::table('product_items')
+                ->where('product_id', $productId);
+                
+            if (!empty($excludedIds)) {
+                $query->where(function ($q) use ($excludedIds, $currentlyAssignedIds) {
+                    $q->whereNotIn('id', $excludedIds);
+                    if (!empty($currentlyAssignedIds)) {
+                        $q->orWhereIn('id', $currentlyAssignedIds);
+                    }
+                });
+            }
+            
+            $availableIds = $query->limit($quantity + count($currentlyAssignedIds))
+                ->pluck('id')
+                ->toArray();
+        }
 
         return $availableIds;
     }
@@ -242,7 +299,10 @@ class TransactionResource extends BaseOptimizedResource
         ?int $currentDetailTransactionId = null
     ): array {
 
-        $bundling = Bundling::with('products')->find($bundlingId);
+        $bundling = Bundling::with(['products' => function($query) {
+            $query->select('bundling_product.bundling_id', 'bundling_product.product_id', 'bundling_product.quantity', 'products.id', 'products.name');
+        }])->find($bundlingId);
+        
         if (!$bundling) {
             return ['ids' => [], 'display' => '-'];
         }
@@ -251,41 +311,56 @@ class TransactionResource extends BaseOptimizedResource
         if (!$currentUuid) {
             $currentUuid = (string) \Illuminate\Support\Str::uuid();
         }
+        
+        // Batasi jumlah detail transaksi yang diproses untuk menghemat memori
+        if (count($allDetailTransactions) > 20) {
+            // Jika terlalu banyak, ambil hanya 20 item terakhir untuk diproses
+            $allDetailTransactions = array_slice($allDetailTransactions, -20);
+        }
 
         // Ambil product_item_id dari tabel pivot yang sudah digunakan dalam repeater saat ini
-        $usedInCurrentRepeater = collect($allDetailTransactions)
-            ->filter(fn($row) => is_array($row) && isset($row['uuid']) && $row['uuid'] !== $currentUuid)
-            ->flatMap(fn($row) => is_array($row['productItems'] ?? null) ? $row['productItems'] : [])
-            ->unique()
-            ->values()
-            ->all();
-
+        // Gunakan pendekatan yang lebih hemat memori
+        $usedInCurrentRepeater = [];
+        foreach ($allDetailTransactions as $row) {
+            if (is_array($row) && isset($row['uuid']) && $row['uuid'] !== $currentUuid && isset($row['productItems'])) {
+                if (is_array($row['productItems'])) {
+                    foreach ($row['productItems'] as $itemId) {
+                        $usedInCurrentRepeater[] = $itemId;
+                    }
+                }
+            }
+        }
+        $usedInCurrentRepeater = array_unique($usedInCurrentRepeater);
 
         // Ambil product_item_id dari transaksi lain yang aktif (EXCLUDE current transaction when editing)
-        $usedInOtherTransactions = DetailTransactionProductItem::whereHas('detailTransaction.transaction', function ($query) use ($startDate, $endDate, $currentTransactionId) {
-            $query->where(function ($q) use ($startDate, $endDate) {
-                // Periksa apakah rentang tanggal tumpang tindih
-                $q->whereBetween('start_date', [$startDate, $endDate]) // Rentang mulai di dalam rentang target
-                    ->orWhereBetween('end_date', [$startDate, $endDate]) // Rentang akhir di dalam rentang target
-                    ->orWhere(function ($q2) use ($startDate, $endDate) {
-                        // Rentang target sepenuhnya berada di dalam rentang transaksi
-                        $q2->where('start_date', '<=', $startDate)
-                            ->where('end_date', '>=', $endDate);
-                    });
-            })
-                // EXCLUDE current transaction when editing to avoid false "unavailable" status
-                ->when($currentTransactionId, function ($q) use ($currentTransactionId) {
-                    $q->where('id', '!=', $currentTransactionId);
-                });
-        })
+        // Gunakan query yang lebih efisien dengan select dan limit
+        $usedInOtherTransactionsQuery = DB::table('detail_transaction_product_item')
+            ->join('detail_transactions', 'detail_transaction_product_item.detail_transaction_id', '=', 'detail_transactions.id')
+            ->join('transactions', 'detail_transactions.transaction_id', '=', 'transactions.id')
+            ->whereIn('transactions.booking_status', ['booking', 'paid', 'on_rented'])
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->whereBetween('transactions.start_date', [$startDate, $endDate])
+                  ->orWhereBetween('transactions.end_date', [$startDate, $endDate])
+                  ->orWhere(function ($q2) use ($startDate, $endDate) {
+                      $q2->where('transactions.start_date', '<=', $startDate)
+                         ->where('transactions.end_date', '>=', $endDate);
+                  });
+            });
+            
+        // EXCLUDE current transaction when editing
+        if ($currentTransactionId) {
+            $usedInOtherTransactionsQuery->where('transactions.id', '!=', $currentTransactionId);
+        }
+        
+        // Batasi jumlah hasil untuk menghemat memori
+        $usedInOtherTransactions = $usedInOtherTransactionsQuery
+            ->select('detail_transaction_product_item.product_item_id')
+            ->limit(1000) // Batasi jumlah maksimum item yang diambil
             ->pluck('product_item_id')
             ->toArray();
 
-
-        // Gabungkan semua ID yang harus dikeluarkan
+        // Gabungkan semua ID yang harus dikeluarkan dengan cara yang lebih efisien
         $excludedIds = array_unique(array_merge($usedInCurrentRepeater, $usedInOtherTransactions));
-
-
 
         $resultIds = [];
         $displayParts = [];
@@ -296,37 +371,49 @@ class TransactionResource extends BaseOptimizedResource
             // Get currently assigned items for this product in this detail transaction
             $currentlyAssignedIds = [];
             if ($currentDetailTransactionId) {
-                $currentlyAssignedIds = DetailTransactionProductItem::where('detail_transaction_id', $currentDetailTransactionId)
-                    ->whereHas('productItem', function ($q) use ($product) {
-                        $q->where('product_id', $product->id);
-                    })
+                $currentlyAssignedIds = DB::table('detail_transaction_product_item')
+                    ->join('product_items', 'detail_transaction_product_item.product_item_id', '=', 'product_items.id')
+                    ->where('detail_transaction_product_item.detail_transaction_id', $currentDetailTransactionId)
+                    ->where('product_items.product_id', $product->id)
+                    ->select('detail_transaction_product_item.product_item_id')
                     ->pluck('product_item_id')
                     ->toArray();
             }
 
-            // Ambil serial number yang tersedia untuk produk ini (including currently assigned ones)
-            $items = ProductItem::query()
-                ->where('product_id', $product->id)
-                ->where(function ($query) use ($excludedIds, $currentlyAssignedIds) {
-                    // Include items that are not excluded OR currently assigned to this transaction
-                    $query->whereNotIn('id', $excludedIds)
-                        ->orWhereIn('id', $currentlyAssignedIds);
-                })
-                ->limit($requiredQty + count($currentlyAssignedIds))
-                ->get(['id', 'serial_number']);
+            // Ambil serial number yang tersedia untuk produk ini dengan query yang lebih efisien
+            $query = DB::table('product_items')
+                ->where('product_id', $product->id);
+                
+            if (!empty($excludedIds)) {
+                $query->where(function ($q) use ($excludedIds, $currentlyAssignedIds) {
+                    $q->whereNotIn('id', $excludedIds);
+                    if (!empty($currentlyAssignedIds)) {
+                        $q->orWhereIn('id', $currentlyAssignedIds);
+                    }
+                });
+            }
+            
+            $items = $query->limit($requiredQty + count($currentlyAssignedIds))
+                ->select('id', 'serial_number')
+                ->get();
 
             $ids = $items->pluck('id')->toArray();
             $serials = $items->pluck('serial_number')->toArray();
 
             if (!empty($serials)) {
-                $displayParts[] = "{$product->name} (" . implode(', ', $serials) . ")";
+                // Batasi jumlah serial yang ditampilkan untuk menghemat memori
+                if (count($serials) > 5) {
+                    $displaySerials = array_slice($serials, 0, 5);
+                    $displayParts[] = "{$product->name} (" . implode(', ', $displaySerials) . ", +" . (count($serials) - 5) . " more)";
+                } else {
+                    $displayParts[] = "{$product->name} (" . implode(', ', $serials) . ")";
+                }
             }
 
             $resultIds = array_merge($resultIds, $ids);
         }
 
         $finalDisplay = empty($displayParts) ? '-' : implode(', ', $displayParts);
-
 
         return [
             'ids' => $resultIds,
@@ -1058,8 +1145,8 @@ class TransactionResource extends BaseOptimizedResource
                                             if ($detailTransactionId) {
                                                 // Edit mode - show currently assigned serial numbers
                                                 $detailTransaction = \App\Models\DetailTransaction::with('productItems.product')->find($detailTransactionId);
-                                                if ($detailTransaction && $detailTransaction->productItems->isNotEmpty()) {
-                                                    $serialNumbers = $detailTransaction->productItems->pluck('serial_number')->toArray();
+                                            if ($detailTransaction && $detailTransaction->productItems && $detailTransaction->productItems->isNotEmpty()) {
+                                                $serialNumbers = $detailTransaction->productItems->pluck('serial_number')->toArray();
                                                     return new HtmlString('<strong>Assigned:</strong> ' . implode(', ', $serialNumbers));
                                                 }
                                             }
@@ -1102,7 +1189,7 @@ class TransactionResource extends BaseOptimizedResource
                                             $detailTransactionId = $get('id');
                                             if ($detailTransactionId) {
                                                 $detailTransaction = \App\Models\DetailTransaction::with('productItems')->find($detailTransactionId);
-                                                if ($detailTransaction && $detailTransaction->productItems->isNotEmpty()) {
+                                                if ($detailTransaction && $detailTransaction->productItems && $detailTransaction->productItems->isNotEmpty()) {
                                                     return $detailTransaction->productItems->pluck('id')->toArray();
                                                 }
                                             }
@@ -1785,7 +1872,7 @@ class TransactionResource extends BaseOptimizedResource
 
                                             // Get serial numbers for this product in this detail transaction
                                             $serialNumbers = [];
-                                            if ($detail->relationLoaded('productItems')) {
+                                            if ($detail->relationLoaded('productItems') && $detail->productItems) {
                                                 foreach ($detail->productItems as $item) {
                                                     if ($item->product_id == $bundlingProduct->id) {
                                                         $serialNumbers[] = static::highlightSearchTerm($item->serial_number, $searchTerm);
@@ -1819,8 +1906,8 @@ class TransactionResource extends BaseOptimizedResource
 
                                     // Get serial numbers for this product
                                     $serialNumbers = [];
-                                    if ($detail->relationLoaded('productItems')) {
-                                        foreach ($detail->productItems as $item) {
+                                    if ($detail->relationLoaded('productItems') && $detail->productItems) {
+                                    foreach ($detail->productItems as $item) {
                                             $serialNumbers[] = static::highlightSearchTerm($item->serial_number, $searchTerm);
                                         }
                                     }

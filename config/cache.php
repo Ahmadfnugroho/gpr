@@ -75,6 +75,12 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_CACHE_CONNECTION', 'cache'),
             'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'default'),
+            // Redis extension not installed - using file driver instead
+            // 'persistent' => true,
+            // 'read_timeout' => 60,
+            // 'retry_interval' => 100,
+            // 'retry_limit' => 3,
+            'prefix' => env('REDIS_PREFIX', 'gpr_cache:'),
         ],
 
         'dynamodb' => [

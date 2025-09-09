@@ -61,7 +61,10 @@ return [
                 array_filter([
                     PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
                     PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
-
+                    PDO::ATTR_PERSISTENT => true, // Enable persistent connections
+                    PDO::ATTR_EMULATE_PREPARES => false, // Use native prepared statements
+                    PDO::ATTR_TIMEOUT => 60, // Connection timeout in seconds
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, // Throw exceptions on errors
                 ]) : [],
         ],
 
@@ -145,11 +148,16 @@ return [
 
     'redis' => [
 
-        'client' => env('REDIS_CLIENT', 'phpredis'),
+        // Redis extension not installed - disabling Redis functionality
+        // 'client' => env('REDIS_CLIENT', 'phpredis'),
+        'client' => 'null', // Disable Redis functionality
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_') . '_database_'),
+            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+            'read_timeout' => 60,
+            'tcp_keepalive' => 1,
+            'persistent' => true,
         ],
 
         'default' => [
@@ -159,6 +167,7 @@ return [
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_DB', '0'),
+            'read_write_timeout' => 60,
         ],
 
         'cache' => [
@@ -168,6 +177,17 @@ return [
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_CACHE_DB', '1'),
+            'read_write_timeout' => 60,
+        ],
+        
+        'session' => [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('REDIS_USERNAME'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('REDIS_SESSION_DB', '2'),
+            'read_write_timeout' => 60,
         ],
 
     ],

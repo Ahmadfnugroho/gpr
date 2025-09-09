@@ -1,9 +1,0 @@
-name,price,thumbnail,status,category,brand,sub_category,premiere,serial_numbers
-Canon EOS R5,45000000,canon_r5.jpg,available,Camera,Canon,Mirrorless,1,"CAM001,CAM002,CAM003"
-Sony A7 III,28000000,sony_a7iii.jpg,available,Camera,Sony,Mirrorless,1,"CAM004,CAM005"
-Canon 24-70mm f2.8,18000000,canon_2470.jpg,available,Lens,Canon,Zoom Lens,0,"LENS001,LENS002,LENS003,LENS004"
-Sony 85mm f1.4,12000000,sony_85mm.jpg,available,Lens,Sony,Prime Lens,0,"LENS005,LENS006"
-Godox AD600Pro,8000000,godox_ad600.jpg,available,Lighting,Godox,Studio Light,0,"LIGHT001,LIGHT002"
-Manfrotto Carbon Tripod,5500000,manfrotto_tripod.jpg,available,Tripod,Manfrotto,Carbon Tripod,0,"TRIP001,TRIP002,TRIP003"
-DJI Mini 3 Pro,9500000,dji_mini3.jpg,available,Drone,DJI,,1,"DRONE001,DRONE002"
-Rode VideoMic Pro,2500000,rode_videomic.jpg,available,Microphone,Rode,Shotgun Mic,0,"MIC001,MIC002,MIC003"

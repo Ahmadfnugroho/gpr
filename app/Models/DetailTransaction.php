@@ -129,63 +129,110 @@ class DetailTransaction extends Model
         static::creating(function ($detail) {
             // Hanya untuk produk individual (non-bundling)
             if ($detail->product_id && !$detail->bundling_id && $detail->quantity > 0) {
-                DB::transaction(function () use ($detail) {
-                    try {
-                        Log::info("Processing DetailTransaction creation", [
-                            'product_id' => $detail->product_id,
-                            'quantity' => $detail->quantity
-                        ]);
+                // Gunakan static flag untuk mencegah rekursi tak terbatas
+                static $isProcessing = false;
+                
+                // Jika sudah dalam proses creating, jangan lakukan lagi
+                if ($isProcessing) {
+                    return;
+                }
+                
+                $isProcessing = true;
+                
+                try {
+                    DB::transaction(function () use ($detail) {
+                        try {
+                            Log::info("Processing DetailTransaction creation", [
+                                'product_id' => $detail->product_id,
+                                'quantity' => $detail->quantity
+                            ]);
 
-                        // Get transaction dates
-                        $transaction = Transaction::findOrFail($detail->transaction_id);
-                        $startDate = $transaction->start_date;
-                        $endDate = $transaction->end_date;
+                            // Get transaction dates
+                            $transaction = Transaction::findOrFail($detail->transaction_id);
+                            $startDate = $transaction->start_date;
+                            $endDate = $transaction->end_date;
 
-                        // Check availability with date range
-                        $availableItems = ProductItem::where('product_id', $detail->product_id)
-                            ->whereDoesntHave('detailTransactions.transaction', function ($query) use ($startDate, $endDate) {
-                                $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-                                    ->where(function ($q) use ($startDate, $endDate) {
-                                        $q->whereBetween('start_date', [$startDate, $endDate])
-                                            ->orWhereBetween('end_date', [$startDate, $endDate])
-                                            ->orWhere(function ($q2) use ($startDate, $endDate) {
-                                                $q2->where('start_date', '<=', $startDate)
-                                                    ->where('end_date', '>=', $endDate);
-                                            });
-                                    });
-                            })
-                            ->take($detail->quantity)
-                            ->get();
+                            // Check availability with date range - gunakan chunk untuk mengurangi penggunaan memori
+                            $availableItems = ProductItem::where('product_id', $detail->product_id)
+                                ->whereDoesntHave('detailTransactions.transaction', function ($query) use ($startDate, $endDate) {
+                                    $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                        ->where(function ($q) use ($startDate, $endDate) {
+                                            $q->whereBetween('start_date', [$startDate, $endDate])
+                                                ->orWhereBetween('end_date', [$startDate, $endDate])
+                                                ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                                    $q2->where('start_date', '<=', $startDate)
+                                                        ->where('end_date', '>=', $endDate);
+                                                });
+                                        });
+                                })
+                                ->limit($detail->quantity) // Gunakan limit daripada take untuk optimasi
+                                ->get();
 
-                        if ($availableItems->count() < $detail->quantity) {
-                            throw new \Exception("Tidak cukup item yang tersedia untuk periode sewa yang dipilih");
+                            if ($availableItems->count() < $detail->quantity) {
+                                throw new \Exception("Tidak cukup item yang tersedia untuk periode sewa yang dipilih");
+                            }
+
+                            Log::info("Found available items", [
+                                'items' => $availableItems->pluck('id')->toArray()
+                            ]);
+
+                            // Pastikan total_price dihitung dengan benar sebelum insert
+                            $price = $detail->price ?? 0;
+                            $quantity = $detail->quantity ?? 0;
+                            $totalPrice = $price * $quantity;
+                            
+                            // Save detail transaction tanpa trigger creating lagi
+                            DB::table('detail_transactions')->insert([
+                                'transaction_id' => $detail->transaction_id,
+                                'product_id' => $detail->product_id,
+                                'bundling_id' => $detail->bundling_id,
+                                'quantity' => $detail->quantity,
+                                'available_quantity' => $detail->available_quantity,
+                                'price' => $price,
+                                'total_price' => $totalPrice,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                            
+                            // Dapatkan ID yang baru saja dimasukkan
+                            $newDetailId = DB::getPdo()->lastInsertId();
+                            $detail->id = $newDetailId;
+
+                            // Sync items dengan atomic operation dan batasi jumlah item
+                            $itemIds = $availableItems->pluck('id')->toArray();
+                            
+                            // Insert ke pivot table secara langsung untuk menghindari query berlebihan
+                            $pivotData = [];
+                            foreach ($itemIds as $itemId) {
+                                $pivotData[] = [
+                                    'detail_transaction_id' => $newDetailId,
+                                    'product_item_id' => $itemId,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ];
+                            }
+                            
+                            if (!empty($pivotData)) {
+                                DB::table('detail_transaction_product_item')->insert($pivotData);
+                            }
+
+                            Log::info("Successfully synced items", [
+                                'detail_transaction_id' => $newDetailId,
+                                'item_ids' => $itemIds
+                            ]);
+
+                            return true;
+                        } catch (\Exception $e) {
+                            Log::error("Error in DetailTransaction creation", [
+                                'error' => $e->getMessage(),
+                                'product_id' => $detail->product_id
+                            ]);
+                            throw $e;
                         }
-
-                        Log::info("Found available items", [
-                            'items' => $availableItems->pluck('id')->toArray()
-                        ]);
-
-                        // Save detail transaction
-                        $detail->save();
-
-                        // Sync items dengan atomic operation
-                        $itemIds = $availableItems->pluck('id')->toArray();
-                        $detail->productItems()->sync($itemIds);
-
-                        Log::info("Successfully synced items", [
-                            'detail_transaction_id' => $detail->id,
-                            'item_ids' => $itemIds
-                        ]);
-
-                        return true;
-                    } catch (\Exception $e) {
-                        Log::error("Error in DetailTransaction creation", [
-                            'error' => $e->getMessage(),
-                            'product_id' => $detail->product_id
-                        ]);
-                        throw $e;
-                    }
-                });
+                    });
+                } finally {
+                    $isProcessing = false;
+                }
 
                 return false; // Prevent additional save
             }

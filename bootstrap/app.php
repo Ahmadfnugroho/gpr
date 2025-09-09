@@ -4,6 +4,7 @@ use App\Http\Middleware\FrontApiKey;
 use App\Http\Middleware\WhatsAppAuth;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\PerformanceMonitoring;
+use App\Http\Middleware\OptimizedSessionHandler;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -26,6 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
         
         // Add performance monitoring globally (fixed version)
         $middleware->append(PerformanceMonitoring::class);
+        
+        // Temporarily disable optimized session handling due to Redis extension issue
+        // $middleware->append(OptimizedSessionHandler::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

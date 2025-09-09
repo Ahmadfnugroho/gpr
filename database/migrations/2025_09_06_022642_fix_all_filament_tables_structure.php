@@ -14,10 +14,10 @@ return new class extends Migration
     {
         // Fix imports table if it has JSON columns instead of integers
         $this->fixTableStructure('imports');
-        
+
         // Fix exports table if it has JSON columns instead of integers
         $this->fixTableStructure('exports');
-        
+
         // Ensure failed_import_rows table exists with correct structure
         if (!Schema::hasTable('failed_import_rows')) {
             Schema::create('failed_import_rows', function (Blueprint $table) {
@@ -29,28 +29,30 @@ return new class extends Migration
             });
         }
     }
-    
+
     private function fixTableStructure(string $tableName): void
     {
         if (Schema::hasTable($tableName)) {
             try {
                 $columns = DB::select("DESCRIBE {$tableName}");
                 $needsFix = false;
-                
+
                 foreach ($columns as $column) {
-                    if (in_array($column->Field, ['total_rows', 'processed_rows', 'successful_rows']) 
-                        && str_contains($column->Type, 'json')) {
+                    if (
+                        in_array($column->Field, ['total_rows', 'processed_rows', 'successful_rows'])
+                        && str_contains($column->Type, 'json')
+                    ) {
                         $needsFix = true;
                         break;
                     }
                 }
-                
+
                 if ($needsFix) {
                     // Drop and recreate the problematic columns
                     Schema::table($tableName, function (Blueprint $table) {
                         $table->dropColumn(['total_rows', 'processed_rows', 'successful_rows']);
                     });
-                    
+
                     Schema::table($tableName, function (Blueprint $table) {
                         $table->unsignedInteger('processed_rows')->default(0);
                         $table->unsignedInteger('total_rows');
@@ -59,7 +61,6 @@ return new class extends Migration
                 }
             } catch (\Exception $e) {
                 // If there's any error, skip this table
-                \Log::warning("Could not fix {$tableName} structure: " . $e->getMessage());
             }
         }
     }

@@ -137,9 +137,54 @@ class RepositoryServiceProvider extends ServiceProvider
         
         // Set connection timeout (if using Redis)
         if (config('cache.default') === 'redis') {
-            config(['database.redis.options.read_timeout' => 10]);
+            config(['database.redis.options.read_timeout' => 60]);
             config(['database.redis.options.tcp_keepalive' => 1]);
         }
+        
+        // Add event listener for connection errors
+        DB::listen(function ($query) {
+            if (str_contains($query->sql, 'Lock wait timeout exceeded')) {
+                Log::warning('Lock wait timeout detected', [
+                    'sql' => $query->sql,
+                    'bindings' => $query->bindings,
+                    'time' => $query->time . 'ms',
+                    'connection' => $query->connection->getName(),
+                ]);
+            }
+        });
+        
+        // Configure retry mechanism for database operations
+        app()->singleton('db.retry', function () {
+            return new class {
+                public function run(\Closure $callback, $maxAttempts = 3, $sleepMs = 100)
+                {
+                    $attempts = 0;
+                    
+                    while ($attempts < $maxAttempts) {
+                        try {
+                            return $callback();
+                        } catch (\Exception $e) {
+                            $attempts++;
+                            
+                            // Only retry on lock timeout errors
+                            if (!str_contains($e->getMessage(), 'Lock wait timeout exceeded') || $attempts >= $maxAttempts) {
+                                throw $e;
+                            }
+                            
+                            // Exponential backoff
+                            $sleepTime = $sleepMs * pow(2, $attempts - 1);
+                            usleep($sleepTime * 1000);
+                            
+                            Log::info('Retrying database operation after lock timeout', [
+                                'attempt' => $attempts,
+                                'max_attempts' => $maxAttempts,
+                                'sleep_ms' => $sleepTime,
+                            ]);
+                        }
+                    }
+                }
+            };
+        });
     }
     
     /**
