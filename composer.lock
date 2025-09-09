@@ -9903,11 +9903,7 @@
             },
             "type": "library",
             "extra": {
-                "laravel": {
-                    "providers": [
-                        "NunoMaduro\\Collision\\Adapters\\Laravel\\CollisionServiceProvider"
-                    ]
-                },
+                "laravel": {},
                 "branch-alias": {
                     "dev-8.x": "8.x-dev"
                 }
