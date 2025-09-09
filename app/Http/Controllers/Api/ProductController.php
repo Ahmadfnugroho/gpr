@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\ProductResource;
 use App\Models\Product;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Symfony\Component\CssSelector\Node\FunctionNode;
 
@@ -18,6 +19,16 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
+        // Validate date parameters
+        $request->validate([
+            'start_date' => 'nullable|date|date_format:Y-m-d',
+            'end_date' => 'nullable|date|date_format:Y-m-d|after_or_equal:start_date',
+        ]);
+
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        // Build base query with relationships
         $query = Product::query()
             ->with([
                 'brand:id,name,slug,logo,premiere',
@@ -28,6 +39,36 @@ class ProductController extends Controller
                 'rentalIncludes.includedProduct:id,name,slug,thumbnail',
                 'items:id,product_id,serial_number,is_available'
             ]);
+
+        // Add available_quantity calculation with date range filtering
+        if ($startDate && $endDate) {
+            // Calculate available quantity for specific date range
+            $query->withCount([
+                'items as available_quantity' => function ($q) use ($startDate, $endDate) {
+                    $q->whereDoesntHave('detailTransactions', function ($dtq) use ($startDate, $endDate) {
+                        $dtq->whereHas('transaction', function ($tq) use ($startDate, $endDate) {
+                            $tq->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                ->where(function ($dateQuery) use ($startDate, $endDate) {
+                                    // Overlap detection logic
+                                    $dateQuery
+                                        // Case 1: Transaction starts within our date range
+                                        ->whereBetween('start_date', [$startDate, $endDate])
+                                        // Case 2: Transaction ends within our date range  
+                                        ->orWhereBetween('end_date', [$startDate, $endDate])
+                                        // Case 3: Transaction completely encompasses our date range
+                                        ->orWhere(function ($encompassQuery) use ($startDate, $endDate) {
+                                            $encompassQuery->where('start_date', '<=', $startDate)
+                                                ->where('end_date', '>=', $endDate);
+                                        });
+                                });
+                        });
+                    });
+                }
+            ]);
+        } else {
+            // No date range specified, return total items count
+            $query->withCount('items as available_quantity');
+        }
 
         // 🔍 Search
         if ($search = $request->query('q')) {
@@ -102,8 +143,18 @@ class ProductController extends Controller
         // Pastikan response mengikuti struktur API yang konsisten
         return ProductResource::collection($products);
     }
-    public function show(Product $product)
+    public function show(Request $request, Product $product)
     {
+        // Validate date parameters
+        $request->validate([
+            'start_date' => 'nullable|date|date_format:Y-m-d',
+            'end_date' => 'nullable|date|date_format:Y-m-d|after_or_equal:start_date',
+        ]);
+
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        // Load relationships
         $product->load([
             'category',
             'brand',
@@ -113,6 +164,22 @@ class ProductController extends Controller
             'productPhotos:id,product_id,photo',
             'items:id,product_id,serial_number,is_available'
         ]);
+
+        // Calculate available quantity based on date range
+        if ($startDate && $endDate) {
+            // Use the existing method from Product model
+            $availableQuantity = $product->getAvailableQuantityForPeriod(
+                Carbon::parse($startDate), 
+                Carbon::parse($endDate)
+            );
+        } else {
+            // No date range specified, return total items count
+            $availableQuantity = $product->items()->count();
+        }
+
+        // Add available_quantity to the model data
+        $product->available_quantity = $availableQuantity;
+
         return new ProductResource($product);
     }
     public function all(Product $product)

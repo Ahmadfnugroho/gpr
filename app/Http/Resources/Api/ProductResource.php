@@ -18,6 +18,9 @@ class ProductResource extends JsonResource
             'quantity' => $this->whenLoaded('items', function () {
                 return $this->items->count();
             }) ?: 0,
+            'available_quantity' => $this->available_quantity ?? ($this->whenLoaded('items', function () {
+                return $this->items->count();
+            }) ?: 0),
             'price' => $this->price,
             'thumbnail' => $this->thumbnail ? asset('storage/' . ltrim($this->thumbnail, '/')) : null,
             'status' => $this->status,

@@ -46,6 +46,7 @@ class BundlingResource extends JsonResource
                             ? (int)$product->price
                             : $product->price,
                         'quantity' => $product->pivot->quantity ?? 1,
+                        'available_quantity' => $product->available_quantity ?? ($product->items ? $product->items->count() : 0),
                         
                         // Category
                         'category' => $product->category ? [
