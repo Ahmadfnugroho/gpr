@@ -196,21 +196,37 @@ class TransactionService
         // Apply business logic based on status
         $updates = ['booking_status' => $status];
 
+        // Load relations for proper calculation
+        $transaction->load(['detailTransactions.product', 'detailTransactions.bundling', 'promo']);
+        
+        // Use calculated grand total (includes additional services)
+        $correctGrandTotal = $transaction->calculateGrandTotal();
+        $updates['grand_total'] = $correctGrandTotal; // Always update with correct value
+        
         switch ($status) {
             case 'paid':
-                $updates['down_payment'] = $transaction->grand_total;
+                // Only set down_payment to grand_total if no existing down_payment
+                if (!$transaction->down_payment || $transaction->down_payment <= 0) {
+                    $updates['down_payment'] = $correctGrandTotal;
+                }
+                // Otherwise preserve existing down_payment
                 $updates['remaining_payment'] = 0;
                 break;
 
             case 'cancel':
-                $cancellationFee = (int)floor($transaction->grand_total * 0.5);
+                $cancellationFee = (int)floor($correctGrandTotal * 0.5);
                 $updates['cancellation_fee'] = $cancellationFee;
+                // For cancellations, always set down_payment to cancellation fee (business rule)
                 $updates['down_payment'] = $cancellationFee;
                 $updates['remaining_payment'] = 0;
                 break;
 
             case 'on_rented':
-                $updates['down_payment'] = $transaction->grand_total;
+                // Only set down_payment to grand_total if no existing down_payment
+                if (!$transaction->down_payment || $transaction->down_payment <= 0) {
+                    $updates['down_payment'] = $correctGrandTotal;
+                }
+                // Otherwise preserve existing down_payment
                 $updates['remaining_payment'] = 0;
                 break;
         }

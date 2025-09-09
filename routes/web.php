@@ -124,3 +124,8 @@ Route::post('/failed-import/clear', [App\Http\Controllers\FailedImportDownloadCo
 
 // Include import error handling routes
 require __DIR__ . '/import.php';
+
+// Include debug routes for local development
+if (app()->environment('local')) {
+    require __DIR__ . '/debug.php';
+}

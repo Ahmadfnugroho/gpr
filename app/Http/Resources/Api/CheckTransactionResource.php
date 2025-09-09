@@ -23,8 +23,8 @@ class CheckTransactionResource extends JsonResource
             'end_date' => $this->end_date,
             'duration' => $this->duration,
             'note' => $this->note,
-            'down_payment' => $this->down_payment,
-            'remaining_payment' => $this->remaining_payment,
+            'down_payment' => (int) ($this->down_payment ?? 0), // DATABASE ONLY
+            'remaining_payment' => (int) ($this->remaining_payment ?? 0), // DATABASE ONLY
             
             // Customer relationship (primary)
             'customer' => $this->whenLoaded('customer', function () {

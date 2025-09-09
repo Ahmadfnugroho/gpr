@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -11,26 +12,67 @@ class Promo extends Model
 {
     use LogsActivity;
 
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($promo) {
+            // Auto-generate code if not provided
+            if (empty($promo->code)) {
+                $promo->code = static::generateUniqueCode();
+            }
+        });
+    }
+
     protected $fillable = [
         'name',
-        'nominal',
+        'code',
+        'description',
         'type',
         'rules',
+        'value',
+        'min_transaction',
+        'max_discount',
+        'valid_from',
+        'valid_until',
         'active',
     ];
 
     protected $casts = [
         'rules' => 'array', // Untuk menyimpan aturan diskon dalam JSON
+        'valid_from' => 'datetime',
+        'valid_until' => 'datetime',
+        'active' => 'boolean',
     ];
+
+    /**
+     * Generate a unique promo code.
+     */
+    public static function generateUniqueCode(): string
+    {
+        do {
+            // Generate code with format PROMO-XXXXXX (6 random uppercase characters)
+            $code = 'PROMO-' . Str::upper(Str::random(6));
+        } while (static::where('code', $code)->exists());
+
+        return $code;
+    }
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
             ->logOnly([
                 'name',
-                'nominal',
+                'code',
+                'description',
                 'type',
                 'rules',
+                'value',
+                'valid_from',
+                'valid_until',
                 'active',
             ]);
     }

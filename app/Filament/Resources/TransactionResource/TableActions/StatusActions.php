@@ -61,11 +61,9 @@ class StatusActions
                     ->label('Paid') // Label yang ditampilkan
                     ->requiresConfirmation() // Memastikan action memerlukan konfirmasi sebelum dijalankan
                     ->action(function (Transaction $record) {
-                        // Update booking_status menjadi 'paid'
-                        $record->update([
-                            'booking_status' => 'paid',
-                            'down_payment' => $record->grand_total, // Set down_payment sama dengan grand_total
-                        ]);
+                        // DATABASE VALUES ONLY - NO CALCULATIONS OR OVERRIDES
+                        // Only change booking status, preserve all financial values
+                        $record->update(['booking_status' => 'paid']);
 
                         // Notifikasi sukses
                         Notification::make()
@@ -80,11 +78,9 @@ class StatusActions
                     ->label('cancel')
                     ->requiresConfirmation()
                     ->action(function (Transaction $record) {
-                        $record->update([
-                            'booking_status' => 'cancel',
-                            'down_payment' => $record->grand_total, // Set down_payment sama dengan grand_total
-
-                        ]);
+                        // DATABASE VALUES ONLY - NO CALCULATIONS OR OVERRIDES
+                        // Only change booking status, preserve all financial values
+                        $record->update(['booking_status' => 'cancel']);
 
 
 
@@ -100,11 +96,9 @@ class StatusActions
                     ->label('on_rented')
                     ->requiresConfirmation()
                     ->action(function (Transaction $record) {
-                        $record->update([
-                            'booking_status' => 'on_rented',
-                            'down_payment' => $record->grand_total, // Set down_payment sama dengan grand_total
-
-                        ]);
+                        // DATABASE VALUES ONLY - NO CALCULATIONS OR OVERRIDES
+                        // Only change booking status, preserve all financial values
+                        $record->update(['booking_status' => 'on_rented']);
 
 
 

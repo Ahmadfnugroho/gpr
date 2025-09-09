@@ -157,13 +157,24 @@ class TransactionProductColumn
             TextInputColumn::make('down_payment')
                 ->label('DP')
                 ->default(
-                    function (Get $get, Set $set): int {
-                        $downPayment = $get('grand_total') * 0.5;
+                    function (Get $get, Set $set, $record): int {
+                        // CRITICAL FIX: Only set default if down_payment is null/0
+                        // Don't override existing down_payment values!
+                        if ($record && $record->down_payment && $record->down_payment > 0) {
+                            // Return existing value, don't override
+                            return (int) $record->down_payment;
+                        }
+                        
+                        // Only calculate default for new/empty records
+                        $grandTotal = $get('grand_total') ?? ($record->grand_total ?? 0);
+                        $downPayment = (int) ($grandTotal * 0.5);
+                        
+                        // Set the calculated value only if no existing value
                         $set('down_payment', $downPayment);
-
                         return $downPayment;
                     }
                 )
+                ->formatStateUsing(fn(int $state): string => 'Rp ' . number_format($state, 0, ',', '.'))
                 ->sortable(),
             TextColumn::make('remaining_payment')
                 ->label('Sisa')

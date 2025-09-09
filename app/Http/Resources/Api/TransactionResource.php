@@ -9,34 +9,47 @@ class TransactionResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
+     * DATABASE VALUES ONLY - NO CALCULATIONS OR OVERRIDES
+     * Ensures API returns exactly what's stored in database
      *
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
         return [
+            // Core transaction data - direct from database
             'id' => $this->id,
             'booking_transaction_id' => $this->booking_transaction_id,
-            'grand_total' => $this->grand_total,
+            
+            // Financial fields - DATABASE VALUES ONLY, no calculations
+            'grand_total' => (int) ($this->grand_total ?? 0),
+            'down_payment' => (int) ($this->down_payment ?? 0), // ← DATABASE ONLY
+            'remaining_payment' => (int) ($this->remaining_payment ?? 0), // ← DATABASE ONLY
+            'cancellation_fee' => (int) ($this->cancellation_fee ?? 0),
+            
+            // Status and dates - direct from database
             'booking_status' => $this->booking_status,
             'start_date' => $this->start_date,
             'end_date' => $this->end_date,
-            'duration' => $this->duration,
+            'duration' => (int) ($this->duration ?? 0),
             'note' => $this->note,
-            'down_payment' => $this->down_payment,
-            'remaining_payment' => $this->remaining_payment,
-            'additional_fee_1_name' => $this->additional_fee_1_name,
-            'additional_fee_1_amount' => $this->additional_fee_1_amount,
-            'additional_fee_2_name' => $this->additional_fee_2_name,
-            'additional_fee_2_amount' => $this->additional_fee_2_amount,
-            'additional_fee_3_name' => $this->additional_fee_3_name,
-            'additional_fee_3_amount' => $this->additional_fee_3_amount,
+            
+            // Additional services - direct from database
             'additional_services' => $this->additional_services,
-            'cancellation_fee' => $this->cancellation_fee,
+            
+            // Legacy additional fees - direct from database
+            'additional_fee_1_name' => $this->additional_fee_1_name,
+            'additional_fee_1_amount' => (int) ($this->additional_fee_1_amount ?? 0),
+            'additional_fee_2_name' => $this->additional_fee_2_name,
+            'additional_fee_2_amount' => (int) ($this->additional_fee_2_amount ?? 0),
+            'additional_fee_3_name' => $this->additional_fee_3_name,
+            'additional_fee_3_amount' => (int) ($this->additional_fee_3_amount ?? 0),
+            
+            // Timestamps
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             
-            // Relationships
+            // Relationships - only when loaded
             'customer' => $this->whenLoaded('customer', function () {
                 return new CustomerResource($this->customer);
             }),
@@ -56,6 +69,13 @@ class TransactionResource extends JsonResource
             'detailTransactions' => $this->whenLoaded('detailTransactions', function () {
                 return DetailTransactionResource::collection($this->detailTransactions);
             }),
+            
+            // Meta information for API consumers
+            '_meta' => [
+                'data_source' => 'database_only',
+                'no_calculations' => true,
+                'note' => 'All financial values are returned exactly as stored in database'
+            ]
         ];
     }
 }

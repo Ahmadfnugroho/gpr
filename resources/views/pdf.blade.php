@@ -511,117 +511,86 @@
       </div>
       <div class="col col-6">
         <table class="summary-table">
+          @php
+          $breakdown = $record->getFinancialBreakdown();
+          $discountDetails = $record->getDiscountDetails();
+          $additionalServices = $record->getAdditionalServicesList();
+          @endphp
+          
           <tr>
             <td class="summary-label">Durasi:</td>
-            <td class="summary-value">{{ $record->duration ?? 0 }} Hari</td>
+            <td class="summary-value">{{ $breakdown['duration'] }} Hari</td>
           </tr>
           <tr>
-            <td class="summary-label">Total:</td>
-            <td class="summary-value">
-              @php
-              $totalPrice = 0;
-              foreach ($record->DetailTransactions as $detail) {
-              if ($detail->bundling_id && $detail->bundling) {
-              $price = $detail->bundling->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              } elseif ($detail->product) {
-              $price = $detail->product->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              } else {
-              $price = $detail->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              }
-              $totalPrice += $price * $qty;
-              }
-              @endphp
-              Rp{{ number_format($totalPrice * ($record->duration ?? 1), 0, ',', '.') }}
+            <td class="summary-label">Harga Dasar:</td>
+            <td class="summary-value">Rp{{ number_format($breakdown['base_price'], 0, ',', '.') }}</td>
+          </tr>
+          <tr>
+            <td class="summary-label">Total ({{ $breakdown['duration'] }} hari):</td>
+            <td class="summary-value">Rp{{ number_format($breakdown['total_with_duration'], 0, ',', '.') }}</td>
+          </tr>
+          @if($breakdown['discount_amount'] > 0)
+          <tr style="background-color: #fee2e2; color: #991b1b;">
+            <td class="summary-label">
+              <strong>Diskon ({{ $record->promo->name ?? 'Promo' }}):</strong>
+              @if(isset($discountDetails['explanation']))
+              <br><small style="font-style: italic; font-size: 6px;">{{ $discountDetails['explanation'] }}</small>
+              @endif
             </td>
-          </tr>
-          <tr>
-            <td class="summary-label">Diskon:</td>
-            <td class="summary-value">
-              @php
-              $diskon = 0;
-              $totalPriceForDiscount = 0;
-
-              foreach ($record->DetailTransactions as $detail) {
-              if ($detail->bundling_id && $detail->bundling) {
-              $price = $detail->bundling->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              } elseif ($detail->product) {
-              $price = $detail->product->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              } else {
-              $price = $detail->price ?? 0;
-              $qty = $detail->quantity ?? 1;
-              }
-              $totalPriceForDiscount += $price * $qty;
-              }
-
-              if ($record->promo && $record->promo->rules) {
-              $rules = $record->promo->rules;
-              $duration = $record->duration ?? 1;
-              $groupSize = isset($rules[0]['group_size']) ? (int) $rules[0]['group_size'] : 1;
-              $payDays = isset($rules[0]['pay_days']) ? (int) $rules[0]['pay_days'] : $groupSize;
-              $discountedDays = (int) ($duration / $groupSize) * $payDays;
-              $remainingDays = $duration % $groupSize;
-              $daysToPay = $discountedDays + $remainingDays;
-
-              $diskon = match ($record->promo->type ?? 'none') {
-              'day_based' => (int) ((int) ($totalPriceForDiscount * $duration) - ($totalPriceForDiscount * $daysToPay)),
-              'percentage' => (int) (($totalPriceForDiscount * $duration) * (($rules[0]['percentage'] ?? 0) / 100)),
-              'nominal' => min($rules[0]['nominal'] ?? 0, (int) ($totalPriceForDiscount * $duration)),
-              default => 0,
-              };
-              }
-              @endphp
-              Rp{{ number_format($diskon, 0, ',', '.') }}
-            </td>
-          </tr>
-          @if($record->additional_services && is_array($record->additional_services) && count($record->additional_services) > 0)
-          @foreach($record->additional_services as $service)
-          @if(isset($service['name']) && isset($service['amount']) && $service['amount'] > 0)
-          <tr>
-            <td class="summary-label">{{ $service['name'] }}:</td>
-            <td class="summary-value">Rp{{ number_format($service['amount'], 0, ',', '.') }}</td>
+            <td class="summary-value"><strong>-Rp{{ number_format($breakdown['discount_amount'], 0, ',', '.') }}</strong></td>
           </tr>
           @endif
+          @if(count($additionalServices) > 0)
+          @foreach($additionalServices as $service)
+          <tr style="background-color: #eff6ff; color: #1d4ed8;">
+            <td class="summary-label">{{ $service['name'] }}:</td>
+            <td class="summary-value">+Rp{{ number_format($service['amount'], 0, ',', '.') }}</td>
+          </tr>
           @endforeach
+          
+          @if(count($additionalServices) > 1)
+          <tr style="background-color: #dbeafe; color: #1e40af;">
+            <td class="summary-label font-semibold">Total Additional Services:</td>
+            <td class="summary-value font-semibold">+Rp{{ number_format($breakdown['additional_services'], 0, ',', '.') }}</td>
+          </tr>
+          @endif
+          @endif
+          
+          <tr style="background-color: #ffe6e6; color: #d63031;">
+            <td class="summary-label font-semibold">Biaya Pembatalan (50%):</td>
+            <td class="summary-value font-semibold">Rp{{ number_format($record->getStoredGrandTotalAmount() > 0 ? floor($record->getStoredGrandTotalAmount() * 0.5) : 0, 0, ',', '.') }}</td>
+          </tr>
+          <tr class="grand-total">
+            <td class="summary-label">Grand Total:</td>
+            <td class="summary-value">Rp{{ number_format($record->getGrandTotalWithFallback(), 0, ',', '.') }}</td>
+          </tr>
+          
+          @php
+          $paymentStatus = $record->getPaymentStatus();
+          @endphp
+          
+          @if($record->getDownPaymentAmount() > 0)
+          <tr style="background-color: #f0f9ff; border-top: 1px solid #e0e7ff;">
+            <td class="summary-label">Down Payment (DP):</td>
+            <td class="summary-value">Rp{{ number_format($record->getDownPaymentAmount(), 0, ',', '.') }}</td>
+          </tr>
           @endif
           
           @php
-          $totalAdditionalServices = 0;
-          if ($record->additional_services && is_array($record->additional_services)) {
-              foreach ($record->additional_services as $service) {
-                  if (isset($service['amount']) && $service['amount'] > 0) {
-                      $totalAdditionalServices += $service['amount'];
-                  }
-              }
-          }
-          
-          // Legacy support for old structure
-          $totalAdditionalServices += ($record->additional_fee_1_amount ?? 0);
-          $totalAdditionalServices += ($record->additional_fee_2_amount ?? 0);
-          $totalAdditionalServices += ($record->additional_fee_3_amount ?? 0);
+          $remainingPayment = $record->getRemainingPaymentAmount();
           @endphp
           
-          @if($totalAdditionalServices > 0)
-          <tr style="background-color: #e8f4fd; color: #1e40af;">
-            <td class="summary-label font-semibold">Total Additional Services:</td>
-            <td class="summary-value font-semibold">Rp{{ number_format($totalAdditionalServices, 0, ',', '.') }}</td>
+          @if($remainingPayment > 0)
+          <tr style="background-color: #fff7ed; border-top: 1px solid #fed7aa; color: #ea580c;">
+            <td class="summary-label font-semibold">Sisa Pembayaran:</td>
+            <td class="summary-value font-semibold">Rp{{ number_format($remainingPayment, 0, ',', '.') }}</td>
+          </tr>
+          @else
+          <tr style="background-color: #f0fdf4; border-top: 1px solid #bbf7d0; color: #16a34a;">
+            <td class="summary-label font-semibold">Status Pembayaran:</td>
+            <td class="summary-value font-semibold">LUNAS</td>
           </tr>
           @endif
-          
-          @if($record->booking_status === 'cancel' && $record->cancellation_fee && $record->cancellation_fee > 0)
-          <tr style="background-color: #ffe6e6; color: #d63031;">
-            <td class="summary-label font-semibold">Biaya Pembatalan (50%):</td>
-            <td class="summary-value font-semibold">Rp{{ number_format($record->cancellation_fee, 0, ',', '.') }}</td>
-          </tr>
-          @endif
-          <tr class="grand-total">
-            <td class="summary-label">Grand Total:</td>
-            <td class="summary-value">Rp{{ number_format($record->grand_total ?? 0, 0, ',', '.') }}</td>
-          </tr>
         </table>
       </div>
     </div>

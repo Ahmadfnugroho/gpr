@@ -23,14 +23,28 @@ class TransactionBulkActions
 
 
                 ->action(function (Collection $records) {
-                    // Batch update for better performance
-                    $recordIds = $records->pluck('id')->toArray();
-                    \App\Models\Transaction::whereIn('id', $recordIds)
-                        ->update(['booking_status' => 'booking', 'updated_at' => now()]);
+                    // Update each record individually to trigger observers and proper calculations
+                    $updatedCount = 0;
+                    foreach ($records as $record) {
+                        try {
+                            // Load relations needed for calculation
+                            $record->load(['detailTransactions.product', 'detailTransactions.bundling', 'promo']);
+                            
+                            // Update status and let observers handle grand_total calculation
+                            $record->booking_status = 'booking';
+                            $record->save();
+                            $updatedCount++;
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error('BulkAction booking failed', [
+                                'transaction_id' => $record->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
                     
                     Notification::make()
                         ->success()
-                        ->title('Berhasil Mengubah Status ' . count($recordIds) . ' Transaksi ke Booking')
+                        ->title('Berhasil Mengubah Status ' . $updatedCount . ' Transaksi ke Booking')
                         ->send();
                 }),
 
@@ -44,14 +58,28 @@ class TransactionBulkActions
 
 
                 ->action(function (Collection $records) {
-                    // Batch update for better performance
-                    $recordIds = $records->pluck('id')->toArray();
-                    \App\Models\Transaction::whereIn('id', $recordIds)
-                        ->update(['booking_status' => 'paid', 'updated_at' => now()]);
+                    // Update each record individually to trigger observers and proper calculations
+                    $updatedCount = 0;
+                    foreach ($records as $record) {
+                        try {
+                            // Load relations needed for calculation
+                            $record->load(['detailTransactions.product', 'detailTransactions.bundling', 'promo']);
+                            
+                            // Update status and let observers handle grand_total calculation
+                            $record->booking_status = 'paid';
+                            $record->save();
+                            $updatedCount++;
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error('BulkAction paid failed', [
+                                'transaction_id' => $record->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
                     
                     Notification::make()
                         ->success()
-                        ->title('Berhasil Mengubah Status ' . count($recordIds) . ' Transaksi ke Paid')
+                        ->title('Berhasil Mengubah Status ' . $updatedCount . ' Transaksi ke Paid')
                         ->send();
                 }),
 
@@ -64,14 +92,28 @@ class TransactionBulkActions
 
 
                 ->action(function (Collection $records) {
-                    // Batch update for better performance
-                    $recordIds = $records->pluck('id')->toArray();
-                    \App\Models\Transaction::whereIn('id', $recordIds)
-                        ->update(['booking_status' => 'cancel', 'updated_at' => now()]);
+                    // Update each record individually to trigger observers and proper calculations
+                    $updatedCount = 0;
+                    foreach ($records as $record) {
+                        try {
+                            // Load relations needed for calculation
+                            $record->load(['detailTransactions.product', 'detailTransactions.bundling', 'promo']);
+                            
+                            // Update status and let observers handle grand_total calculation
+                            $record->booking_status = 'cancel';
+                            $record->save();
+                            $updatedCount++;
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error('BulkAction cancel failed', [
+                                'transaction_id' => $record->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
                     
                     Notification::make()
                         ->success()
-                        ->title('Berhasil Mengubah Status ' . count($recordIds) . ' Transaksi ke Cancel')
+                        ->title('Berhasil Mengubah Status ' . $updatedCount . ' Transaksi ke Cancel')
                         ->send();
                 }),
 
@@ -84,14 +126,28 @@ class TransactionBulkActions
 
 
                 ->action(function (Collection $records) {
-                    // Batch update for better performance
-                    $recordIds = $records->pluck('id')->toArray();
-                    \App\Models\Transaction::whereIn('id', $recordIds)
-                        ->update(['booking_status' => 'on_rented', 'updated_at' => now()]);
+                    // Update each record individually to trigger observers and proper calculations
+                    $updatedCount = 0;
+                    foreach ($records as $record) {
+                        try {
+                            // Load relations needed for calculation
+                            $record->load(['detailTransactions.product', 'detailTransactions.bundling', 'promo']);
+                            
+                            // Update status and let observers handle grand_total calculation
+                            $record->booking_status = 'on_rented';
+                            $record->save();
+                            $updatedCount++;
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error('BulkAction on_rented failed', [
+                                'transaction_id' => $record->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
                     
                     Notification::make()
                         ->success()
-                        ->title('Berhasil Mengubah Status ' . count($recordIds) . ' Transaksi ke On Rented')
+                        ->title('Berhasil Mengubah Status ' . $updatedCount . ' Transaksi ke On Rented')
                         ->send();
                 }),
 
@@ -104,14 +160,28 @@ class TransactionBulkActions
 
 
                 ->action(function (Collection $records) {
-                    // Batch update for better performance
-                    $recordIds = $records->pluck('id')->toArray();
-                    \App\Models\Transaction::whereIn('id', $recordIds)
-                        ->update(['booking_status' => 'done', 'updated_at' => now()]);
+                    // Update each record individually to trigger observers and proper calculations
+                    $updatedCount = 0;
+                    foreach ($records as $record) {
+                        try {
+                            // Load relations needed for calculation
+                            $record->load(['detailTransactions.product', 'detailTransactions.bundling', 'promo']);
+                            
+                            // Update status and let observers handle grand_total calculation
+                            $record->booking_status = 'done';
+                            $record->save();
+                            $updatedCount++;
+                        } catch (\Exception $e) {
+                            \Illuminate\Support\Facades\Log::error('BulkAction done failed', [
+                                'transaction_id' => $record->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
                     
                     Notification::make()
                         ->success()
-                        ->title('Berhasil Mengubah Status ' . count($recordIds) . ' Transaksi ke Done')
+                        ->title('Berhasil Mengubah Status ' . $updatedCount . ' Transaksi ke Done')
                         ->send();
                 }),
 

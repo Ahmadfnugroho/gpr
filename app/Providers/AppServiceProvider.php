@@ -54,7 +54,7 @@ class AppServiceProvider extends ServiceProvider
         }, 'Ukuran file :attribute tidak boleh melebihi :max_server_size KB setelah kompresi.');
 
         DetailTransaction::observe(DetailTransactionObserver::class);
-
+        Transaction::observe(TransactionObserver::class);
 
         DetailTransaction::updated(function ($detailTransaction) {
             if ($detailTransaction->isDirty('booking_status')) {

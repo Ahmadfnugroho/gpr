@@ -5,11 +5,12 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\BaseOptimizedResource;
 use App\Filament\Resources\TransactionResource\Number;
 use App\Filament\Resources\TransactionResource\Pages;
-use App\Services\TransactionImportExportService;
 use App\Services\ResourceCacheService;
 use App\Repositories\TransactionRepository;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use App\Services\PromoCalculationService;
+use Filament\Forms\Components\DatePicker;
 
 use App\Models\Bundling;
 use App\Models\Product;
@@ -54,6 +55,8 @@ use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Actions\Exports\Enums\ExportFormat;
 use App\Filament\Exports\TransactionExporter;
+use Filament\Tables\Actions\ExportAction;
+use Filament\Tables\Actions\ExportBulkAction;
 use Illuminate\Support\Facades\DB;
 
 use Filament\Tables\Columns\TextInputColumn;
@@ -94,16 +97,7 @@ class TransactionResource extends BaseOptimizedResource
     protected static function getSelectColumns(): array
     {
         return [
-            'transactions.id',
-            'transactions.booking_transaction_id',
-            'transactions.customer_id',
-            'transactions.start_date',
-            'transactions.end_date',
-            'transactions.grand_total',
-            'transactions.booking_status',
-            'transactions.promo_id',
-            'transactions.created_at',
-            'transactions.updated_at'
+            'transactions.*'
         ];
     }
 
@@ -125,10 +119,87 @@ class TransactionResource extends BaseOptimizedResource
         ];
     }
 
-    // Global Search disabled for TransactionResource
+    /**
+     * Global search attributes for TransactionResource
+     * Searches: booking_transaction_id, customer.name, product names, bundling names
+     */
     public static function getGloballySearchableAttributes(): array
     {
-        return [];
+        return [
+            'booking_transaction_id',
+            'customer.name',
+        ];
+    }
+
+    /**
+     * Override global search to include product and bundling names
+     */
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        return parent::getGlobalSearchEloquentQuery()->with([
+            'customer:id,name',
+            'detailTransactions:id,transaction_id,product_id,bundling_id',
+            'detailTransactions.product:id,name',
+            'detailTransactions.bundling:id,name',
+            'detailTransactions.productItems:id,serial_number,product_id',
+        ]);
+    }
+
+    /**
+     * Override global search query to include product and bundling names with case-insensitive search
+     */
+    public static function getGlobalSearchQuery(string $search): Builder
+    {
+        $lowerSearch = strtolower($search);
+
+        return static::getModel()::query()
+            ->with([
+                'customer:id,name',
+                'detailTransactions:id,transaction_id,product_id,bundling_id',
+                'detailTransactions.product:id,name',
+                'detailTransactions.bundling:id,name',
+            ])
+            ->where(function (Builder $query) use ($lowerSearch) {
+                $query->whereRaw('LOWER(booking_transaction_id) LIKE ?', ["%{$lowerSearch}%"])
+                    ->orWhereHas('customer', function (Builder $q) use ($lowerSearch) {
+                        $q->whereRaw('LOWER(name) LIKE ?', ["%{$lowerSearch}%"]);
+                    })
+                    ->orWhereHas('detailTransactions.product', function (Builder $q) use ($lowerSearch) {
+                        $q->whereRaw('LOWER(name) LIKE ?', ["%{$lowerSearch}%"]);
+                    })
+                    ->orWhereHas('detailTransactions.bundling', function (Builder $q) use ($lowerSearch) {
+                        $q->whereRaw('LOWER(name) LIKE ?', ["%{$lowerSearch}%"]);
+                    });
+            });
+    }
+
+    /**
+     * Custom global search results details
+     */
+    public static function getGlobalSearchResultDetails($record): array
+    {
+        $details = [];
+
+        // Add customer name
+        if ($record->customer) {
+            $details['Customer'] = $record->customer->name;
+        }
+
+        // Add product/bundling info
+        $products = [];
+        foreach ($record->detailTransactions as $detail) {
+            if ($detail->bundling) {
+                $products[] = $detail->bundling->name . ' (Bundle)';
+            } elseif ($detail->product) {
+                $products[] = $detail->product->name;
+            }
+        }
+
+        if (!empty($products)) {
+            $details['Products'] = implode(', ', array_unique($products));
+        }
+
+        return $details;
     }
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
@@ -532,65 +603,24 @@ class TransactionResource extends BaseOptimizedResource
     protected static function calculateDiscountAmount(Get $get, int $totalBeforeDiscount): int
     {
         $promoId = $get('promo_id');
-        if (!$promoId) return 0;
-
-        $promo = \App\Models\Promo::find($promoId);
-        if (!$promo || !is_array($promo->rules) || empty($promo->rules)) {
-            return 0;
-        }
-
-        $rule = $promo->rules[0] ?? [];
         $duration = (int)($get('duration') ?? 1);
 
-        // Apply discount per duration (multiply by duration)
-        $totalWithDuration = $totalBeforeDiscount * $duration;
+        $service = new PromoCalculationService();
+        $result = $service->calculateDiscount($promoId, $totalBeforeDiscount, $duration);
 
-        $discount = match ($promo->type) {
-            'day_based' => static::calculateDayBasedDiscount($rule, $duration, $totalBeforeDiscount),
-            'percentage' => static::calculatePercentageDiscount($rule, $totalWithDuration),
-            'nominal' => static::calculateNominalDiscount($rule, $totalWithDuration),
-            default => 0,
-        };
-
-        return max(0, min($discount, $totalWithDuration));
+        return (int)($result['discountAmount'] ?? 0);
     }
 
     /**
-     * Calculate day-based discount
+     * Get detailed discount calculation using service
      */
-    protected static function calculateDayBasedDiscount(array $rule, int $duration, int $totalBeforeDiscount): int
+    protected static function getDiscountCalculationDetails(Get $get, int $totalBeforeDiscount): array
     {
-        $groupSize = max(1, (int)($rule['group_size'] ?? 1));
-        $payDays = max(0, (int)($rule['pay_days'] ?? 0));
+        $promoId = $get('promo_id');
+        $duration = (int)($get('duration') ?? 1);
 
-        $fullGroups = intval($duration / $groupSize);
-        $remainingDays = $duration % $groupSize;
-
-        $discountedDays = $fullGroups * $payDays;
-        $totalDaysToPay = $discountedDays + $remainingDays;
-
-        $totalWithoutDiscount = $totalBeforeDiscount * $duration;
-        $totalWithDiscount = $totalBeforeDiscount * $totalDaysToPay;
-
-        return max(0, $totalWithoutDiscount - $totalWithDiscount);
-    }
-
-    /**
-     * Calculate percentage discount
-     */
-    protected static function calculatePercentageDiscount(array $rule, int $totalWithDuration): int
-    {
-        $percentage = max(0, min(100, (float)($rule['percentage'] ?? 0)));
-        return (int)(($totalWithDuration * $percentage) / 100);
-    }
-
-    /**
-     * Calculate nominal discount
-     */
-    protected static function calculateNominalDiscount(array $rule, int $totalWithDuration): int
-    {
-        $nominal = max(0, (int)($rule['nominal'] ?? 0));
-        return min($nominal, $totalWithDuration);
+        $service = new PromoCalculationService();
+        return $service->calculateDiscount($promoId, $totalBeforeDiscount, $duration);
     }
 
     /**
@@ -1251,18 +1281,40 @@ class TransactionResource extends BaseOptimizedResource
                                     'aria-describedby' => 'promo-help',
                                     'id' => 'promo_code_select'
                                 ])
+                                ->helperText(function (Get $get) {
+                                    $promoId = $get('promo_id');
+                                    if (!$promoId) return 'Pilih promo untuk melihat detail diskon';
+
+                                    $promo = \App\Models\Promo::find($promoId);
+                                    if (!$promo || !is_array($promo->rules) || !isset($promo->rules[0])) {
+                                        return 'Promo tidak valid atau tidak memiliki aturan yang benar';
+                                    }
+
+                                    $rule = $promo->rules[0]; // Use first rule as per simplified form
+                                    $helperText = match ($promo->type) {
+                                        'percentage' => 'Diskon ' . ($rule['percentage'] ?? 0) . '% dari total' .
+                                            (!empty($rule['days']) ? ' (berlaku pada: ' . implode(', ', $rule['days']) . ')' : ''),
+                                        'nominal' => 'Potongan tetap Rp ' . number_format($rule['nominal'] ?? 0, 0, ',', '.') .
+                                            (!empty($rule['days']) ? ' (berlaku pada: ' . implode(', ', $rule['days']) . ')' : ''),
+                                        'day_based' => 'Sewa ' . ($rule['group_size'] ?? 1) . ' hari bayar ' . ($rule['pay_days'] ?? 1) . ' hari',
+                                        default => 'Promo tersedia'
+                                    };
+
+                                    return new HtmlString('<strong>Kode: ' . $promo->name . '</strong><br>' . $helperText);
+                                })
                                 ->columnSpanFull(),
 
                             Placeholder::make('total_before_discount')
-                                ->label('Total Sebelum Diskon')
+                                ->label('Total Sebelum Diskon - Breakdown')
                                 ->content(function (Get $get) {
-                                    // Ambil semua detail transaksi dari repeater
                                     $details = $get('detailTransactions');
+                                    $duration = max(1, (int)($get('duration') ?? 1));
 
                                     if (!$details || !is_array($details)) {
-                                        return 'Rp 0';
+                                        return new HtmlString('<div style="color: #6b7280; font-style: italic;">Tidak ada produk dipilih</div>');
                                     }
 
+                                    $breakdown = [];
                                     $totalBeforeDiscount = 0;
 
                                     foreach ($details as $item) {
@@ -1271,90 +1323,71 @@ class TransactionResource extends BaseOptimizedResource
 
                                         if (!$customId) continue;
 
-                                        $price = 0;
-                                        $quantity = $item['quantity'] ?? 1;
+                                        $name = '';
+                                        $unitPrice = 0;
+                                        $quantity = (int)($item['quantity'] ?? 1);
 
                                         if ($isBundling) {
                                             $bundling = \App\Models\Bundling::find($customId);
                                             if ($bundling) {
-                                                $price = $bundling->price;
+                                                $name = $bundling->name;
+                                                $unitPrice = (int)$bundling->price;
                                             }
                                         } else {
                                             $product = \App\Models\Product::find($customId);
                                             if ($product) {
-                                                $price = $product->price;
+                                                $name = $product->name;
+                                                $unitPrice = (int)$product->price;
                                             }
                                         }
 
-                                        $totalBeforeDiscount += $price * $quantity;
+                                        if ($name && $unitPrice > 0) {
+                                            $subtotal = $unitPrice * $quantity * $duration;
+                                            $breakdown[] = "{$name}: Rp " . number_format($unitPrice, 0, ',', '.') .
+                                                " × {$quantity} × {$duration} hari = Rp " . number_format($subtotal, 0, ',', '.');
+                                            $totalBeforeDiscount += $subtotal;
+                                        }
                                     }
 
-                                    return new HtmlString("Rp " . number_format($totalBeforeDiscount, 0, ',', '.'));
+                                    $html = '<div style="background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">';
+
+                                    if (!empty($breakdown)) {
+                                        $html .= '<div style="margin-bottom: 8px; font-size: 12px; color: #64748b;">Detail Perhitungan:</div>';
+                                        foreach ($breakdown as $line) {
+                                            $html .= '<div style="font-size: 11px; margin-bottom: 4px; color: #334155;">• ' . $line . '</div>';
+                                        }
+                                        $html .= '<hr style="margin: 8px 0; border: none; border-top: 1px solid #e2e8f0;">';
+                                        $html .= '<div style="font-weight: bold; font-size: 13px; color: #1e293b;">Total: Rp ' . number_format($totalBeforeDiscount, 0, ',', '.') . '</div>';
+                                    } else {
+                                        $html .= '<div style="color: #6b7280; font-style: italic;">Tidak ada produk yang valid dipilih</div>';
+                                    }
+
+                                    $html .= '</div>';
+
+                                    return new HtmlString($html);
                                 })
                                 ->reactive()
-                                ->columnSpan(1)
-                                ->extraAttributes(['class' => 'text-lg font-bold']),
+                                ->columnSpanFull()
+                                ->extraAttributes(['class' => 'breakdown-container']),
                             Placeholder::make('discount_given')
                                 ->label('Diskon Diberikan')
-                                ->content(function (Get $get) use (&$totalBeforeDiscount) {
-                                    // Ambil promo_id
+                                ->content(function (Get $get) {
                                     $promoId = $get('promo_id');
                                     if (!$promoId) return 'Rp 0';
 
-                                    // Hitung total sebelum diskon
-                                    $details = $get('detailTransactions');
-                                    $totalBeforeDiscount = 0;
+                                    $totalBeforeDiscount = static::calculateTotalBeforeDiscount($get);
+                                    $discountCalculation = static::getDiscountCalculationDetails($get, $totalBeforeDiscount);
 
-                                    foreach ($details as $item) {
-                                        $isBundling = (bool)($item['is_bundling'] ?? false);
-                                        $customId = $isBundling ? ($item['bundling_id'] ?? '') : ($item['product_id'] ?? '');
+                                    $discountAmount = $discountCalculation['discountAmount'] ?? 0;
+                                    $calculationDetails = $discountCalculation['calculationDetails'] ?? [];
 
-                                        if (!$customId) continue;
+                                    // Get explanation
+                                    $service = new PromoCalculationService();
+                                    $explanation = $service->getDiscountExplanation($calculationDetails);
 
-                                        $price = 0;
-                                        $quantity = $item['quantity'] ?? 1;
+                                    $formattedAmount = "Rp " . number_format($discountAmount, 0, ',', '.');
 
-                                        if ($isBundling) {
-                                            $bundling = \App\Models\Bundling::find($customId);
-                                            if ($bundling) {
-                                                $price = $bundling->price;
-                                            }
-                                        } else {
-                                            $product = \App\Models\Product::find($customId);
-                                            if ($product) {
-                                                $price = $product->price;
-                                            }
-                                        }
-
-                                        $totalBeforeDiscount += $price * $quantity;
-                                    }
-
-                                    // Ambil promo
-                                    $promo = \App\Models\Promo::find($promoId);
-                                    if (!$promo || !is_array($promo->rules)) return 'Rp 0';
-
-                                    $rules = $promo->rules;
-                                    $duration = $get('duration') ?? 1;
-                                    $discountGiven = 0;
-
-                                    if ($promo->type === 'day_based') {
-                                        $groupSize = isset($rules[0]['group_size']) ? (int)$rules[0]['group_size'] : 1;
-                                        $payDays = isset($rules[0]['pay_days']) ? (int)$rules[0]['pay_days'] : $groupSize;
-
-                                        $discountedDays = (int)($duration / $groupSize) * $payDays;
-                                        $remainingDays = $duration % $groupSize;
-                                        $daysToPay = $discountedDays + $remainingDays;
-
-                                        $discountGiven = max(0, $totalBeforeDiscount - ($totalBeforeDiscount / $duration * $daysToPay));
-                                    } elseif ($promo->type === 'percentage') {
-                                        $percentage = isset($rules[0]['percentage']) ? (float)$rules[0]['percentage'] : 0;
-                                        $discountGiven = ($totalBeforeDiscount * ($percentage / 100));
-                                    } elseif ($promo->type === 'nominal') {
-                                        $nominal = isset($rules[0]['nominal']) ? (float)$rules[0]['nominal'] : 0;
-                                        $discountGiven = min($nominal, $totalBeforeDiscount);
-                                    }
-
-                                    return "Rp " . number_format((int)$discountGiven, 0, ',', '.');
+                                    return new HtmlString($formattedAmount . '<br><small class="text-gray-600">' . $explanation . '</small>');
                                 })
                                 ->reactive()
                                 ->extraAttributes(['class' => 'text-lg font-bold'])
@@ -1397,53 +1430,98 @@ class TransactionResource extends BaseOptimizedResource
                             Hidden::make('grand_total')
                                 ->label('Grand Total')
                                 ->reactive()
+                                ->live()
+                                ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                    $grandTotal = static::calculateGrandTotal($get);
+                                    $set('grand_total', $grandTotal);
+                                })
                                 ->default(function (Get $get) {
                                     $grandTotal = static::calculateGrandTotal($get);
-                                    return $grandTotal; // Simpan sebagai INT
+                                    return $grandTotal; // Save as INT
                                 }),
 
-                            TextInput::make('down_payment')
-                                ->label('Jumlah Pembayaran/DP')
-                                ->numeric()
-                                ->default(0)
-                                ->live(debounce: 500)
-                                ->extraAttributes([
-                                    'aria-label' => 'Enter down payment amount in Rupiah',
-                                    'aria-describedby' => 'down-payment-help',
-                                    'id' => 'down_payment_input'
-                                ])
-                                ->rules([
-                                    function (Get $get) {
-                                        $grandTotal = static::calculateGrandTotal($get);
-                                        if ($grandTotal <= 0) return ['required', 'min:0'];
-
-                                        $min = max(0, floor($grandTotal * 0.5)); // 50% minimum including fees
-
-                                        return [
-                                            'required',
-                                            'numeric',
-                                            'min:0',
-                                            function ($attribute, $value, $fail) use ($min, $grandTotal) {
-                                                $value = (int)$value;
-                                                if ($value < $min) {
-                                                    $fail("Nilai harus minimal Rp " . number_format($min, 0, ',', '.') . " (50% dari total termasuk additional services)");
-                                                }
-                                                if ($value > $grandTotal) {
-                                                    $fail("Nilai tidak boleh melebihi total Rp " . number_format($grandTotal, 0, ',', '.'));
-                                                }
-                                            },
-                                        ];
+                            Placeholder::make('down_payment_display')
+                                ->label('Down Payment (DP) - Display Only')
+                                ->content(function (Get $get, $record) {
+                                    // For edit mode, show existing down payment
+                                    if ($record && $record->down_payment) {
+                                        $dpAmount = (int)$record->down_payment;
+                                        return 'Rp ' . number_format($dpAmount, 0, ',', '.') . ' (Stored)';
                                     }
+
+                                    // For create mode, show calculated default (50% of grand total)
+                                    $grandTotal = static::calculateGrandTotal($get);
+                                    $defaultDp = max(0, floor($grandTotal * 0.5));
+                                    return 'Rp ' . number_format($defaultDp, 0, ',', '.') . ' (50% default)';
+                                })
+                                ->extraAttributes([
+                                    'class' => 'text-lg font-medium text-green-600'
                                 ])
-                                ->default(function (Get $get) {
+                                ->columnSpan(1),
+
+                            Hidden::make('down_payment')
+                                ->default(function (Get $get, $record) {
+                                    // For edit mode, preserve existing down payment
+                                    if ($record && $record->down_payment) {
+                                        return (int)$record->down_payment;
+                                    }
+                                    // For create mode, calculate 50% of grand total
                                     $grandTotal = static::calculateGrandTotal($get);
                                     return max(0, floor($grandTotal * 0.5));
+                                }),
+
+
+
+                            Placeholder::make('cancellation_fee_display')
+                                ->label('Cancellation Fee (50%)')
+                                ->content(function (Get $get, $record) {
+                                    if ($record && $record->cancellation_fee) {
+                                        $cancelFee = (int)$record->cancellation_fee;
+                                        return 'Rp ' . number_format($cancelFee, 0, ',', '.') . ' (Stored)';
+                                    }
+
+                                    $grandTotal = static::calculateGrandTotal($get);
+                                    $cancelFee = (int) floor($grandTotal * 0.5);
+                                    return 'Rp ' . number_format($cancelFee, 0, ',', '.') . ' (50% of Grand Total)';
                                 })
+                                ->extraAttributes(['class' => 'text-md text-gray-600'])
+                                ->columnSpan(1),
+                            Hidden::make('cancellation_fee')
+                                ->default(function (Get $get, $record) {
+                                    $grandTotal = static::calculateGrandTotal($get);
+                                    $cancelFee = (int) floor($grandTotal * 0.5);
+                                    return max(0, $cancelFee); // Simpan sebagai INT
+
+                                })
+                                ->extraAttributes(['class' => 'text-md text-gray-600'])
+                                ->columnSpan(1),
+
+
+                            // TextInput::make('editable_down_payment_admin')
+                            //     ->label('Edit DP (Admin Only)')
+                            //     ->numeric()
+                            //     ->placeholder('Leave empty to use default')
+                            //     ->helperText('Only administrators can modify down payment manually')
+                            //     ->visible(fn() => auth()->user()?->hasRole('admin'))
+                            //     ->afterStateUpdated(function ($state, Set $set) {
+                            //         if ($state && is_numeric($state)) {
+                            //             $set('down_payment', (int)$state);
+                            //         }
+                            //     })
+                            //     ->columnSpan(1),
+
+                            TextInput::make('down_payment')
+                                ->label('Down Payment (DP)')
+                                ->numeric()
+                                ->required()
+                                ->live(debounce: 300)
+                                ->prefix('Rp')
+                                ->step(1000)
                                 ->helperText(function (Get $get) {
                                     $grandTotal = static::calculateGrandTotal($get);
                                     $minPayment = max(0, floor($grandTotal * 0.5));
-                                    return 'Pembayaran minimal 50% (termasuk additional services): Rp ' . number_format($minPayment, 0, ',', '.') .
-                                        ' - Maksimal: Rp ' . number_format($grandTotal, 0, ',', '.');
+                                    return 'Minimum 50% of Grand Total: Rp ' . number_format($minPayment, 0, ',', '.') .
+                                        ' - Maximum: Rp ' . number_format($grandTotal, 0, ',', '.');
                                 })
                                 ->minValue(function (Get $get) {
                                     $grandTotal = static::calculateGrandTotal($get);
@@ -1454,47 +1532,39 @@ class TransactionResource extends BaseOptimizedResource
                                     $grandTotal = static::calculateGrandTotal($get);
                                     $downPayment = max(0, (int)($state ?? 0));
 
-                                    // Validasi dan koreksi nilai
-                                    if ($grandTotal <= 0) {
-                                        $set('down_payment', 0);
-                                        $set('remaining_payment', 0);
-                                        $set('booking_status', 'cancel');
-                                        return;
-                                    }
-
-                                    $minPayment = max(0, floor($grandTotal * 0.5));
-
-                                    // Auto-correct invalid values
-                                    if ($downPayment < $minPayment && $downPayment > 0) {
-                                        $downPayment = $minPayment;
-                                        $set('down_payment', $downPayment);
-                                    } elseif ($downPayment > $grandTotal) {
-                                        $downPayment = $grandTotal;
-                                        $set('down_payment', $downPayment);
-                                    }
-
-                                    // Calculate remaining payment
-                                    $remaining = max(0, $grandTotal - $downPayment);
-                                    $set('remaining_payment', $remaining);
+                                    // Ensure grand total is set
                                     $set('grand_total', $grandTotal);
 
-                                    // Update booking status based on payment
-                                    static::updateBookingStatusBasedOnPayment($set, $downPayment, $grandTotal);
+                                    // Calculate remaining payment without changing booking status
+                                    $remaining = max(0, $grandTotal - $downPayment);
+                                    $set('remaining_payment', $remaining);
                                 })
-                                ->columnSpanFull()
-                                ->step(500),
-                            Placeholder::make('remaining_payment')
-                                ->label('Pelunasan')
+                                ->default(function (Get $get, $record) {
+                                    // For edit mode, preserve existing down payment
+                                    if ($record && $record->down_payment) {
+                                        return (int)$record->down_payment;
+                                    }
+                                    // For create mode, calculate 50% of grand total
+                                    $grandTotal = static::calculateGrandTotal($get);
+                                    return max(0, floor($grandTotal * 0.5));
+                                })
+                                ->columnSpanFull(),
+                            Placeholder::make('remaining_payment_display')
+                                ->label('Remaining Payment (Pelunasan)')
+                                ->live()
                                 ->content(function (Get $get) {
                                     $grandTotal = static::calculateGrandTotal($get);
                                     $downPayment = (int)($get('down_payment') ?? 0);
                                     $remainingPayment = max(0, $grandTotal - $downPayment);
 
-                                    // Format sebagai Rupiah
-                                    $formattedRemaining = 'Rp ' . number_format($remainingPayment, 0, ',', '.');
+                                    $status = $remainingPayment > 0 ? 'Outstanding' : 'Fully Paid';
+                                    $color = $remainingPayment > 0 ? 'text-orange-600' : 'text-green-600';
 
-                                    // Kembalikan sebagai HTML terformat
-                                    return new HtmlString($formattedRemaining);
+                                    return new HtmlString(
+                                        '<div class="' . $color . ' font-medium text-lg">' .
+                                            'Rp ' . number_format($remainingPayment, 0, ',', '.') .
+                                            '<br><small>(' . $status . ')</small></div>'
+                                    );
                                 })
                                 ->columnSpanFull(),
 
@@ -1609,13 +1679,21 @@ class TransactionResource extends BaseOptimizedResource
                                                 ->numeric()
                                                 ->default(0)
                                                 ->minValue(0)
-                                                ->live()
+                                                ->live(debounce: 300)
                                                 ->prefix('Rp')
                                                 ->inputMode('decimal')
                                                 ->step(1000)
                                                 ->formatStateUsing(fn($state) => $state ? number_format($state, 0, '', '') : '')
                                                 ->dehydrateStateUsing(fn($state) => (int) str_replace(',', '', $state))
-                                                ->afterStateUpdated(fn($state, $set, $get) => $set('../../grand_total', static::calculateGrandTotal($get)))
+                                                ->afterStateUpdated(function ($state, $set, $get) {
+                                                    $grandTotal = static::calculateGrandTotal($get);
+                                                    $set('../../grand_total', $grandTotal);
+
+                                                    // Recalculate remaining payment
+                                                    $downPayment = (int)($get('../../down_payment') ?? 0);
+                                                    $remaining = max(0, $grandTotal - $downPayment);
+                                                    $set('../../remaining_payment', $remaining);
+                                                })
                                                 ->columnSpan(1),
                                         ])
                                         ->columns(2)
@@ -1624,14 +1702,6 @@ class TransactionResource extends BaseOptimizedResource
                                         ->collapsible()
                                         ->columnSpanFull(),
 
-                                    TextInput::make('cancellation_fee')
-                                        ->label('Cancellation Fee')
-                                        ->numeric()
-                                        ->default(0)
-                                        ->minValue(0)
-                                        ->readonly()
-                                        ->helperText('Automatically calculated when status is set to cancel')
-                                        ->columnSpanFull(),
                                 ])
                                 ->collapsible()
                                 ->columnSpanFull(),
@@ -1765,8 +1835,26 @@ class TransactionResource extends BaseOptimizedResource
                 $searchTerm = request('tableSearch');
 
                 if ($searchTerm && strlen($searchTerm) >= 2) {
-                    // Use repository for optimized search
-                    return static::getRepository()->searchTransactions($searchTerm, 25)->getCollection()->toQuery();
+                    // Convert search term to lowercase for case-insensitive search
+                    $lowerSearchTerm = strtolower($searchTerm);
+
+                    $query->where(function (Builder $q) use ($lowerSearchTerm) {
+                        $q->whereRaw('LOWER(transactions.booking_transaction_id) LIKE ?', ["%{$lowerSearchTerm}%"])
+                            ->orWhereRaw('LOWER(transactions.start_date) LIKE ?', ["%{$lowerSearchTerm}%"])
+                            ->orWhereRaw('LOWER(transactions.end_date) LIKE ?', ["%{$lowerSearchTerm}%"])
+                            ->orWhereHas('customer', function (Builder $q2) use ($lowerSearchTerm) {
+                                $q2->whereRaw('LOWER(name) LIKE ?', ["%{$lowerSearchTerm}%"]);
+                            })
+                            ->orWhereHas('detailTransactions.product', function (Builder $q3) use ($lowerSearchTerm) {
+                                $q3->whereRaw('LOWER(name) LIKE ?', ["%{$lowerSearchTerm}%"]);
+                            })
+                            ->orWhereHas('detailTransactions.bundling', function (Builder $q4) use ($lowerSearchTerm) {
+                                $q4->whereRaw('LOWER(name) LIKE ?', ["%{$lowerSearchTerm}%"]);
+                            })
+                            ->orWhereHas('detailTransactions.productItems', function (Builder $q5) use ($lowerSearchTerm) {
+                                $q5->whereRaw('LOWER(serial_number) LIKE ?', ["%{$lowerSearchTerm}%"]);
+                            });
+                    });
                 }
 
                 // Apply default ordering for better performance
@@ -1774,7 +1862,7 @@ class TransactionResource extends BaseOptimizedResource
 
                 return $query;
             })
-            ->searchable()
+            // ->searchable()
             ->searchOnBlur()
             ->searchDebounce('500ms')
             ->columns([
@@ -1840,6 +1928,16 @@ class TransactionResource extends BaseOptimizedResource
                     ->tooltip('Click to open WhatsApp chat'),
                 TextColumn::make('product_info')
                     ->label('Product + Serial Numbers')
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('detailTransactions', function (Builder $q) use ($search) {
+                            $q->whereHas('product', function (Builder $q2) use ($search) {
+                                $q2->where('name', 'like', "%{$search}%");
+                            })
+                                ->orWhereHas('bundling', function (Builder $q2) use ($search) {
+                                    $q2->where('name', 'like', "%{$search}%");
+                                });
+                        });
+                    })
                     ->size(TextColumnSize::ExtraSmall)
                     ->html()
                     ->wrap()
@@ -1865,8 +1963,8 @@ class TransactionResource extends BaseOptimizedResource
                                     // Get bundling products and their serial numbers
                                     if ($detail->bundling->relationLoaded('bundlingProducts')) {
                                         $bundlingDetails = [];
-                                        Log::info('Processing bundling detail', ['detail_id' => $detail->id, 'bundling_id' => $detail->bundling_id]);
-                                        Log::info('Detail productItems loaded:', ['productItems' => $detail->productItems->pluck('id', 'product_id')->toArray()]);
+                                        // Log::info('Processing bundling detail', ['detail_id' => $detail->id, 'bundling_id' => $detail->bundling_id]);
+                                        // Log::info('Detail productItems loaded:', ['productItems' => $detail->productItems->pluck('id', 'product_id')->toArray()]);
 
                                         foreach ($detail->bundling->bundlingProducts as $bundlingProductRel) {
                                             $requiredQty = $quantity * ($bundlingProductRel->quantity ?? 1);
@@ -1874,7 +1972,7 @@ class TransactionResource extends BaseOptimizedResource
 
                                             // Get serial numbers for this product in this detail transaction
                                             $serialNumbers = [];
-                                            Log::info('Checking bundling product:', ['bundling_product_id' => $bundlingProduct->id, 'name' => $bundlingProduct->name]);
+                                            // Log::info('Checking bundling product:', ['bundling_product_id' => $bundlingProduct->id, 'name' => $bundlingProduct->name]);
 
                                             if ($detail->relationLoaded('productItems') && $detail->productItems) {
                                                 // Filter product items directly for the current bundling product
@@ -1917,10 +2015,10 @@ class TransactionResource extends BaseOptimizedResource
                                     }
 
                                     if (!empty($serialNumbers)) {
-                                         $productInfo .= implode(', ', $serialNumbers);
-                                     } else {
-                                         $productInfo .= "<em>No serial numbers</em>";
-                                     }
+                                        $productInfo .= implode(', ', $serialNumbers);
+                                    } else {
+                                        $productInfo .= "<em>No serial numbers</em>";
+                                    }
                                 }
 
                                 if ($productInfo) {
@@ -1931,41 +2029,37 @@ class TransactionResource extends BaseOptimizedResource
 
                         return !empty($products) ? implode('<br><br>', $products) : 'N/A';
                     })
-                    ->html()
-                    ->searchable()
-                    ->wrap()
                     ->lineClamp(null), // Remove line clamp to show all content
-                TextColumn::make('detailTransactions.productItems.serial_number')
-                    ->label('S/N')
-                    ->size(TextColumnSize::ExtraSmall)
-                    ->formatStateUsing(function ($record) {
-                        $serialNumbers = [];
-                        $searchTerm = request('tableSearch');
+                // TextColumn::make('detailTransactions.productItems.serial_number')
+                //     ->label('S/N')
+                //     ->size(TextColumnSize::ExtraSmall)
+                //     ->formatStateUsing(function ($record) {
+                //         $serialNumbers = [];
+                //         $searchTerm = request('tableSearch');
 
-                        foreach ($record->detailTransactions as $detail) {
-                            if ($detail->relationLoaded('productItems') && $detail->productItems) {
-                                foreach ($detail->productItems as $item) {
-                                    $serialNumbers[] = static::highlightSearchTerm($item->serial_number, $searchTerm);
-                                }
-                            }
-                        }
+                //         foreach ($record->detailTransactions as $detail) {
+                //             if ($detail->relationLoaded('productItems') && $detail->productItems) {
+                //                 foreach ($detail->productItems as $item) {
+                //                     $serialNumbers[] = static::highlightSearchTerm($item->serial_number, $searchTerm);
+                //                 }
+                //             }
+                //         }
 
-                        if (empty($serialNumbers)) {
-                            return '-';
-                        }
+                //         if (empty($serialNumbers)) {
+                //             return '-';
+                //         }
 
-                        if (count($serialNumbers) <= 5) {
-                            return implode(', ', $serialNumbers);
-                        }
+                //         if (count($serialNumbers) <= 5) {
+                //             return implode(', ', $serialNumbers);
+                //         }
 
-                        $first5 = array_slice($serialNumbers, 0, 5);
-                        $remaining = count($serialNumbers) - 5;
+                //         $first5 = array_slice($serialNumbers, 0, 5);
+                //         $remaining = count($serialNumbers) - 5;
 
-                        return implode(', ', $first5) . " <span style='color: #6b7280; font-style: italic;'>dan {$remaining} lainnya</span>";
-                    })
-                    ->html()
-                    ->searchable()
-                    ->wrap(),
+                //         return implode(', ', $first5) . " <span style='color: #6b7280; font-style: italic;'>dan {$remaining} lainnya</span>";
+                //     })
+                //     ->html()
+                //     ->wrap(),
                 TextColumn::make('start_date')
                     ->label('Start')
                     ->wrap()
@@ -1983,73 +2077,196 @@ class TransactionResource extends BaseOptimizedResource
                     ->searchable(),
 
                 TextColumn::make('grand_total')
-                    ->label('Tot')
-                    ->formatStateUsing(fn(string $state): HtmlString => new HtmlString(
-                        'Rp ' . number_format((int) $state, 0, ',', '.')
-                    ))
-                    ->size(TextColumnSize::ExtraSmall),
-                TextInputColumn::make('down_payment')
-                    ->label('DP')
-                    ->type('number')
-                    ->default(fn(Transaction $record): int => (int)($record->grand_total / 2))
-                    ->rules([
-                        'required',
-                        'numeric',
-                        'min:0',
-                    ])
-                    ->afterStateUpdated(function ($record, $state) {
-                        if ($record && $state !== null) {
-                            $grandTotal = (int)$record->grand_total;
-                            $downPayment = (int)$state;
-
-                            // Calculate remaining payment
-                            $remainingPayment = max(0, $grandTotal - $downPayment);
-
-                            // Update the record
-                            $record->update([
-                                'down_payment' => $downPayment,
-                                'remaining_payment' => $remainingPayment,
-                            ]);
-
-                            // Update booking status based on payment
-                            if ($grandTotal <= 0) {
-                                $record->update(['booking_status' => 'cancel']);
-                            } elseif ($downPayment <= 0) {
-                                $record->update(['booking_status' => 'cancel']);
-                            } elseif ($downPayment >= $grandTotal) {
-                                // Full payment - set to paid if not already on_rented/done
-                                if (!in_array($record->booking_status, ['on_rented', 'done'])) {
-                                    $record->update(['booking_status' => 'paid']);
-                                }
-                            } else {
-                                // Partial payment
-                                $minPayment = max(0, floor($grandTotal * 0.5));
-                                if ($downPayment >= $minPayment) {
-                                    $record->update(['booking_status' => 'booking']);
-                                } else {
-                                    $record->update(['booking_status' => 'cancel']);
-                                }
-                            }
-                        }
-                    })
-                    ->sortable(),
-
-                TextColumn::make('remaining_payment')
-                    ->label('Sisa')
+                    ->label('Grand Total')
                     ->size(TextColumnSize::ExtraSmall)
-                    ->formatStateUsing(fn(string $state): HtmlString => new HtmlString(
-                        $state == '0' ? '<strong style="color: green">LUNAS</strong>' : 'Rp ' . number_format((int) $state, 0, ',', '.')
-                    ))
-                    ->sortable(),
+                    ->formatStateUsing(function (?int $state, $record): string {
+                        $transactionId = $record->id ?? 'unknown';
+
+                        Log::info("[GRAND_TOTAL_COLUMN] Processing transaction ID: {$transactionId}", [
+                            'state_parameter' => $state,
+                            'record_grand_total' => $record->grand_total,
+                            'booking_status' => $record->booking_status ?? 'unknown'
+                        ]);
+
+                        // PRIORITY: Use database value if exists, never override
+                        $grandTotal = (int) ($record->grand_total ?? 0);
+
+                        Log::info("[GRAND_TOTAL_COLUMN] Database value check for transaction {$transactionId}", [
+                            'database_grand_total' => $grandTotal,
+                            'will_use_fallback' => $grandTotal <= 0
+                        ]);
+
+                        // FALLBACK ONLY: If grand_total is 0/null, calculate including additional_services
+                        if ($grandTotal <= 0) {
+                            Log::info("[GRAND_TOTAL_COLUMN] Using fallback calculation for transaction {$transactionId}");
+
+                            try {
+                                $grandTotal = $record->getGrandTotalWithFallback();
+
+                                Log::info("[GRAND_TOTAL_COLUMN] Fallback calculation result for transaction {$transactionId}", [
+                                    'calculated_grand_total' => $grandTotal,
+                                    'additional_services_total' => $record->getTotalAdditionalServices(),
+                                    'base_price' => $record->getTotalBasePrice(),
+                                    'duration' => $record->duration,
+                                    'discount_amount' => $record->getDiscountAmount()
+                                ]);
+                            } catch (\Throwable $e) {
+                                Log::error("[GRAND_TOTAL_COLUMN] Error in fallback calculation for transaction {$transactionId}", [
+                                    'error' => $e->getMessage(),
+                                    'trace' => $e->getTraceAsString()
+                                ]);
+                                $grandTotal = 0;
+                            }
+                        } else {
+                            Log::info("[GRAND_TOTAL_COLUMN] Using database value for transaction {$transactionId}", [
+                                'database_value' => $grandTotal
+                            ]);
+                        }
+
+                        $formatted = 'Rp ' . number_format($grandTotal, 0, ',', '.');
+
+                        Log::info("[GRAND_TOTAL_COLUMN] Final result for transaction {$transactionId}", [
+                            'final_grand_total' => $grandTotal,
+                            'formatted_display' => $formatted
+                        ]);
+
+                        return $formatted;
+                    })
+                    ->color('success')
+                    ->weight(FontWeight::Bold)
+                    ->alignRight()
+                    ->sortable()
+                    ->searchable()
+                    ->tooltip('Grand Total from database (includes additional services)'),
+                TextColumn::make('down_payment')
+                    ->label('down Payment')
+                    ->size(TextColumnSize::ExtraSmall)
+                    ->formatStateUsing(function (?int $state, $record): string {
+                        $transactionId = $record->id ?? 'unknown';
+
+
+                        // PRIORITY: Use database value if exists, never override
+                        $downPayment = (int) ($record->down_payment ?? 0);
+
+
+                        // FALLBACK ONLY: If grand_total is 0/null, calculate including additional_services
+
+                        $formatted = 'Rp ' . number_format($downPayment, 0, ',', '.');
+
+
+                        return $formatted;
+                    })
+                    ->color('success')
+                    ->weight(FontWeight::Bold)
+                    ->alignRight()
+                    ->sortable()
+                    ->searchable()
+                    ->tooltip('Down payment from database'),
+                TextColumn::make('remaining_payment')
+                    ->label('sisa')
+                    ->size(TextColumnSize::ExtraSmall)
+                    ->formatStateUsing(function (?int $state, $record): string {
+                        // Ambil nilai dari database, fallback ke 0 jika null
+                        $remainingPayment = (int) ($record->remaining_payment ?? 0);
+
+                        // Jika sisa = 0, tampilkan "LUNAS"
+                        if ($remainingPayment === 0) {
+                            return 'LUNAS';
+                        }
+
+                        // Format Rupiah jika > 0
+                        return 'Rp ' . number_format($remainingPayment, 0, ',', '.');
+                    })
+                    ->color('success')
+                    ->weight(FontWeight::Bold)
+                    ->alignRight()
+                    ->sortable()
+                    ->searchable()
+                    ->tooltip('Down payment from database'),
+
+
+
 
                 TextColumn::make('cancellation_fee')
                     ->label('Cancel Fee')
                     ->size(TextColumnSize::ExtraSmall)
-                    ->formatStateUsing(fn(?string $state): HtmlString => new HtmlString(
-                        $state && $state != '0' ? 'Rp ' . number_format((int) $state, 0, ',', '.') : '-'
-                    ))
-                    ->visible(fn($record) => $record && $record->booking_status === 'cancel')
-                    ->color('danger'),
+                    ->formatStateUsing(function (?int $state, $record): string {
+                        $transactionId = $record->id ?? 'unknown';
+
+                        Log::info("[CANCELLATION_FEE_COLUMN] Processing transaction ID: {$transactionId}", [
+                            'state_parameter' => $state,
+                            'record_cancellation_fee' => $record->cancellation_fee,
+                            'record_grand_total' => $record->grand_total,
+                            'booking_status' => $record->booking_status ?? 'unknown'
+                        ]);
+
+                        // PRIORITY: Use stored cancellation fee if available, default to 0 if null
+                        if ($state && $state > 0) {
+                            Log::info("[CANCELLATION_FEE_COLUMN] Using stored cancellation fee for transaction {$transactionId}", [
+                                'stored_cancellation_fee' => $state
+                            ]);
+
+                            $formatted = 'Rp ' . number_format($state, 0, ',', '.');
+
+                            Log::info("[CANCELLATION_FEE_COLUMN] Final result (stored) for transaction {$transactionId}", [
+                                'final_cancellation_fee' => $state,
+                                'formatted_display' => $formatted
+                            ]);
+
+                            return $formatted;
+                        }
+
+                        Log::info("[CANCELLATION_FEE_COLUMN] No stored cancellation fee, calculating for transaction {$transactionId}");
+
+                        // FALLBACK: Calculate 50% of grand_total (including additional_services)
+                        $grandTotal = (int) ($record->grand_total ?? 0);
+
+                        Log::info("[CANCELLATION_FEE_COLUMN] Grand total check for transaction {$transactionId}", [
+                            'database_grand_total' => $grandTotal,
+                            'will_use_fallback_calculation' => $grandTotal <= 0
+                        ]);
+
+                        // If grand_total is 0/null, use non-override calculation
+                        if ($grandTotal <= 0) {
+                            Log::info("[CANCELLATION_FEE_COLUMN] Using fallback grand total calculation for transaction {$transactionId}");
+
+                            try {
+                                $grandTotal = $record->getGrandTotalWithFallback();
+
+                                Log::info("[CANCELLATION_FEE_COLUMN] Fallback grand total result for transaction {$transactionId}", [
+                                    'fallback_grand_total' => $grandTotal,
+                                    'includes_additional_services' => $record->getTotalAdditionalServices()
+                                ]);
+                            } catch (\Throwable $e) {
+                                Log::error("[CANCELLATION_FEE_COLUMN] Error in fallback grand total calculation for transaction {$transactionId}", [
+                                    'error' => $e->getMessage(),
+                                    'trace' => $e->getTraceAsString()
+                                ]);
+                                $grandTotal = 0;
+                            }
+                        } else {
+                            Log::info("[CANCELLATION_FEE_COLUMN] Using database grand total for transaction {$transactionId}", [
+                                'database_grand_total' => $grandTotal
+                            ]);
+                        }
+
+                        $cancellationFee = (int) floor($grandTotal * 0.5);
+                        $formatted = 'Rp ' . number_format($cancellationFee, 0, ',', '.');
+
+                        Log::info("[CANCELLATION_FEE_COLUMN] Final result (calculated) for transaction {$transactionId}", [
+                            'final_grand_total' => $grandTotal,
+                            'calculated_cancellation_fee' => $cancellationFee,
+                            'percentage' => '50%',
+                            'formatted_display' => $formatted
+                        ]);
+
+                        return $formatted;
+                    })
+                    ->color('danger')
+                    ->weight(FontWeight::Medium)
+                    ->alignRight()
+                    ->sortable()
+                    ->tooltip('50% of Grand Total (database value or calculated)'),
                 TextColumn::make('booking_status')
                     ->label('')
                     ->wrap()
@@ -2076,6 +2293,89 @@ class TransactionResource extends BaseOptimizedResource
                     ->relationship('customer', 'name')
                     ->searchable()
                     ->preload(),
+
+                Tables\Filters\SelectFilter::make('product_or_bundling')
+                    ->label('Product / Bundling')
+                    ->options(function () {
+                        $products = \App\Models\Product::pluck('name', 'id')->toArray();
+                        $bundlings = \App\Models\Bundling::pluck('name', 'id')->toArray();
+
+                        // Prefix key untuk membedakan produk dan bundling
+                        $productOptions = collect($products)->mapWithKeys(fn($name, $id) => ["product_{$id}" => $name])->toArray();
+                        $bundlingOptions = collect($bundlings)->mapWithKeys(fn($name, $id) => ["bundling_{$id}" => $name])->toArray();
+
+                        return array_merge($productOptions, $bundlingOptions);
+                    })
+                    ->query(function (Builder $query, array $data) {
+                        $query->where(function (Builder $q) use ($data) {
+                            foreach ($data as $key) {
+                                if (str_starts_with($key, 'product_')) {
+                                    $id = str_replace('product_', '', $key);
+                                    $q->orWhereHas('detailTransactions.product', fn($q2) => $q2->where('id', $id));
+                                } elseif (str_starts_with($key, 'bundling_')) {
+                                    $id = str_replace('bundling_', '', $key);
+                                    $q->orWhereHas('detailTransactions.bundling', fn($q2) => $q2->where('id', $id));
+                                }
+                            }
+                        });
+                    })
+                    ->searchable()
+                    ->preload(),
+
+                Tables\Filters\Filter::make('date_range')
+                    ->form([
+                        DatePicker::make('start_date')
+                            ->label('Start Date')
+                            ->default(Carbon::now()->subDays(10)),
+                        DatePicker::make('end_date')
+                            ->label('End Date')
+                            ->default(Carbon::now()->addDays(10)),
+                    ])
+                    ->default([
+                        'start_date' => Carbon::now()->subDays(10)->toDateString(),
+                        'end_date' => Carbon::now()->addDays(10)->toDateString(),
+                    ])
+                    ->query(function (Builder $query, array $data) {
+                        if (!empty($data['start_date']) && !empty($data['end_date'])) {
+                            // Show transactions that overlap with the selected date range
+                            $query->where(function (Builder $q) use ($data) {
+                                $q->whereBetween('start_date', [$data['start_date'], $data['end_date']])
+                                  ->orWhereBetween('end_date', [$data['start_date'], $data['end_date']])
+                                  ->orWhere(function (Builder $q2) use ($data) {
+                                      $q2->where('start_date', '<=', $data['start_date'])
+                                         ->where('end_date', '>=', $data['end_date']);
+                                  });
+                            });
+                        } elseif (!empty($data['start_date'])) {
+                            // Show transactions that start on or after the start date OR end after the start date
+                            $query->where(function (Builder $q) use ($data) {
+                                $q->where('start_date', '>=', $data['start_date'])
+                                  ->orWhere('end_date', '>=', $data['start_date']);
+                            });
+                        } elseif (!empty($data['end_date'])) {
+                            // Show transactions that end on or before the end date OR start before the end date
+                            $query->where(function (Builder $q) use ($data) {
+                                $q->where('end_date', '<=', $data['end_date'])
+                                  ->orWhere('start_date', '<=', $data['end_date']);
+                            });
+                        }
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        if (! $data['start_date'] && ! $data['end_date']) {
+                            return null;
+                        }
+
+                        if ($data['start_date'] && $data['end_date']) {
+                            return 'From ' . Carbon::parse($data['start_date'])->toFormattedDateString()
+                                . ' to ' . Carbon::parse($data['end_date'])->toFormattedDateString();
+                        }
+
+                        if ($data['start_date']) {
+                            return 'From ' . Carbon::parse($data['start_date'])->toFormattedDateString();
+                        }
+
+                        return 'Until ' . Carbon::parse($data['end_date'])->toFormattedDateString();
+                    }),
                 Tables\Filters\SelectFilter::make('booking_status')
                     ->multiple()
                     ->options([
@@ -2088,26 +2388,11 @@ class TransactionResource extends BaseOptimizedResource
                     ->default(['booking', 'paid', 'on_rented']),
             ])
             ->headerActions([
-                Action::make('downloadTemplate')
-                    ->label('Download Reference Template')
-                    ->icon('heroicon-o-document-arrow-down')
-                    ->color('warning')
-                    ->tooltip('Note: Transaction import is not supported due to business complexity')
-                    ->action(function () {
-                        $service = new TransactionImportExportService();
-                        $filePath = $service->generateTemplate();
-                        return response()->download($filePath, 'transaction_reference_template.xlsx')->deleteFileAfterSend();
-                    }),
-
-                Action::make('export')
+                ExportAction::make()
                     ->label('Export All')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
-                    ->action(function () {
-                        $service = new TransactionImportExportService();
-                        $filePath = $service->exportTransactions();
-                        return response()->download($filePath, 'transactions_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
-                    }),
+                    ->exporter(TransactionExporter::class)
             ])
             ->actions([
                 BulkActionGroup::make([
@@ -2369,16 +2654,11 @@ class TransactionResource extends BaseOptimizedResource
                                 ->send();
                         }),
 
-                    BulkAction::make('exportSelected')
+                    ExportBulkAction::make()
                         ->label('Export Selected')
                         ->icon('heroicon-o-arrow-down-tray')
                         ->color('info')
-                        ->action(function (Collection $records) {
-                            $service = new TransactionImportExportService();
-                            $transactionIds = $records->pluck('id')->toArray();
-                            $filePath = $service->exportTransactions($transactionIds);
-                            return response()->download($filePath, 'transactions_selected_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
-                        }),
+                        ->exporter(TransactionExporter::class),
 
                 ]),
             ]);

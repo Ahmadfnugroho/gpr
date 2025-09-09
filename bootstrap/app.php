@@ -22,11 +22,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'whatsapp.auth' => WhatsAppAuth::class
         ]);
         
-        // Add security headers globally
-        $middleware->append(SecurityHeaders::class);
+        // Temporarily disable security headers for debugging
+        // $middleware->append(SecurityHeaders::class);
         
-        // Add performance monitoring globally (fixed version)
-        $middleware->append(PerformanceMonitoring::class);
+        // Temporarily disable performance monitoring for debugging login issues
+        // $middleware->append(PerformanceMonitoring::class);
         
         // Temporarily disable optimized session handling due to Redis extension issue
         // $middleware->append(OptimizedSessionHandler::class);
