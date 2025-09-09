@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class BundlingProduct extends Model
 {
     protected $table = 'bundling_products';
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
         'bundling_id',

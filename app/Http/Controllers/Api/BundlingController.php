@@ -19,13 +19,14 @@ class BundlingController extends Controller
     {
         $query = Bundling::query()->with([
             'bundlingPhotos',
-            'products',
-            'products.category',
-            'products.brand',
-            'products.subCategory',
-            'products.productPhotos',
-            'products.productSpecifications',
-            'products.rentalIncludes.includedProduct'
+            'products:id,name,slug,thumbnail,status,price,category_id,brand_id,sub_category_id',
+            'products.category:id,name,slug',
+            'products.brand:id,name,slug',
+            'products.subCategory:id,name,slug',
+            'products.productPhotos:id,product_id,photo',
+            'products.productSpecifications:id,product_id,name',
+            'products.rentalIncludes:id,product_id,include_product_id,quantity',
+            'products.rentalIncludes.includedProduct:id,name,slug'
         ]);
 
         // Search by name
@@ -59,13 +60,14 @@ class BundlingController extends Controller
     {
         $bundling = Bundling::with([
             'bundlingPhotos',
-            'products',
-            'products.category',
-            'products.brand',
-            'products.subCategory',
-            'products.productPhotos',
-            'products.productSpecifications',
-            'products.rentalIncludes.includedProduct'
+            'products:id,name,slug,thumbnail,status,price,category_id,brand_id,sub_category_id',
+            'products.category:id,name,slug',
+            'products.brand:id,name,slug',
+            'products.subCategory:id,name,slug',
+            'products.productPhotos:id,product_id,photo',
+            'products.productSpecifications:id,product_id,name',
+            'products.rentalIncludes:id,product_id,include_product_id,quantity',
+            'products.rentalIncludes.includedProduct:id,name,slug'
         ])
         ->where('slug', $slug)
         ->firstOrFail();
@@ -92,7 +94,10 @@ class BundlingController extends Controller
         foreach ($request->products as $product) {
             $bundling->products()->attach($product['id'], ['quantity' => $product['quantity']]);
         }
-        $bundling->load(['bundlingPhotos', 'products']);
+        $bundling->load([
+            'bundlingPhotos',
+            'products:id,name,slug,thumbnail,status,price'
+        ]);
         return new BundlingResource($bundling);
     }
 
@@ -119,7 +124,10 @@ class BundlingController extends Controller
             }
             $bundling->products()->sync($syncData);
         }
-        $bundling->load(['bundlingPhotos', 'products']);
+        $bundling->load([
+            'bundlingPhotos',
+            'products:id,name,slug,thumbnail,status,price'
+        ]);
         return new BundlingResource($bundling);
     }
 

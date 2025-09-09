@@ -57,7 +57,7 @@ class ReturnedProductsToday extends BaseWidget
 
                         // Get bundling products if bundlingId exists
                         if ($bundlingId) {
-                            $bundling = \App\Models\Bundling::with('products')->find($bundlingId);
+                            $bundling = \App\Models\Bundling::with('bundlingProducts.product')->find($bundlingId);
                             if ($bundling) {
                                 return 'bundling';
                             }
@@ -84,9 +84,9 @@ class ReturnedProductsToday extends BaseWidget
 
                         // Get bundling products if bundlingId exists
                         if ($bundlingId) {
-                            $bundling = \App\Models\Bundling::with('products')->find($bundlingId);
+                            $bundling = \App\Models\Bundling::with('bundlingProducts.product')->find($bundlingId);
                             if ($bundling) {
-                                $bundlingProducts = $bundling->products->pluck('name')->map(function ($name) {
+                                $bundlingProducts = $bundling->bundlingProducts->pluck('product.name')->map(function ($name) {
                                     return e($name); // Escape HTML untuk keamanan
                                 })->implode('<br>');
                                 $productName .= "<br>({$bundlingProducts})";

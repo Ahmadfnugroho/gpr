@@ -127,22 +127,22 @@ class DetailTransaction extends Model
         parent::boot();
 
         static::creating(function ($detail) {
-            // Hanya untuk produk individual (non-bundling)
-            if ($detail->product_id && !$detail->bundling_id && $detail->quantity > 0) {
-                // Gunakan static flag untuk mencegah rekursi tak terbatas
-                static $isProcessing = false;
-                
-                // Jika sudah dalam proses creating, jangan lakukan lagi
-                if ($isProcessing) {
-                    return;
-                }
-                
-                $isProcessing = true;
-                
-                try {
+            // Gunakan static flag untuk mencegah rekursi tak terbatas
+            static $isProcessing = false;
+            
+            // Jika sudah dalam proses creating, jangan lakukan lagi
+            if ($isProcessing) {
+                return;
+            }
+            
+            $isProcessing = true;
+            
+            try {
+                // Handle individual product (non-bundling)
+                if ($detail->product_id && !$detail->bundling_id && $detail->quantity > 0) {
                     DB::transaction(function () use ($detail) {
                         try {
-                            Log::info("Processing DetailTransaction creation", [
+                            Log::info("Processing DetailTransaction creation for individual product", [
                                 'product_id' => $detail->product_id,
                                 'quantity' => $detail->quantity
                             ]);
@@ -172,7 +172,7 @@ class DetailTransaction extends Model
                                 throw new \Exception("Tidak cukup item yang tersedia untuk periode sewa yang dipilih");
                             }
 
-                            Log::info("Found available items", [
+                            Log::info("Found available items for individual product", [
                                 'items' => $availableItems->pluck('id')->toArray()
                             ]);
 
@@ -216,25 +216,153 @@ class DetailTransaction extends Model
                                 DB::table('detail_transaction_product_item')->insert($pivotData);
                             }
 
-                            Log::info("Successfully synced items", [
+                            Log::info("Successfully synced items for individual product", [
                                 'detail_transaction_id' => $newDetailId,
                                 'item_ids' => $itemIds
                             ]);
 
                             return true;
                         } catch (\Exception $e) {
-                            Log::error("Error in DetailTransaction creation", [
+                            Log::error("Error in DetailTransaction creation for individual product", [
                                 'error' => $e->getMessage(),
                                 'product_id' => $detail->product_id
                             ]);
                             throw $e;
                         }
                     });
-                } finally {
-                    $isProcessing = false;
+                    
+                    return false; // Prevent additional save
                 }
+                
+                // Handle bundling
+                elseif ($detail->bundling_id && !$detail->product_id && $detail->quantity > 0) {
+                    DB::transaction(function () use ($detail) {
+                        try {
+                            Log::info("Processing DetailTransaction creation for bundling", [
+                                'bundling_id' => $detail->bundling_id,
+                                'quantity' => $detail->quantity
+                            ]);
 
-                return false; // Prevent additional save
+                            // Get transaction dates
+                            $transaction = Transaction::findOrFail($detail->transaction_id);
+                            $startDate = $transaction->start_date;
+                            $endDate = $transaction->end_date;
+
+                            // Get bundling with products
+                            $bundling = Bundling::with('bundlingProducts.product')->findOrFail($detail->bundling_id);
+                            
+                            // Collect all product items that will be assigned
+                            $allProductItemIds = [];
+                            $productItemsForBundling = [];
+                            
+                            // Check availability for each product in bundling
+                            foreach ($bundling->bundlingProducts as $bundlingProduct) {
+                                $requiredQuantity = $detail->quantity * $bundlingProduct->quantity;
+                                
+                                Log::info("Processing bundling product", [
+                                    'product_id' => $bundlingProduct->product_id,
+                                    'product_name' => $bundlingProduct->product->name ?? 'Unknown',
+                                    'required_quantity' => $requiredQuantity
+                                ]);
+                                
+                                // Get available items for this product
+                                $availableItems = ProductItem::where('product_id', $bundlingProduct->product_id)
+                                    ->whereDoesntHave('detailTransactions.transaction', function ($query) use ($startDate, $endDate) {
+                                        $query->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
+                                            ->where(function ($q) use ($startDate, $endDate) {
+                                                $q->whereBetween('start_date', [$startDate, $endDate])
+                                                    ->orWhereBetween('end_date', [$startDate, $endDate])
+                                                    ->orWhere(function ($q2) use ($startDate, $endDate) {
+                                                        $q2->where('start_date', '<=', $startDate)
+                                                            ->where('end_date', '>=', $endDate);
+                                                    });
+                                            });
+                                    })
+                                    ->limit($requiredQuantity)
+                                    ->get();
+
+                                if ($availableItems->count() < $requiredQuantity) {
+                                    throw new \Exception(
+                                        "Tidak cukup item untuk produk '{$bundlingProduct->product->name}' "
+                                        . "dalam bundling. Dibutuhkan: {$requiredQuantity}, Tersedia: {$availableItems->count()}"
+                                    );
+                                }
+                                
+                                $itemIds = $availableItems->pluck('id')->toArray();
+                                $allProductItemIds = array_merge($allProductItemIds, $itemIds);
+                                
+                                $productItemsForBundling[] = [
+                                    'product_id' => $bundlingProduct->product_id,
+                                    'product_name' => $bundlingProduct->product->name ?? 'Unknown',
+                                    'item_ids' => $itemIds,
+                                    'required_quantity' => $requiredQuantity
+                                ];
+                            }
+                            
+                            Log::info("Found available items for bundling", [
+                                'bundling_id' => $detail->bundling_id,
+                                'total_items' => count($allProductItemIds),
+                                'product_breakdown' => $productItemsForBundling
+                            ]);
+
+                            // Calculate price from bundling
+                            $price = $bundling->price ?? 0;
+                            $quantity = $detail->quantity ?? 0;
+                            $totalPrice = $price * $quantity;
+                            
+                            // Save detail transaction tanpa trigger creating lagi
+                            DB::table('detail_transactions')->insert([
+                                'transaction_id' => $detail->transaction_id,
+                                'product_id' => null, // bundling tidak punya product_id langsung
+                                'bundling_id' => $detail->bundling_id,
+                                'quantity' => $detail->quantity,
+                                'available_quantity' => $detail->available_quantity,
+                                'price' => $price,
+                                'total_price' => $totalPrice,
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]);
+                            
+                            // Dapatkan ID yang baru saja dimasukkan
+                            $newDetailId = DB::getPdo()->lastInsertId();
+                            $detail->id = $newDetailId;
+
+                            // Insert semua product items ke pivot table
+                            $pivotData = [];
+                            foreach ($allProductItemIds as $itemId) {
+                                $pivotData[] = [
+                                    'detail_transaction_id' => $newDetailId,
+                                    'product_item_id' => $itemId,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ];
+                            }
+                            
+                            if (!empty($pivotData)) {
+                                DB::table('detail_transaction_product_item')->insert($pivotData);
+                            }
+
+                            Log::info("Successfully synced items for bundling", [
+                                'detail_transaction_id' => $newDetailId,
+                                'bundling_id' => $detail->bundling_id,
+                                'total_items_assigned' => count($allProductItemIds),
+                                'item_ids' => $allProductItemIds
+                            ]);
+
+                            return true;
+                        } catch (\Exception $e) {
+                            Log::error("Error in DetailTransaction creation for bundling", [
+                                'error' => $e->getMessage(),
+                                'bundling_id' => $detail->bundling_id
+                            ]);
+                            throw $e;
+                        }
+                    });
+                    
+                    return false; // Prevent additional save
+                }
+            } finally {
+                $isProcessing = false;
             }
         });
 

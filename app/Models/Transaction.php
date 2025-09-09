@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Facades\Log;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Illuminate\Contracts\Queue\Queueable;
 
 
 class Transaction extends Model
@@ -169,14 +170,7 @@ class Transaction extends Model
     //     return $relation instanceof Collection ? $relation : new Collection($relation);
     // }
 
-    public function setRelation($key, $value)
-    {
-        if ($key === 'detailTransactions' && $value === false) {
-            // Log::error("Someone set detailTransactions to FALSE! ID: " . $this->id);
-        }
 
-        return parent::setRelation($key, $value);
-    }
     public function rentalIncludes(): HasManyThrough
     {
         return $this->hasManyThrough(
@@ -190,6 +184,16 @@ class Transaction extends Model
     public function promo(): BelongsTo
     {
         return $this->belongsTo(Promo::class);
+    }
+
+    /**
+     * Get the relationships that should be queueable.
+     *
+     * @return array<string>
+     */
+    public function getQueueableRelations(): array
+    {
+        return [];
     }
 
     /**

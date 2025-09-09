@@ -6,9 +6,18 @@ use App\Http\Controllers\PdfController;
 use App\Http\Controllers\ProductSearchController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SessionController;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [SessionController::class, 'index']);
+Route::get('/', function () {
+    Log::info('Test log entry from web.php');
+    return view('welcome');
+});
+
+Route::get('/test-log', function () {
+    Log::info('Test log entry from /test-log route.');
+    return 'Log entry written from /test-log route.';
+});
 Route::post('/', [SessionController::class, 'login']);
 
 // Reset Password Routes
@@ -55,14 +64,14 @@ Route::prefix('customers')->name('customers.')->middleware('auth')->group(functi
     Route::get('/{customer}/edit', [CustomerController::class, 'edit'])->name('edit');
     Route::put('/{customer}', [CustomerController::class, 'update'])->name('update');
     Route::delete('/{customer}', [CustomerController::class, 'destroy'])->name('destroy');
-    
+
     // Import/Export routes
     Route::get('/import/form', [CustomerController::class, 'importForm'])->name('import.form');
     Route::post('/import', [CustomerController::class, 'import'])->name('import');
     Route::get('/export', [CustomerController::class, 'export'])->name('export');
     Route::get('/import/template', [CustomerController::class, 'downloadTemplate'])->name('import.template');
     Route::post('/bulk-action', [CustomerController::class, 'bulkAction'])->name('bulk-action');
-    
+
     // Enhanced bulk action routes with progress tracking
     Route::post('/bulk-action/start', [App\Http\Controllers\BulkActionProgressController::class, 'startBulkAction'])->name('bulk-action.start');
     Route::get('/bulk-action/progress', [App\Http\Controllers\BulkActionProgressController::class, 'getProgress'])->name('bulk-action.progress');
@@ -114,4 +123,4 @@ Route::get('/failed-import/download', [App\Http\Controllers\FailedImportDownload
 Route::post('/failed-import/clear', [App\Http\Controllers\FailedImportDownloadController::class, 'clearNotification'])->name('failed-import.clear');
 
 // Include import error handling routes
-require __DIR__.'/import.php';
+require __DIR__ . '/import.php';

@@ -58,7 +58,8 @@ class Bundling extends Model
     public function products()
     {
         return $this->belongsToMany(Product::class, 'bundling_products', 'bundling_id', 'product_id')
-            ->withPivot('id', 'quantity');
+            ->withPivot('id', 'quantity')
+            ->withTimestamps();
     }
 
     public function bundlingProducts()
@@ -89,8 +90,8 @@ class Bundling extends Model
      */
     public function items()
     {
-        // Return a query that gets all product items for products in this bundling
-        $productIds = $this->products()->pluck('products.id');
+        // Use bundlingProducts instead to avoid SQL conflict
+        $productIds = $this->bundlingProducts()->pluck('product_id');
         return \App\Models\ProductItem::whereIn('product_id', $productIds);
     }
 
@@ -99,8 +100,12 @@ class Bundling extends Model
      */
     public function isAvailableForRental($startDate, $endDate, $bundlingQty = 1)
     {
-        foreach ($this->products as $product) {
-            $needed = $product->pivot->quantity * $bundlingQty;
+        // Load bundlingProducts with product relationship to avoid SQL conflicts
+        $this->load('bundlingProducts.product');
+        
+        foreach ($this->bundlingProducts as $bundlingProduct) {
+            $needed = $bundlingProduct->quantity * $bundlingQty;
+            $product = $bundlingProduct->product;
 
             // Hitung jumlah item tersedia di semua produk dalam bundling
             $available = $product->items()
@@ -121,9 +126,13 @@ class Bundling extends Model
     public function getAvailableQuantityForPeriod(Carbon $startDate, Carbon $endDate, int $requestedQty = 1): int
     {
         $minAvailable = null;
+        
+        // Load bundlingProducts with product relationship to avoid SQL conflicts
+        $this->load('bundlingProducts.product');
 
-        foreach ($this->products as $product) {
-            $requiredPerBundle = $product->pivot->quantity;
+        foreach ($this->bundlingProducts as $bundlingProduct) {
+            $requiredPerBundle = $bundlingProduct->quantity;
+            $product = $bundlingProduct->product;
 
             // Ambil serial number yang tersedia untuk produk
             $availableSerials = $product->getAvailableSerialNumbersForPeriod($startDate, $endDate);
@@ -141,16 +150,20 @@ class Bundling extends Model
     public function getBundlingSerialNumbersForPeriod(Carbon $startDate, Carbon $endDate, int $bundleQty): array
     {
         $result = [];
+        
+        // Load bundlingProducts with product relationship to avoid SQL conflicts
+        $this->load('bundlingProducts.product');
 
-        foreach ($this->products as $product) {
-            $requiredQty = $product->pivot->quantity * $bundleQty;
+        foreach ($this->bundlingProducts as $bundlingProduct) {
+            $product = $bundlingProduct->product;
+            $requiredQty = $bundlingProduct->quantity * $bundleQty;
 
             $availableSerials = $product->getAvailableSerialNumbersForPeriod($startDate, $endDate);
 
             $result[] = [
                 'product_id' => $product->id,
                 'product_name_display' => $product->name,
-                'max_serial_quantity' => $product->pivot->quantity,
+                'max_serial_quantity' => $bundlingProduct->quantity,
                 'product_item_ids' => array_slice($availableSerials, 0, $requiredQty),
             ];
         }

@@ -179,7 +179,9 @@ class Product extends Model
 
     public function bundlings()
     {
-        return $this->belongsToMany(Bundling::class, 'bundling_products', 'product_id', 'bundling_id')->withPivot('id', 'quantity');
+        return $this->belongsToMany(Bundling::class, 'bundling_products', 'product_id', 'bundling_id')
+            ->withPivot('id', 'quantity')
+            ->withTimestamps();
     }
 
 

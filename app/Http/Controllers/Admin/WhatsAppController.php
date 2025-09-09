@@ -106,7 +106,7 @@ class WhatsAppController extends Controller
                         break;
                     }
                 }
-                
+
                 // If still no session found, return default data
                 if (!$sessionData) {
                     $sessionData = [

@@ -46,7 +46,12 @@ class ProductSearchController extends Controller
         }
 
         // Search bundlings
-        $bundlingQuery = Bundling::with(['products.items', 'products.detailTransactions.transaction']);
+        $bundlingQuery = Bundling::with([
+            'bundlingProducts:id,bundling_id,product_id,quantity',
+            'bundlingProducts.product:id,name,price', 
+            'bundlingProducts.product.items', 
+            'bundlingProducts.product.detailTransactions.transaction'
+        ]);
 
         if (!empty($search)) {
             $bundlingQuery->where('name', 'like', '%' . $search . '%');
@@ -56,7 +61,7 @@ class ProductSearchController extends Controller
 
         foreach ($allBundlings as $bundling) {
             $availableCount = $this->calculateBundlingAvailability($bundling, $startDateTime, $endDateTime);
-            $includedProducts = $bundling->products->pluck('name')->toArray();
+            $includedProducts = $bundling->bundlingProducts->pluck('product.name')->toArray();
             
             $products->push([
                 'id' => $bundling->id,
@@ -118,15 +123,15 @@ class ProductSearchController extends Controller
      */
     private function calculateBundlingAvailability(Bundling $bundling, Carbon $startDate, Carbon $endDate): int
     {
-        if ($bundling->products->isEmpty()) {
+        if ($bundling->bundlingProducts->isEmpty()) {
             return 0;
         }
 
         $minAvailable = PHP_INT_MAX;
 
-        foreach ($bundling->products as $product) {
-            $requiredQuantity = $product->pivot->quantity ?? 1;
-            $availableQuantity = $this->calculateProductAvailability($product, $startDate, $endDate);
+        foreach ($bundling->bundlingProducts as $bundlingProduct) {
+            $requiredQuantity = $bundlingProduct->quantity ?? 1;
+            $availableQuantity = $this->calculateProductAvailability($bundlingProduct->product, $startDate, $endDate);
             
             // Calculate how many complete sets we can make
             $possibleSets = floor($availableQuantity / $requiredQuantity);

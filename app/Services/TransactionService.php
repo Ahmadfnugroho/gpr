@@ -114,7 +114,9 @@ class TransactionService
 
         // Assign serial numbers
         $productItemIds = ProductItem::whereIn('serial_number', $requiredSerials)->pluck('id');
+        \Illuminate\Support\Facades\Log::info('ProductItemIds for sync (single product)', ['product_item_ids' => $productItemIds->toArray()]);
         $detailTransaction->productItems()->sync($productItemIds);
+        \Illuminate\Support\Facades\Log::info('ProductItemIds after sync (single product)', ['detail_transaction_id' => $detailTransaction->id, 'synced_product_item_ids' => $detailTransaction->productItems->pluck('id')->toArray()]);
 
         return $detailTransaction->total_price;
     }
@@ -124,6 +126,7 @@ class TransactionService
      */
     protected function createBundlingDetailTransaction(Transaction $transaction, array $data, Carbon $startDate, Carbon $endDate): int
     {
+        Log::info('createBundlingDetailTransaction method entered.');
         $bundling = \App\Models\Bundling::with('products')->find($data['bundling_id']);
         if (!$bundling) {
             throw new \Exception('Bundling not found');
@@ -146,7 +149,11 @@ class TransactionService
 
         // Assign product items for bundling
         $assignedItemIds = $this->assignBundlingProductItems($bundling, $data['quantity'], $startDate, $endDate);
+        
+        \Illuminate\Support\Facades\Log::info('Assigned ProductItemIds for bundling', ['detail_transaction_id' => $detailTransaction->id, 'assigned_item_ids' => $assignedItemIds]);
+
         $detailTransaction->productItems()->sync($assignedItemIds);
+        \Illuminate\Support\Facades\Log::info('ProductItemIds after sync (bundling)', ['detail_transaction_id' => $detailTransaction->id, 'synced_product_item_ids' => $detailTransaction->productItems->pluck('id')->toArray()]);
 
         return $detailTransaction->total_price;
     }
