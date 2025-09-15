@@ -32,7 +32,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-gpr-backup-sa.json
+
 .vercel
 
 .vercel
