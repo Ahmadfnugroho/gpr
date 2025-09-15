@@ -3,15 +3,13 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # ---------- CONFIG ----------
-ENV_FILE="/var/www/gpr/.env"               # Laravel backend .env
-WORKDIR="/tmp/backup_staging"              # Staging folder
-OUTDIR="/var/backups"                      # Local backup storage
-RCLONE_REMOTE="backup:backups/gpr"        # rclone remote path
+ENV_FILE="/var/www/gpr/.env"
+STAGING="/tmp/backup_staging"
+OUTDIR="/var/backups"
+RCLONE_REMOTE="backup:backups/gpr"
 LOGFILE="/var/log/backup.log"
 TIMEZONE="Asia/Jakarta"
 RETENTION_DAYS=7
-
-# Paths to backup
 LARAVEL_PATH="/var/www/gpr"
 REACT_PATH="/var/www/fegpr"
 WA_PATH="/root/waha"
@@ -21,8 +19,7 @@ NGINX_SITES_ENABLED="/etc/nginx/sites-enabled"
 
 log() { echo "[$(TZ=$TIMEZONE date '+%Y-%m-%d %H:%M:%S %Z')] $*" | tee -a "$LOGFILE"; }
 
-# Prepare directories
-mkdir -p "$WORKDIR" "$OUTDIR"
+mkdir -p "$STAGING" "$OUTDIR"
 touch "$LOGFILE"
 
 # ---------- Parse DB credentials ----------
@@ -41,47 +38,45 @@ DB_USER=$(get_env "DB_USERNAME" "$ENV_FILE")
 DB_PASS=$(get_env "DB_PASSWORD" "$ENV_FILE")
 
 DATE=$(TZ=$TIMEZONE date +%F)
-BACKUP_NAME="backup-${DATE}.tar.gz"
 SQL_FILE="db-${DATE}.sql"
+BACKUP_NAME="backup-${DATE}.tar.gz"
 
-# ---------- Clean staging ----------
-rm -rf "$WORKDIR/*"
-mkdir -p "$WORKDIR"/{laravel,react,waha,nginx}
-
-# ---------- Dump MySQL ----------
 log "Dumping MySQL database..."
 export MYSQL_PWD="$DB_PASS"
-mysqldump --single-transaction --quick --lock-tables=false -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" "$DB_NAME" > "$WORKDIR/$SQL_FILE"
+mysqldump --single-transaction --quick --lock-tables=false --no-tablespaces \
+    -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" "$DB_NAME" > "$STAGING/$SQL_FILE"
 unset MYSQL_PWD
 
-# Move SQL dump into staging folder
-mv "$WORKDIR/$SQL_FILE" "$WORKDIR/db-$DATE.sql"
-
-# ---------- Copy application files ----------
+# ---------- Copy application files to staging ----------
 log "Copying application files to staging..."
-rsync -a --exclude='node_modules' "$LARAVEL_PATH/" "$WORKDIR/laravel/"
-rsync -a --exclude='node_modules' "$REACT_PATH/" "$WORKDIR/react/"
-rsync -a "$WA_PATH/" "$WORKDIR/waha/"
-rsync -a "$NGINX_SITES_AVAILABLE/" "$WORKDIR/nginx/sites-available/"
-rsync -a "$NGINX_SITES_ENABLED/" "$WORKDIR/nginx/sites-enabled/"
+rm -rf "$STAGING/app" "$STAGING/frontend" "$STAGING/waha" "$STAGING/nginx"
+mkdir -p "$STAGING/app" "$STAGING/frontend" "$STAGING/waha" "$STAGING/nginx"
+
+cp -r "$LARAVEL_PATH"/* "$STAGING/app/"
+cp -r "$REACT_PATH"/* "$STAGING/frontend/"
+cp -r "$WA_PATH"/* "$STAGING/waha/"
+cp -r "$NGINX_SITES_AVAILABLE" "$STAGING/nginx/sites-available"
+cp -r "$NGINX_SITES_ENABLED" "$STAGING/nginx/sites-enabled"
 
 # ---------- Create tar.gz ----------
-log "Creating tar.gz archive..."
-tar -czf "$OUTDIR/$BACKUP_NAME" -C "$WORKDIR" .
+log "Creating compressed backup archive..."
+tar -C "$STAGING" -czf "$OUTDIR/$BACKUP_NAME" .
 
 # ---------- Upload to Google Drive ----------
 log "Uploading backup to Google Drive..."
-rclone copy "$OUTDIR/$BACKUP_NAME" "$RCLONE_REMOTE" --drive-chunk-size 64M --transfers 4 --checkers 8 --verbose
+rclone copy "$OUTDIR/$BACKUP_NAME" "$RCLONE_REMOTE" \
+    --drive-chunk-size 64M --transfers 4 --checkers 8 --verbose
 
 # ---------- Delete local backup ----------
+log "Deleting local backup file..."
 rm -f "$OUTDIR/$BACKUP_NAME"
 
 # ---------- Retention: delete backups older than 7 days ----------
-log "Deleting old backups from Google Drive (> $RETENTION_DAYS days)..."
+log "Removing old backups on Google Drive (older than $RETENTION_DAYS days)..."
 rclone delete "$RCLONE_REMOTE" --min-age "${RETENTION_DAYS}d"
 
 # ---------- Clear Laravel logs ----------
 log "Clearing Laravel logs..."
 find "${LARAVEL_PATH}/storage/logs" -type f -name "*.log" -exec truncate -s 0 {} \;
 
-log "Backup completed successfully."
+log "Backup process completed successfully."
