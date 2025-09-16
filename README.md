@@ -1,66 +1,190 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 📸 **Global Photo Rental (GPR)**
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+[![Laravel](https://img.shields.io/badge/Laravel-10.x-red?logo=laravel&logoColor=white)](https://laravel.com)
+[![PHP](https://img.shields.io/badge/PHP-8.1+-blue?logo=php&logoColor=white)](https://php.net)
+[![Filament](https://img.shields.io/badge/Filament-v3-green?logo=filament&logoColor=white)](https://filamentphp.com)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-## About Laravel
+Global Photo Rental adalah platform manajemen rental peralatan fotografi terlengkap. Dari kamera mirrorless hingga lighting setup, kelola inventaris, booking, dan transaksi dengan mudah melalui admin panel modern dan API robust.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## ✨ **Fitur Utama**
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+-   **📦 Manajemen Inventaris Lengkap**
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+    -   Kategori, sub-kategori, brand (termasuk premiere brands)
+    -   Produk dengan spesifikasi detail, serial numbers, dan rental includes
+    -   Bundling packages untuk rental combo (misal: wedding kit)
+    -   Tracking ketersediaan real-time berdasarkan tanggal
 
-## Learning Laravel
+-   **💳 Sistem Rental & Transaksi**
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+    -   Booking rental dengan periode tanggal fleksibel
+    -   Kalkulasi harga otomatis (harian, diskon promo, subtotal)
+    -   Status transaksi (booking, confirmed, completed)
+    -   Integrasi promo codes dan notes pelanggan
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+-   **🔧 Admin Panel Modern**
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+    -   Dibangun dengan [Filament PHP](https://filamentphp.com) - UI intuitif
+    -   CRUD operations untuk semua resources (products, customers, transactions)
+    -   Bulk import/export Excel/CSV dengan validasi serial numbers
+    -   Memory-optimized untuk dataset besar
 
-## Laravel Sponsors
+-   **🌐 API RESTful Siap Produksi**
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+    -   Public endpoints untuk browsing products, categories, brands
+    -   Protected endpoints dengan API Key (rate limiting, logging)
+    -   Search advanced dengan autocomplete dan suggestions
+    -   Availability checks untuk cart dan multiple items
 
-### Premium Partners
+-   **📱 Integrasi Eksternal**
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+    -   WhatsApp API untuk notifikasi otomatis (via WAHA)
+    -   Google Sheets sync untuk backup dan reporting
+    -   Email verification dan custom notifications
+    -   Region data (provinsi, kabupaten, kecamatan, desa) untuk alamat pelanggan
 
-## Contributing
+-   **⚡ Performance & Security**
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+    -   Optimized queries dan caching untuk speed tinggi
+    -   Rate limiting, API key expiration, dan security headers
+    -   Logging lengkap untuk monitoring usage dan errors
+    -   Image compression dan session handling efisien
 
-## Code of Conduct
+-   **🛠 Tools Pengembang**
+    -   Artisan commands untuk API key management
+    -   Queue jobs untuk bulk operations (imports, updates)
+    -   Observers untuk auto-sync dan notifications
+    -   Deployment scripts untuk server dan backup otomatis
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## 🛠 **Tech Stack**
 
-## Security Vulnerabilities
+-   **Backend:** Laravel 10.x, PHP 8.1+
+-   **Frontend Admin:** Filament v3 (TALL Stack: Tailwind, Alpine, Livewire)
+-   **Database:** MySQL (optimized schema untuk inventory)
+-   **API:** Sanctum untuk auth, Custom middleware untuk keys
+-   **Integrations:** WAHA (WhatsApp), Google Sheets API, Fonnte SMS
+-   **Tools:** Composer, NPM, Artisan, Queue (Redis/Database), Filament Importers/Exporters
+-   **Deployment:** Laragon (local), Nginx/Apache (prod), Cron jobs untuk queues
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## 🚀 **Installation**
 
-## License
+### **Prerequisites**
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+-   PHP 8.1+
+-   Composer
+-   Node.js & NPM
+-   MySQL 8.0+
+-   Laragon (untuk local dev Windows) atau XAMPP/MAMP
+
+### **Local Setup dengan Laragon**
+
+1. **Clone Repository**
+
+    ```bash
+    git clone https://github.com/yourusername/global-photo-rental.git
+    cd global-photo-rental
+    ```
+
+2. **Install Dependencies**
+
+    ```bash
+    composer install
+    npm install
+    npm run build
+    ```
+
+3. **Environment Setup**
+
+    - Copy `.env.example` ke `.env`
+    - Generate app key: `php artisan key:generate`
+    - Konfigurasi database di `.env` (DB_HOST=127.0.0.1, DB_DATABASE=gpr_db, etc.)
+    - Setup mailer (untuk notifications): Gunakan Mailtrap atau SMTP
+
+4. **Database & Migrations**
+
+    ```bash
+    php artisan migrate --seed
+    ```
+
+5. **Jalankan Server**
+
+    - Start Laragon (Apache + MySQL)
+    - Set virtual host ke `gpr.id` (edit hosts file: 127.0.0.1 gpr.id)
+    - Akses: http://gpr.id
+    - Admin login: Default user dari seeder (check database)
+
+6. **API Keys & Queues**
+
+    ```bash
+    php artisan api:key:create --name="Local Dev"
+    php artisan queue:work  # Untuk background jobs
+    ```
+
+7. **Test API**
+    - Base URL: http://gpr.id/api
+    - Coba: `curl http://gpr.id/api/categories`
+
+### **Production Deployment**
+
+-   Gunakan Forge/Envoyer atau manual setup
+-   Config queue supervisor untuk WhatsApp dan sync jobs
+-   Enable HTTPS dan optimize .htaccess
+
+## 📖 **Usage**
+
+### **Admin Panel**
+
+-   Login di http://gpr.id/admin
+-   Manage products: Tambah/edit dengan foto, specs, serials
+-   Transactions: View invoices, update status, export PDF
+-   Customers: Import dari Excel, sync ke Google Sheets
+-   Bundlings: Buat package rental custom
+
+### **API Usage**
+
+Lihat detail di [API Documentation](API_DOCUMENTATION.md) atau http://gpr.id/api/docs (jika setup Swagger).
+
+Contoh frontend integration:
+
+```javascript
+fetch("http://gpr.id/api/products?category=camera", {
+    headers: { Accept: "application/json" },
+})
+    .then((res) => res.json())
+    .then((data) => console.log(data.data));
+```
+
+### **WhatsApp Integration**
+
+-   Start WAHA server: `php artisan whatsapp:start`
+-   Send notifications otomatis pada booking confirmed
+
+## 🔍 **Screenshots**
+
+_(Tambahkan gambar di folder assets atau gunakan GitHub images)_
+
+-   Admin Dashboard: ![Dashboard](screenshots/dashboard.png)
+-   Product Management: ![Products](screenshots/products.png)
+-   Transaction View: ![Transaction](screenshots/transaction.png)
+
+## 🤝 **Contributing**
+
+1. Fork repo dan buat feature branch
+2. Commit changes: `git commit -m "Add: New feature"`
+3. Push dan buat Pull Request
+4. Ikuti coding standards Laravel (PSR-12)
+
+Issues? Buka ticket di GitHub.
+
+## 📄 **License**
+
+MIT License - Lihat [LICENSE](LICENSE) file.
+
+## 👥 **Contact**
+
+-   **Developer:** Ahmad Fauzi
+-   **Email:** ahmad@globalphotorental.com
+-   **Website:** https://globalphotorental.com
+
+Terima kasih telah berkontribusi! 🚀
