@@ -110,11 +110,29 @@
       0 => 'Intervention\\Image\\Laravel\\ServiceProvider',
     ),
   ),
+  'kevincobain2000/laravel-erd' => 
+  array (
+    'aliases' => 
+    array (
+      'LaravelERD' => 'Kevincobain2000\\LaravelERD\\LaravelERDFacade',
+    ),
+    'providers' => 
+    array (
+      0 => 'Kevincobain2000\\LaravelERD\\LaravelERDServiceProvider',
+    ),
+  ),
   'kirschbaum-development/eloquent-power-joins' => 
   array (
     'providers' => 
     array (
       0 => 'Kirschbaum\\PowerJoins\\PowerJoinsServiceProvider',
+    ),
+  ),
+  'laravel/sail' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Laravel\\Sail\\SailServiceProvider',
     ),
   ),
   'laravel/sanctum' => 

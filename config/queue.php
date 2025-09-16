@@ -42,7 +42,7 @@ return [
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 300), // Increased for bulk operations
             'after_commit' => false,
         ],
-        
+
         // Optimized database queue for bulk operations
         'bulk_database' => [
             'driver' => 'database',
@@ -96,7 +96,7 @@ return [
     */
 
     'batching' => [
-        'database' => env('DB_CONNECTION', 'sqlite'),
+        'database' => env('DB_CONNECTION', 'mysql'),
         'table' => 'job_batches',
     ],
 
@@ -115,7 +115,7 @@ return [
 
     'failed' => [
         'driver' => env('QUEUE_FAILED_DRIVER', 'database-uuids'),
-        'database' => env('DB_CONNECTION', 'sqlite'),
+        'database' => env('DB_CONNECTION', 'mysql'),
         'table' => 'failed_jobs',
     ],
 
