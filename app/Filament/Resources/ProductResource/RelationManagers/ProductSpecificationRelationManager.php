@@ -25,7 +25,6 @@ class ProductSpecificationRelationManager extends RelationManager
             ->schema([
                 Forms\Components\TextInput::make('name')
                     ->required()
-                    ->maxLength(255),
             ]);
     }
 
@@ -44,7 +43,7 @@ class ProductSpecificationRelationManager extends RelationManager
             ->headerActions([
                 Tables\Actions\CreateAction::make(),
                 Tables\Actions\ImportAction::make()
-                ->importer(ProductSpecificationImporter::class),
+                    ->importer(ProductSpecificationImporter::class),
 
             ])
             ->actions([
@@ -58,4 +57,3 @@ class ProductSpecificationRelationManager extends RelationManager
             ]);
     }
 }
-

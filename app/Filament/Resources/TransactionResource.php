@@ -494,22 +494,31 @@ class TransactionResource extends BaseOptimizedResource
     }
     public static function resolveProductOrBundlingSelection($state, \Filament\Forms\Set $set, Get $get, ?array $allDetailTransactions)
     {
-        if (!$state) {
+        // Enhanced type safety - ensure $state is a valid selection key string
+        if (!$state || !is_string($state)) {
             $set('is_bundling', false);
             $set('bundling_id', null);
             $set('product_id', null);
             $set('productItems', []); // Reset productItems jika state kosong
+            return;
+        }
 
+        // Additional validation - must contain hyphen and not be a date/time/numeric value
+        if (!str_contains($state, '-') || 
+            is_numeric($state) || 
+            preg_match('/^\d{4}-\d{2}-\d{2}/', $state) || // Date pattern
+            preg_match('/^\d+$/', str_replace('-', '', $state))) { // Pure numeric with hyphens
+            
+            // If it's not a valid selection key, just clear the fields without error
+            $set('is_bundling', false);
+            $set('bundling_id', null);
+            $set('product_id', null);
+            $set('productItems', []);
             return;
         }
 
         // Reset quantity awal
         $set('quantity', 1);
-
-        // Pisahkan type dan ID dari state dengan validasi
-        if (!str_contains($state, '-')) {
-            return; // Invalid format
-        }
 
         [$type, $id] = explode('-', $state, 2);
         if (!$type || !$id) {
@@ -549,7 +558,7 @@ class TransactionResource extends BaseOptimizedResource
             );
 
             // Auto-assign all available items for bundling
-            $set('productItems', $result['ids'] ?? []);
+            $set('productItems', array_map('intval', $result['ids'] ?? []));
         } else {
             // Jika produk tunggal dipilih
             $set('product_id', (int) $id);
@@ -816,6 +825,7 @@ class TransactionResource extends BaseOptimizedResource
                             'id' => 'start_date_picker'
                         ])
                         ->afterStateUpdated(function ($state, $get, $set) {
+                            // Clear product/bundling selections when date changes
                             $set('is_bundling', false);
                             $set('bundling_id', null);
                             $set('product_id', null);
@@ -828,8 +838,9 @@ class TransactionResource extends BaseOptimizedResource
                                 $endDate = Carbon::parse($startDate)->addHours($duration * 24)->format('Y-m-d H:i');
                                 $set('end_date', $endDate);
                             }
-                            $allDetailTransactions = $get('../../detailTransactions') ?? [];
-                            \App\Filament\Resources\TransactionResource::resolveProductOrBundlingSelection($state, $set, $get, $allDetailTransactions);
+                            
+                            // Note: We don't call resolveProductOrBundlingSelection here because $state is a date, not a selection key
+                            // Product/bundling selections will be updated automatically when the repeater reacts to date changes
                         }),
                     Select::make('duration')
                         ->label('Duration')
@@ -852,8 +863,9 @@ class TransactionResource extends BaseOptimizedResource
                                 $endDate = Carbon::parse($startDate)->addHours($duration * 24)->format('Y-m-d H:i:s');
                                 $set('end_date', $endDate);
                             }
-                            $allDetailTransactions = $get('../../detailTransactions') ?? [];
-                            \App\Filament\Resources\TransactionResource::resolveProductOrBundlingSelection($state, $set, $get, $allDetailTransactions);
+                            
+                            // Note: We don't call resolveProductOrBundlingSelection here because $state is a duration (int), not a selection key
+                            // Product/bundling selections will be updated automatically when the repeater reacts to duration changes
                         }),
                     DateTimePicker::make('end_date')
                         ->label('End Date')
@@ -1122,8 +1134,11 @@ class TransactionResource extends BaseOptimizedResource
                                             'step' => '1'
                                         ])
                                         ->afterStateUpdated(function ($state, Set $set, Get $get) {
-                                            $allDetailTransactions = $get('../../detailTransactions') ?? [];
-                                            \App\Filament\Resources\TransactionResource::resolveProductOrBundlingSelection($state, $set, $get, $allDetailTransactions);
+                                            // Only call resolveProductOrBundlingSelection when $state is actually a selection_key
+                                            if ($state && is_string($state) && str_contains($state, '-')) {
+                                                $allDetailTransactions = $get('../../detailTransactions') ?? [];
+                                                \App\Filament\Resources\TransactionResource::resolveProductOrBundlingSelection($state, $set, $get, $allDetailTransactions);
+                                            }
                                         })
                                         ->columnSpan(1),
 
@@ -2340,23 +2355,23 @@ class TransactionResource extends BaseOptimizedResource
                             // Show transactions that overlap with the selected date range
                             $query->where(function (Builder $q) use ($data) {
                                 $q->whereBetween('start_date', [$data['start_date'], $data['end_date']])
-                                  ->orWhereBetween('end_date', [$data['start_date'], $data['end_date']])
-                                  ->orWhere(function (Builder $q2) use ($data) {
-                                      $q2->where('start_date', '<=', $data['start_date'])
-                                         ->where('end_date', '>=', $data['end_date']);
-                                  });
+                                    ->orWhereBetween('end_date', [$data['start_date'], $data['end_date']])
+                                    ->orWhere(function (Builder $q2) use ($data) {
+                                        $q2->where('start_date', '<=', $data['start_date'])
+                                            ->where('end_date', '>=', $data['end_date']);
+                                    });
                             });
                         } elseif (!empty($data['start_date'])) {
                             // Show transactions that start on or after the start date OR end after the start date
                             $query->where(function (Builder $q) use ($data) {
                                 $q->where('start_date', '>=', $data['start_date'])
-                                  ->orWhere('end_date', '>=', $data['start_date']);
+                                    ->orWhere('end_date', '>=', $data['start_date']);
                             });
                         } elseif (!empty($data['end_date'])) {
                             // Show transactions that end on or before the end date OR start before the end date
                             $query->where(function (Builder $q) use ($data) {
                                 $q->where('end_date', '<=', $data['end_date'])
-                                  ->orWhere('start_date', '<=', $data['end_date']);
+                                    ->orWhere('start_date', '<=', $data['end_date']);
                             });
                         }
                     })

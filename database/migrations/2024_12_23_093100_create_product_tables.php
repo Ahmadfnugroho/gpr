@@ -28,7 +28,7 @@ return new class extends Migration
             $table->foreignId('sub_category_id')->nullable()->constrained('sub_categories')->nullOnDelete();
             $table->softDeletes();
             $table->timestamps();
-            
+
             // Indexes for performance
             $table->index('name');
             $table->index('slug');
@@ -44,7 +44,7 @@ return new class extends Migration
             $table->string('serial_number')->unique();
             $table->boolean('is_available')->default(true);
             $table->timestamps();
-            
+
             $table->index(['product_id', 'is_available']);
             $table->index('serial_number');
         });
@@ -55,7 +55,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->string('photo');
             $table->timestamps();
-            
+
             $table->index('product_id');
         });
 
@@ -63,10 +63,10 @@ return new class extends Migration
         Schema::create('product_specifications', function (Blueprint $table) {
             $table->id();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->string('name');
+            $table->text('name');
             $table->text('value')->nullable();
             $table->timestamps();
-            
+
             $table->index('product_id');
         });
 
@@ -78,7 +78,7 @@ return new class extends Migration
             $table->string('include_name');
             $table->unsignedInteger('quantity')->default(1);
             $table->timestamps();
-            
+
             $table->index('product_id');
             $table->index('include_product_id');
         });
