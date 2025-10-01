@@ -35,8 +35,6 @@ class VerifyEmailNotification extends VerifyEmail implements ShouldQueue
      */
     public function __construct()
     {
-        // Set queue name for email notifications
-        $this->onQueue('emails');
         // Small delay to ensure transaction is committed
         $this->delay(now()->addSeconds(5));
     }
@@ -72,18 +70,6 @@ class VerifyEmailNotification extends VerifyEmail implements ShouldQueue
                 'hash' => sha1($notifiable->getEmailForVerification()),
             ]
         );
-    }
-    
-    /**
-     * Determine which connections the job should run on.
-     *
-     * @return array
-     */
-    public function viaConnections(): array
-    {
-        return [
-            'mail' => 'database',
-        ];
     }
     
     /**
