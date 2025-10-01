@@ -7,7 +7,7 @@ User=www-data
 Group=www-data
 Restart=always
 RestartSec=5s
-ExecStart=/usr/bin/php /var/www/gpr/artisan queue:work --sleep=3 --tries=3 --max-time=3600 --timeout=60
+ExecStart=/usr/bin/php /var/www/gpr/artisan queue:work --queue=default,emails --sleep=3 --tries=3 --max-time=3600 --timeout=60
 WorkingDirectory=/var/www/gpr   
 Environment=HOME=/home/www-data
 StandardOutput=journal
