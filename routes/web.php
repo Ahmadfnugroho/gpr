@@ -35,6 +35,8 @@ Route::get('/registration/success', [RegistrationController::class, 'success'])-
 Route::get('/email/verify/{id}/{hash}', [RegistrationController::class, 'verifyEmail'])
     ->middleware(['signed'])
     ->name('verification.verify');
+Route::post('/email/resend', [RegistrationController::class, 'resendVerification'])
+    ->name('verification.resend');
 
 // Product Search Route
 Route::get('/search-products', [ProductSearchController::class, 'index'])->name('product.search');

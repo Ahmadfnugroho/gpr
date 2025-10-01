@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Registrasi - Global Photo Rental</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/LOGO GPR.png') }}">
+    <link rel="shortcut icon" type="image/png" href="{{ asset('images/LOGO GPR.png') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -225,7 +227,7 @@
         <div class="registration-container">
             <div class="text-center mb-4">
                 <h2 class="fw-bold">
-                    <i class="fas fa-camera text-primary me-2"></i>
+                    <img src="{{ asset('images/LOGO GPR.png') }}" alt="Global Photo Rental Logo" style="height: 40px; width: auto; margin-right: 10px; vertical-align: middle;">
                     Global Photo Rental
                 </h2>
                 <p class="text-muted">Form Registrasi Penyewa</p>

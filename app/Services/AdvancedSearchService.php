@@ -26,20 +26,20 @@ class AdvancedSearchService
         }
 
         $searchQuery = trim($query);
-        
+
         // Get products and bundlings with weighted scoring
         $products = $this->searchProducts($searchQuery, $filters);
         $bundlings = $this->searchBundlings($searchQuery, $filters);
-        
+
         // Combine and sort by score
         $combined = $products->merge($bundlings);
         $sorted = $combined->sortByDesc('score')->values();
-        
+
         // Apply pagination
         $total = $sorted->count();
         $offset = ($page - 1) * $limit;
         $paginatedResults = $sorted->slice($offset, $limit)->values();
-        
+
         return [
             'results' => $paginatedResults->toArray(),
             'total' => $total,
@@ -59,16 +59,16 @@ class AdvancedSearchService
         $productsQuery = Product::query()
             ->with([
                 'category:id,name,slug',
-                'brand:id,name,slug', 
+                'brand:id,name,slug',
                 'productPhotos:id,product_id,photo'
-            ])
-            ->where('status', 'available'); // Only available products
+            ]);
+        // ->where('status', 'available'); // Only available products
 
         // Apply filters
         $productsQuery = $this->applyFilters($productsQuery, $filters, 'product');
-        
+
         $products = $productsQuery->get();
-        
+
         return $products->map(function ($product) use ($query) {
             $score = $this->calculateScore($query, [
                 'name' => $product->name,
@@ -76,7 +76,7 @@ class AdvancedSearchService
                 'brand' => $product->brand?->name,
                 'description' => $product->description ?? '',
             ]);
-            
+
             return [
                 'id' => $product->id,
                 'type' => 'product',
@@ -117,14 +117,14 @@ class AdvancedSearchService
                 'category:id,name,slug',
                 'brand:id,name,slug',
                 'bundlingPhotos:id,bundling_id,photo'
-            ])
-            ->where('status', 'available'); // Only available bundlings
+            ]);
+        // ->where('status', 'available'); // Only available bundlings
 
         // Apply filters
         $bundlingsQuery = $this->applyFilters($bundlingsQuery, $filters, 'bundling');
-        
+
         $bundlings = $bundlingsQuery->get();
-        
+
         return $bundlings->map(function ($bundling) use ($query) {
             $score = $this->calculateScore($query, [
                 'name' => $bundling->name,
@@ -132,7 +132,7 @@ class AdvancedSearchService
                 'brand' => $bundling->brand?->name,
                 'description' => $bundling->description ?? '',
             ]);
-            
+
             return [
                 'id' => $bundling->id,
                 'type' => 'bundling',
@@ -261,7 +261,7 @@ class AdvancedSearchService
 
         foreach ($queryWords as $qWord) {
             $bestWordScore = 0.0;
-            
+
             foreach ($textWords as $tWord) {
                 if (strpos($tWord, $qWord) !== false || strpos($qWord, $tWord) !== false) {
                     $bestWordScore = max($bestWordScore, 0.7);
@@ -340,7 +340,7 @@ class AdvancedSearchService
         // Get popular products and bundlings
         $popularProducts = Product::query()
             ->with(['category:id,name,slug', 'brand:id,name,slug'])
-            ->where('status', 'available')
+            // ->where('status', 'available')
             ->where('premiere', true) // Popular items
             ->orderBy('created_at', 'desc')
             ->take($limit / 2)
@@ -348,7 +348,7 @@ class AdvancedSearchService
 
         $popularBundlings = Bundling::query()
             ->with(['category:id,name,slug', 'brand:id,name,slug'])
-            ->where('status', 'available')
+            // ->where('status', 'available')
             ->orderBy('created_at', 'desc')
             ->take($limit / 2)
             ->get();

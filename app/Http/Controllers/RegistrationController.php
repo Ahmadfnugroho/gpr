@@ -557,6 +557,29 @@ class RegistrationController extends Controller
     }
 
     /**
+     * Resend verification email for customer
+     */
+    public function resendVerification(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:customers,email'
+        ]);
+
+        $customer = Customer::where('email', $request->email)->first();
+
+        if ($customer->hasVerifiedEmail()) {
+            return redirect()->back()
+                ->with('message', 'Email sudah terverifikasi.');
+        }
+
+        // Trigger the Registered event to send queued verification email
+        event(new Registered($customer));
+
+        return redirect()->back()
+            ->with('success', 'Email verifikasi telah dikirim ulang.');
+    }
+
+    /**
      * Kompres gambar untuk mengurangi ukuran file
      * Target ukuran: < 1MB (800-900KB)
      * Mendukung format WebP jika browser mendukung
