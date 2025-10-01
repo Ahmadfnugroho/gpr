@@ -2,10 +2,10 @@
 # Cek setiap 5 menit apakah queue worker masih berjalan
 
 # Untuk Laravel Scheduler (recommended)
-* * * * * cd /path/to/your/laravel && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd /var/www/gpr && php artisan schedule:run >> /dev/null 2>&1
 
 # Atau manual check queue worker (alternative)
-*/5 * * * * /path/to/your/laravel/deployment/check-queue.sh >> /var/log/queue-check.log 2>&1
+*/5 * * * * /var/www/gpr/deployment/check-queue.sh >> /var/log/queue-check.log 2>&1
 
 # Installation:
 # crontab -e

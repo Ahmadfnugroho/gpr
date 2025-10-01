@@ -3,7 +3,7 @@
 # Script untuk mengecek apakah queue worker masih berjalan
 # Jika tidak, restart worker
 
-LARAVEL_PATH="/path/to/your/laravel"
+LARAVEL_PATH="/var/www/gpr"
 LOCK_FILE="$LARAVEL_PATH/storage/logs/queue-worker.lock"
 LOG_FILE="$LARAVEL_PATH/storage/logs/queue-monitor.log"
 
