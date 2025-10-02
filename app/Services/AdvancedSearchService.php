@@ -13,7 +13,7 @@ class AdvancedSearchService
     /**
      * Perform advanced search with Elasticsearch-like features
      */
-    public function search(string $query, array $filters = [], int $limit = 20, int $page = 1): array
+    public function search(string $query, array $filters = [], int $limit = 10, int $page = 1): array
     {
         if (empty(trim($query))) {
             return [
@@ -47,7 +47,7 @@ class AdvancedSearchService
             'limit' => $limit,
             'filters' => $filters,
             'query' => $searchQuery,
-            'execution_time' => microtime(true) - LARAVEL_START
+            'execution_time' => microtime(true) - ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true))
         ];
     }
 
@@ -114,8 +114,6 @@ class AdvancedSearchService
     {
         $bundlingsQuery = Bundling::query()
             ->with([
-                'category:id,name,slug',
-                'brand:id,name,slug',
                 'bundlingPhotos:id,bundling_id,photo'
             ]);
         // ->where('status', 'available'); // Only available bundlings
@@ -128,8 +126,6 @@ class AdvancedSearchService
         return $bundlings->map(function ($bundling) use ($query) {
             $score = $this->calculateScore($query, [
                 'name' => $bundling->name,
-                'category' => $bundling->category?->name,
-                'brand' => $bundling->brand?->name,
                 'description' => $bundling->description ?? '',
             ]);
 
@@ -140,20 +136,12 @@ class AdvancedSearchService
                 'slug' => $bundling->slug,
                 'price' => $bundling->price,
                 'thumbnail' => $bundling->bundlingPhotos->first()?->photo,
-                'category' => $bundling->category ? [
-                    'name' => $bundling->category->name,
-                    'slug' => $bundling->category->slug,
-                ] : null,
-                'brand' => $bundling->brand ? [
-                    'name' => $bundling->brand->name,
-                    'slug' => $bundling->brand->slug,
-                ] : null,
+                'category' => null,
+                'brand' => null,
                 'description' => $bundling->description,
                 'score' => $score,
                 'matched_fields' => $this->getMatchedFields($query, [
                     'name' => $bundling->name,
-                    'category' => $bundling->category?->name,
-                    'brand' => $bundling->brand?->name,
                 ]),
                 'url' => "/bundling/{$bundling->slug}",
                 'display' => "📦 {$bundling->name}",
@@ -168,15 +156,15 @@ class AdvancedSearchService
      */
     private function applyFilters($query, array $filters, string $type)
     {
-        // Category filter
-        if (isset($filters['category']) && is_array($filters['category'])) {
+        // Category filter - only apply to products
+        if (isset($filters['category']) && is_array($filters['category']) && $type === 'product') {
             $query->whereHas('category', function ($q) use ($filters) {
                 $q->whereIn('slug', $filters['category']);
             });
         }
 
-        // Brand filter
-        if (isset($filters['brand']) && is_array($filters['brand'])) {
+        // Brand filter - only apply to products
+        if (isset($filters['brand']) && is_array($filters['brand']) && $type === 'product') {
             $query->whereHas('brand', function ($q) use ($filters) {
                 $q->whereIn('slug', $filters['brand']);
             });
@@ -347,7 +335,6 @@ class AdvancedSearchService
             ->get();
 
         $popularBundlings = Bundling::query()
-            ->with(['category:id,name,slug', 'brand:id,name,slug'])
             // ->where('status', 'available')
             ->orderBy('created_at', 'desc')
             ->take($limit / 2)
@@ -372,8 +359,8 @@ class AdvancedSearchService
                 'type' => 'bundling',
                 'name' => $bundling->name,
                 'slug' => $bundling->slug,
-                'category' => $bundling->category?->name,
-                'brand' => $bundling->brand?->name,
+                'category' => null,
+                'brand' => null,
                 'url' => "/bundling/{$bundling->slug}",
                 'display' => "📦 {$bundling->name}",
             ];

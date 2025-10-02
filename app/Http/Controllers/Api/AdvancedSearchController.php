@@ -156,7 +156,7 @@ class AdvancedSearchController extends Controller
      */
     public function popularSuggestions(Request $request): JsonResponse
     {
-        $limit = (int) $request->input('limit', 10);
+        $limit = (int) $request->input('limit', 20);
         $limit = min($limit, 20); // Maximum 20 suggestions
 
         try {
@@ -216,8 +216,8 @@ class AdvancedSearchController extends Controller
         try {
             // Get basic search statistics
             $stats = [
-                'total_products' => \App\Models\Product::where('status', 'available')->count(),
-                'total_bundlings' => \App\Models\Bundling::where('status', 'available')->count(),
+                'total_products' => \App\Models\Product::count(),
+                'total_bundlings' => \App\Models\Bundling::count(),
                 'total_categories' => \App\Models\Category::count(),
                 'total_brands' => \App\Models\Brand::count(),
                 'cache_enabled' => Cache::getStore() !== null,
