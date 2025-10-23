@@ -23,6 +23,7 @@ return new class extends Migration
             $table->string('thumbnail')->nullable();
             $table->enum('status', ['available', 'unavailable']);
             $table->boolean('premiere')->default(false);
+            $table->boolean('is_rental_include')->default(false);
             $table->foreignId('category_id')->nullable()->constrained()->cascadeOnDelete();
             $table->foreignId('brand_id')->nullable()->constrained('brands')->nullOnDelete();
             $table->foreignId('sub_category_id')->nullable()->constrained('sub_categories')->nullOnDelete();

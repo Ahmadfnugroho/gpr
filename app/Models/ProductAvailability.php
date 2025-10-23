@@ -28,6 +28,7 @@ class ProductAvailability extends Model
         'bundling_model',
         'total_items',
         'available_items'
+
     ];
 
     // Disable timestamps since this is a virtual model
@@ -63,6 +64,9 @@ class ProductAvailability extends Model
             $item->id = 'product_' . $product->id;
             $item->name = $product->name;
             $item->type = 'product';
+            $item->is_rental_include = $product->is_rental_include; // tambahkan di sini
+            $item->premiere = $product->premiere; // Tambahkan ini
+
             $item->product_model = $product;
             return $item;
         });

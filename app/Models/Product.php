@@ -34,10 +34,13 @@ class Product extends Model
         'brand_id',
         'sub_category_id',
         'premiere',
+        'is_rental_include'
     ];
 
     protected $casts = [
         'price' => MoneyCast::class,
+        'premiere' => 'boolean',
+        'is_rental_include' => 'boolean',
     ];
     protected $appends = ['is_available'];
 
@@ -96,7 +99,7 @@ class Product extends Model
     public function getAvailableQuantityForPeriod(Carbon $startDate, Carbon $endDate): int
     {
         $cacheKey = "product_availability_{$this->id}_{$startDate->format('Y-m-d')}_{$endDate->format('Y-m-d')}";
-        
+
         return Cache::remember($cacheKey, now()->addMinutes(5), function () use ($startDate, $endDate) {
             return $this->items()
                 ->whereDoesntHave('detailTransactions.transaction', function ($q) use ($startDate, $endDate) {
@@ -116,7 +119,7 @@ class Product extends Model
     public function getAvailableSerialNumbersForPeriod($startDate, $endDate)
     {
         $cacheKey = "product_serials_{$this->id}_{$startDate}_{$endDate}";
-        
+
         return Cache::remember($cacheKey, now()->addMinutes(3), function () use ($startDate, $endDate) {
             return $this->items()
                 ->actuallyAvailableForPeriod($startDate, $endDate)
@@ -215,7 +218,7 @@ class Product extends Model
     {
         // Cache availability status for 10 minutes
         $cacheKey = "product_availability_{$this->id}_" . now()->format('Y-m-d_H');
-        
+
         return Cache::remember($cacheKey, now()->addMinutes(10), function () {
             $today = Carbon::today();
             $endOfDay = Carbon::today()->endOfDay();
@@ -236,13 +239,13 @@ class Product extends Model
     {
         // Cache status calculation for better performance
         $cacheKey = "product_status_{$this->id}_" . now()->format('Y-m-d_H');
-        
+
         return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($value) {
             // Use database value if explicitly set, otherwise calculate from availability
             if ($value && in_array($value, [self::STATUS_AVAILABLE, self::STATUS_UNAVAILABLE, 'maintenance'])) {
                 return $value;
             }
-            
+
             return $this->is_available
                 ? self::STATUS_AVAILABLE
                 : self::STATUS_UNAVAILABLE;

@@ -7,6 +7,7 @@ use App\Http\Resources\Api\ProductResource;
 use App\Models\Product;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\CssSelector\Node\FunctionNode;
 
 class ProductController extends Controller
@@ -107,12 +108,9 @@ class ProductController extends Controller
 
         // 🚫 Filter: Exclude products that are rental includes
         if ($request->boolean('exclude_rental_includes', false)) {
-            $query->whereNotIn('id', function ($subQuery) {
-                $subQuery->select('include_product_id')
-                    ->from('rental_includes')
-                    ->whereNotNull('include_product_id');
-            });
+            $query->where('is_rental_include', false);
         }
+
 
         // 🔼 Sorting
         $sort = $request->query('sort');
@@ -169,7 +167,7 @@ class ProductController extends Controller
         if ($startDate && $endDate) {
             // Use the existing method from Product model
             $availableQuantity = $product->getAvailableQuantityForPeriod(
-                Carbon::parse($startDate), 
+                Carbon::parse($startDate),
                 Carbon::parse($endDate)
             );
         } else {
@@ -198,10 +196,16 @@ class ProductController extends Controller
 
 
 
-    public function ProductsHome()
+    public function ProductsHome(Request $request)
     {
-        $products = Product::where('premiere', 1)
-            ->with([
+        $query = Product::where('premiere', 1);
+
+        // 🚫 Filter: Exclude products that are rental includes
+        if ($request->boolean('exclude_rental_includes', false)) {
+            $query->where('is_rental_include', false);
+        }
+
+        $products = $query->with([
                 'category:id,name,slug',
                 'brand:id,name,slug,logo',
                 'subCategory:id,name,slug',
@@ -224,25 +228,24 @@ class ProductController extends Controller
             // Use AdvancedSearchService for better suggestions
             $searchService = app(\App\Services\AdvancedSearchService::class);
             $results = $searchService->autocomplete($query, 10);
-            
+
             return response()->json([
                 'suggestions' => $results['suggestions'] ?? []
             ]);
-            
         } catch (\Exception $e) {
             // Fallback to basic search if service fails
-            \Log::warning('AdvancedSearchService failed, using fallback', [
+            Log::warning('AdvancedSearchService failed, using fallback', [
                 'query' => $query,
                 'error' => $e->getMessage()
             ]);
-            
+
             // Simple fallback search
             $products = Product::where('name', 'like', "%{$query}%")
                 ->where('status', 'available')
                 ->with(['category:id,name,slug', 'productPhotos:id,product_id,photo'])
                 ->take(6)
                 ->get();
-            
+
             $suggestions = $products->map(function ($product) {
                 return [
                     'type' => 'product',
@@ -253,7 +256,7 @@ class ProductController extends Controller
                     'display' => $product->name
                 ];
             });
-            
+
             return response()->json([
                 'suggestions' => $suggestions->toArray()
             ]);

@@ -288,7 +288,7 @@ class ProductAvailabilityResource extends Resource
                     ->icon('heroicon-o-question-mark-circle')
                     ->color('info')
                     ->modalHeading('📖 Product Availability Help')
-                    ->modalSubheading('How to use the Product Availability Search')
+                    ->modalDescription('How to use the Product Availability Search')
                     ->modalContent(new HtmlString('
                         <div class="space-y-4">
                             <div>

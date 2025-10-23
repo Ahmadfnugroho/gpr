@@ -71,6 +71,7 @@ class ProductResource extends BaseOptimizedResource
             'products.name',
             'products.status',
             'products.premiere',
+            'products.is_rental_include',
             'products.category_id',
             'products.brand_id',
             'products.sub_category_id',
@@ -307,6 +308,10 @@ class ProductResource extends BaseOptimizedResource
                 Forms\Components\Toggle::make('premiere')
                     ->label('Brand Premiere')
                     ->default(false),
+                Forms\Components\Toggle::make('is_rental_include')
+                    ->label('Rental Include')
+                    ->default(false),
+
 
                 Forms\Components\Repeater::make('items')
                     ->label('Nomor Seri Produk')
@@ -467,6 +472,12 @@ class ProductResource extends BaseOptimizedResource
                         ->label('Featured')
                         ->sortable()
                         ->width('1%'),
+                    Tables\Columns\ToggleColumn::make('is_rental_include')
+                        ->label('Rental Include')
+                        ->sortable()
+                        ->width('1%'),
+
+
                 ])
                     ->alignment(Alignment::Center)
                     ->wrapHeader()
