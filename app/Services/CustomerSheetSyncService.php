@@ -73,7 +73,9 @@ final class CustomerSheetSyncService
                 'instagram_username' => $rowData['instagram_username'] ?? null,
                 'emergency_contact_name' => $rowData['emergency_contact_name'] ?? null,
                 'emergency_contact_number' => $rowData['emergency_contact_number'] ?? null,
-                'phones' => $phones,
+                // Kirim sebagai string saja
+                'phone1' => $rowData['phone1'] ?? null,
+                'phone2' => $rowData['phone2'] ?? null,
             ]);
 
             $toProcess[] = $dto;
