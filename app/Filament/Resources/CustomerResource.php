@@ -75,7 +75,7 @@ class CustomerResource extends Resource
                                     ->native(false),
                                 Select::make('status')
                                     ->label('Status')
-                                    ->options(Customer::STATUS_LABELS)
+                                    ->options(Customer::AVAILABLE_STATUSES)
                                     ->default(Customer::STATUS_BLACKLIST)
                                     ->required()
                                     ->native(false),
@@ -156,7 +156,7 @@ class CustomerResource extends Resource
                         Customer::STATUS_BLACKLIST => 'danger',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn(string $state): string => Customer::STATUS_LABELS[$state] ?? $state)
+                    ->formatStateUsing(fn(string $state): string => Customer::AVAILABLE_STATUSES[$state] ?? $state)
                     ->sortable(),
                 TextColumn::make('transactions_count')
                     ->label('Transactions')
@@ -174,7 +174,7 @@ class CustomerResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('status')
-                    ->options(Customer::STATUS_LABELS)
+                    ->options(Customer::AVAILABLE_STATUSES)
                     ->multiple(),
                 SelectFilter::make('gender')
                     ->options([
@@ -214,7 +214,7 @@ class CustomerResource extends Resource
                     ->modalDescription('Upload an Excel file to import customers. Make sure your file has the correct format.')
                     ->modalSubmitActionLabel('Import')
                     ->successNotificationTitle('Customers imported successfully'),
-                    
+
                 ExportAction::make()
                     ->exporter(CustomerExporter::class)
                     ->label('Export Customers')
@@ -223,22 +223,12 @@ class CustomerResource extends Resource
                     ->modalHeading('Export Customers')
                     ->modalDescription('Export all customers to an Excel file.')
                     ->modalSubmitActionLabel('Export')
-                    ->fileName(fn (): string => 'customers-' . date('Y-m-d-H-i-s'))
+                    ->fileName(fn(): string => 'customers-' . date('Y-m-d-H-i-s'))
                     ->successNotificationTitle('Customers exported successfully'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
-                    Action::make('exportSelected')
-                        ->label('Export Selected')
-                        ->icon('heroicon-o-arrow-down-tray')
-                        ->color('info')
-                        ->action(function ($records) {
-                            $service = new CustomerImportExportService();
-                            $customerIds = $records->pluck('id')->toArray();
-                            $filePath = $service->exportCustomers($customerIds);
-                            return response()->download($filePath, 'customers_selected_export_' . date('Y-m-d_H-i-s') . '.xlsx')->deleteFileAfterSend();
-                        }),
                     Action::make('bulkActivate')
                         ->label('Activate')
                         ->icon('heroicon-o-check-circle')
