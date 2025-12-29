@@ -28,8 +28,6 @@ final class CustomerSheetSyncService
         Carbon $lastSyncedAt,
         int $batchSize = 100
     ): array {
-        Activity::disable();
-
         $toProcess = [];
         $processed = 0;
         $skipped   = 0;
@@ -101,8 +99,6 @@ final class CustomerSheetSyncService
                 $processed++;
             }
         }
-
-        Activity::enable();
 
         return [
             'processed' => $processed,
