@@ -223,6 +223,8 @@ class CustomerResource extends Resource
                     ->modalHeading('Export Customers')
                     ->modalDescription('Export all customers to an Excel file.')
                     ->modalSubmitActionLabel('Export')
+                    ->directDownload() // <--- tambahkan ini supaya langsung download
+
                     ->fileName(fn(): string => 'customers-' . date('Y-m-d-H-i-s'))
                     ->successNotificationTitle('Customers exported successfully'),
             ])
