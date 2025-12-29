@@ -2,30 +2,30 @@
 
 namespace App\Services\Customer;
 
+use App\Models\Customer;
 use App\Services\Customer\DTO\CustomerSheetDTO;
 use Illuminate\Support\Facades\DB;
 
-class CustomerSyncService
+final class CustomerSyncService
 {
     public function __construct(
-        protected CustomerProfileUpdater $profileUpdater
+        protected CustomerProfileUpdater $profileUpdater,
+        protected CustomerPhoneNumberSync $phoneNumberSync
     ) {}
 
-    public function sync(array $rows): array
+    /**
+     * Sinkronisasi SATU customer dari DTO (Sheet → DB).
+     * One-way, deterministic, row-level transaction.
+     */
+    public function syncOne(CustomerSheetDTO $dto): Customer
     {
-        $processed = 0;
+        return DB::transaction(function () use ($dto) {
+            $customer = $this->profileUpdater->upsert($dto);
 
-        DB::transaction(function () use ($rows, &$processed) {
-            foreach ($rows as $row) {
-                $dto = CustomerSheetDTO::fromArray($row);
-                $this->profileUpdater->upsert($dto);
-                $processed++;
-            }
+            // Sinkron nomor HP terpisah
+            $this->phoneNumberSync->sync($customer, $dto->phones);
+
+            return $customer;
         });
-
-        return [
-            'processed' => $processed,
-            'synced_at' => now(),
-        ];
     }
 }

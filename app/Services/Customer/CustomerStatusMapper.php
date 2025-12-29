@@ -4,15 +4,41 @@ namespace App\Services\Customer;
 
 use App\Models\Customer;
 
-class CustomerStatusMapper
+final class CustomerStatusMapper
 {
-    public static function map(?string $value): string
+    /**
+     * Map status dari Google Sheet ke enum database (canonical).
+     */
+    public static function fromSheet(?string $value): string
     {
-        return match (strtolower($value ?? '')) {
-            'active'     => Customer::STATUS_ACTIVE,
-            'inactive'   => Customer::STATUS_INACTIVE,
-            'blacklist'  => Customer::STATUS_BLACKLIST,
-            default      => Customer::STATUS_BLACKLIST,
+        $normalized = strtolower(trim($value ?? ''));
+
+        return match (true) {
+            in_array($normalized, ['active', 'aktif']) =>
+            Customer::STATUS_ACTIVE,
+
+            in_array($normalized, ['inactive', 'nonaktif']) =>
+            Customer::STATUS_INACTIVE,
+
+            in_array($normalized, ['blacklist', 'banned', 'ban']) =>
+            Customer::STATUS_BLACKLIST,
+
+            default =>
+            Customer::STATUS_BLACKLIST,
+        };
+    }
+
+    /**
+     * Map dari enum database ke representasi Sheet (read-only / snapshot).
+     * Saat ini tidak dipakai, tapi disiapkan untuk export.
+     */
+    public static function toSheet(string $dbValue): string
+    {
+        return match ($dbValue) {
+            Customer::STATUS_ACTIVE     => 'active',
+            Customer::STATUS_INACTIVE   => 'inactive',
+            Customer::STATUS_BLACKLIST  => 'blacklist',
+            default                     => 'blacklist',
         };
     }
 }
