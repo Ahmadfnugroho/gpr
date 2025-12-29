@@ -11,9 +11,6 @@ use Illuminate\Support\ServiceProvider;
 class EventServiceProvider extends ServiceProvider
 {
     protected $listen = [
-        UserDataChanged::class => [
-            SyncUserToGoogleSheet::class,
-        ],
         Registered::class => [
             SendEmailVerificationNotification::class,
         ],

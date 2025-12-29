@@ -16,7 +16,9 @@ class Customer extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, HasApiTokens, Notifiable, LogsActivity;
 
-    // Customer Status Constants
+    /* =========================
+     | Status Constants
+     ========================= */
     public const STATUS_ACTIVE = 'active';
     public const STATUS_INACTIVE = 'inactive';
     public const STATUS_BLACKLIST = 'blacklist';
@@ -27,18 +29,13 @@ class Customer extends Authenticatable implements MustVerifyEmail
         self::STATUS_BLACKLIST,
     ];
 
-    public const STATUS_LABELS = [
-        self::STATUS_ACTIVE => 'Active',
-        self::STATUS_INACTIVE => 'Inactive',
-        self::STATUS_BLACKLIST => 'Blacklist',
-    ];
-
+    /* =========================
+     | Mass Assignment
+     | (PROFILE ONLY)
+     ========================= */
     protected $fillable = [
         'name',
-        'google_id',
         'email',
-        'email_verified_at',
-        'password',
         'address',
         'job',
         'office_address',
@@ -51,8 +48,28 @@ class Customer extends Authenticatable implements MustVerifyEmail
         'status',
     ];
 
-    protected $with = ['customerPhotos', 'customerPhoneNumbers'];
+    /* =========================
+     | Hidden (AUTH ONLY)
+     ========================= */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
+    /* =========================
+     | Casts
+     ========================= */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+
+    /* =========================
+     | Activity Log
+     ========================= */
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -66,44 +83,40 @@ class Customer extends Authenticatable implements MustVerifyEmail
             ->dontLogIfAttributesChangedOnly(['updated_at']);
     }
 
-    protected $hidden = [
-        'password',
-        'remember_token',
-    ];
-
-    protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
-    }
-
+    /* =========================
+     | Relationships
+     ========================= */
     public function customerPhotos(): HasMany
     {
-        return $this->hasMany(CustomerPhoto::class, 'customer_id', 'id');
+        return $this->hasMany(CustomerPhoto::class);
     }
 
     public function customerPhoneNumbers(): HasMany
     {
-        return $this->hasMany(CustomerPhoneNumber::class, 'customer_id', 'id');
+        return $this->hasMany(CustomerPhoneNumber::class);
     }
 
     public function transactions(): HasMany
     {
-        return $this->hasMany(Transaction::class, 'customer_id', 'id');
+        return $this->hasMany(Transaction::class);
     }
 
-    // Accessor untuk phone_number dari relasi customerPhoneNumbers
+    /* =========================
+     | Derived Attributes
+     ========================= */
     public function getPhoneNumberAttribute(): ?string
     {
+        if (! $this->relationLoaded('customerPhoneNumbers')) {
+            return null;
+        }
+
         return $this->customerPhoneNumbers->first()?->phone_number;
     }
 
-    /**
-     * Send the email verification notification.
-     */
-    public function sendEmailVerificationNotification()
+    /* =========================
+     | Auth Utilities
+     ========================= */
+    public function sendEmailVerificationNotification(): void
     {
         $this->notify(new VerifyEmailNotification);
     }
