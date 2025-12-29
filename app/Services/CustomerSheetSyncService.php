@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Services\Customer\CustomerSyncService;
 use App\Services\Customer\DTO\CustomerSheetDTO;
 use Carbon\Carbon;
-use Spatie\Activitylog\Facades\Activity;
 
 final class CustomerSheetSyncService
 {
@@ -34,31 +33,34 @@ final class CustomerSheetSyncService
         $lastRow   = null;
 
         foreach ($rows as $index => $row) {
+            // Gabungkan header dengan row, pad jika row kurang kolom
             $rowData = array_combine(
                 $headers,
                 array_pad($row, count($headers), null)
             );
 
             // Skip jika email kosong
-            if (empty($rowData['Email Address'])) {
+            if (empty($rowData['email'])) {
                 $skipped++;
                 continue;
             }
 
             // Incremental: hanya row baru/update
-            $rowUpdatedAt = isset($rowData['last_updated'])
-                ? Carbon::parse($rowData['last_updated'])
+            $rowUpdatedAt = isset($rowData['updated_at'])
+                ? Carbon::parse($rowData['updated_at'])
                 : null;
 
             if ($rowUpdatedAt && $rowUpdatedAt->lte($lastSyncedAt)) {
+                $skipped++;
                 continue;
             }
 
-            // Normalisasi phones
+            // Normalisasi phone
             $phones = [];
             if (!empty($rowData['phone1'])) $phones[] = ['number' => $rowData['phone1'], 'is_primary' => true];
             if (!empty($rowData['phone2'])) $phones[] = ['number' => $rowData['phone2'], 'is_primary' => false];
 
+            // Build DTO
             $dto = CustomerSheetDTO::fromNormalizedArray([
                 'email' => $rowData['email'] ?? '',
                 'name' => $rowData['name'] ?? '',
