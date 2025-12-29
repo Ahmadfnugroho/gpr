@@ -34,7 +34,7 @@ class CustomerExporter extends Exporter
 
             ExportColumn::make('gender')
                 ->label('Jenis Kelamin')
-                ->formatStateUsing(fn (Customer $record): string => match($record->gender) {
+                ->formatStateUsing(fn(Customer $record): string => match ($record->gender) {
                     'male' => 'Laki-laki',
                     'female' => 'Perempuan',
                     default => $record->gender ?? ''
@@ -42,7 +42,7 @@ class CustomerExporter extends Exporter
 
             ExportColumn::make('status')
                 ->label('Status')
-                ->formatStateUsing(fn (Customer $record): string => Customer::STATUS_LABELS[$record->status] ?? $record->status ?? ''),
+                ->formatStateUsing(fn(Customer $record): string => Customer::AVAILABLE_STATUSES[$record->status] ?? $record->status ?? ''),
 
             ExportColumn::make('address')
                 ->label('Alamat'),
