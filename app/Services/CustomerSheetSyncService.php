@@ -56,26 +56,21 @@ final class CustomerSheetSyncService
 
             // Normalisasi phones
             $phones = [];
-            if (!empty($rowData['No. Hp1'])) {
-                $phones[] = ['number' => $rowData['No. Hp1'], 'is_primary' => true];
-            }
-            if (!empty($rowData['No. Hp2'])) {
-                $phones[] = ['number' => $rowData['No. Hp2'], 'is_primary' => false];
-            }
+            if (!empty($rowData['phone1'])) $phones[] = ['number' => $rowData['phone1'], 'is_primary' => true];
+            if (!empty($rowData['phone2'])) $phones[] = ['number' => $rowData['phone2'], 'is_primary' => false];
 
-            // Build DTO
             $dto = CustomerSheetDTO::fromNormalizedArray([
-                'email' => $rowData['Email Address'] ?? '',
-                'name' => $rowData['Nama Lengkap (Sesuai KTP)'] ?? '',
-                'address' => $rowData['Alamat Tinggal Sekarang (Ditulis Lengkap)'] ?? null,
-                'job' => $rowData['Pekerjaan'] ?? null,
-                'office_address' => $rowData['Alamat Kantor'] ?? null,
-                'gender' => $rowData['Jenis Kelamin'] ?? null,
-                'status' => $rowData['Status'] ?? null,
-                'source_info' => 'google_sheet',
-                'instagram_username' => $rowData['Nama akun Instagram penyewa'] ?? null,
-                'emergency_contact_name' => $rowData['Nama Kontak Emergency'] ?? null,
-                'emergency_contact_number' => $rowData['No. Hp Kontak Emergency'] ?? null,
+                'email' => $rowData['email'] ?? '',
+                'name' => $rowData['name'] ?? '',
+                'address' => $rowData['address'] ?? null,
+                'job' => $rowData['job'] ?? null,
+                'office_address' => $rowData['office_address'] ?? null,
+                'gender' => $rowData['gender'] ?? null,
+                'status' => $rowData['status'] ?? null,
+                'source_info' => $rowData['source_info'] ?? 'google_sheet',
+                'instagram_username' => $rowData['instagram_username'] ?? null,
+                'emergency_contact_name' => $rowData['emergency_contact_name'] ?? null,
+                'emergency_contact_number' => $rowData['emergency_contact_number'] ?? null,
                 'phones' => $phones,
             ]);
 
