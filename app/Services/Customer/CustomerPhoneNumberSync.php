@@ -19,7 +19,7 @@ final class CustomerPhoneNumberSync
             ->values();
 
         // Hapus semua nomor lama
-        $customer->phoneNumbers()->delete();
+        $customer->customerPhoneNumbers()->delete();
 
         if ($phones->isEmpty()) {
             return;
@@ -27,7 +27,7 @@ final class CustomerPhoneNumberSync
 
         // Insert ulang (deterministic)
         foreach ($phones as $index => $phone) {
-            $customer->phoneNumbers()->create([
+            $customer->customerPhoneNumbers()->create([
                 'phone'      => $phone,
                 'is_primary' => $index === 0,
             ]);

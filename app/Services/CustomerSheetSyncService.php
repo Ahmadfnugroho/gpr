@@ -56,9 +56,6 @@ final class CustomerSheetSyncService
             }
 
             // Normalisasi phone
-            $phones = [];
-            if (!empty($rowData['phone1'])) $phones[] = ['number' => $rowData['phone1'], 'is_primary' => true];
-            if (!empty($rowData['phone2'])) $phones[] = ['number' => $rowData['phone2'], 'is_primary' => false];
 
             // Build DTO
             $dto = CustomerSheetDTO::fromNormalizedArray([
