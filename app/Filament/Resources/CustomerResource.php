@@ -32,6 +32,7 @@ use Filament\Tables\Actions\ImportAction;
 use Filament\Tables\Actions\ExportAction;
 use App\Filament\Imports\CustomerImporter;
 use App\Filament\Exports\CustomerExporter;
+use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use Filament\Forms\Components\Checkbox;
@@ -223,8 +224,7 @@ class CustomerResource extends Resource
                     ->modalHeading('Export Customers')
                     ->modalDescription('Export all customers to an Excel file.')
                     ->modalSubmitActionLabel('Export')
-                    ->directDownload() // <--- tambahkan ini supaya langsung download
-
+                    ->formats([ExportFormat::Xlsx])
                     ->fileName(fn(): string => 'customers-' . date('Y-m-d-H-i-s'))
                     ->successNotificationTitle('Customers exported successfully'),
             ])
