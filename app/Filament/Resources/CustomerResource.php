@@ -157,7 +157,7 @@ class CustomerResource extends Resource
                         Customer::STATUS_BLACKLIST => 'danger',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn(string $state): string => Customer::AVAILABLE_STATUSES[$state] ?? $state)
+                    ->formatStateUsing(fn(string $state) => Customer::getStatusLabel($state))
                     ->sortable(),
                 TextColumn::make('transactions_count')
                     ->label('Transactions')

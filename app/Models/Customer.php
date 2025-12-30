@@ -23,11 +23,21 @@ class Customer extends Authenticatable implements MustVerifyEmail
     public const STATUS_INACTIVE = 'inactive';
     public const STATUS_BLACKLIST = 'blacklist';
 
+    // public const AVAILABLE_STATUSES = [
+    //     self::STATUS_ACTIVE,
+    //     self::STATUS_INACTIVE,
+    //     self::STATUS_BLACKLIST,
+    // ];
     public const AVAILABLE_STATUSES = [
-        self::STATUS_ACTIVE,
-        self::STATUS_INACTIVE,
-        self::STATUS_BLACKLIST,
+        self::STATUS_ACTIVE => 'Active',
+        self::STATUS_INACTIVE => 'Inactive',
+        self::STATUS_BLACKLIST => 'Blacklist',
     ];
+    public static function getStatusLabel(string $status): string
+    {
+        return self::AVAILABLE_STATUSES[$status] ?? ucfirst($status);
+    }
+
 
     /* =========================
      | Mass Assignment
