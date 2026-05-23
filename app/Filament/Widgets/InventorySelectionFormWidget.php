@@ -32,33 +32,31 @@ class InventorySelectionFormWidget extends Widget implements HasForms
 
     public function mount(): void
     {
-        // Pre-populate from URL parameters
+        // Pre-populate from URL parameters with robust array handling
         $selectedItems = [];
         
         // Handle products from URL
-        $selectedProducts = request('selected_products', []);
-        if (is_array($selectedProducts) && !empty($selectedProducts)) {
-            foreach ($selectedProducts as $productId) {
+        $selectedProducts = request('selected_products');
+        if ($selectedProducts) {
+            foreach ((array) $selectedProducts as $productId) {
                 $selectedItems[] = "produk-{$productId}";
             }
         }
         
         // Handle bundlings from URL
-        $selectedBundlings = request('selected_bundlings', []);
-        if (is_array($selectedBundlings) && !empty($selectedBundlings)) {
-            foreach ($selectedBundlings as $bundlingId) {
+        $selectedBundlings = request('selected_bundlings');
+        if ($selectedBundlings) {
+            foreach ((array) $selectedBundlings as $bundlingId) {
                 $selectedItems[] = "bundling-{$bundlingId}";
             }
         }
         
         // Initialize data property for statePath
-        $this->data = [
+        $this->form->fill([
             'selected_items' => $selectedItems,
             'start_date' => request('start_date', now()->format('Y-m-d H:i:s')),
             'end_date' => request('end_date', now()->addDays(7)->endOfDay()->format('Y-m-d H:i:s')),
-        ];
-        
-        $this->form->fill($this->data);
+        ]);
     }
 
     public function form(Form $form): Form
@@ -94,7 +92,6 @@ class InventorySelectionFormWidget extends Widget implements HasForms
                                     ->helperText('💡 Pilih kombinasi produk dan bundling sesuai kebutuhan')
                                     ->required()
                                     ->minItems(1)
-                                    ->live()
                                     ->columnSpanFull(),
                             ]),
                             
