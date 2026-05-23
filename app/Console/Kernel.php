@@ -19,6 +19,12 @@ class Kernel extends ConsoleKernel
         $schedule->command('monitor:serials')
             ->hourly()
             ->withoutOverlapping();
+
+        // Membersihkan file temporary upload Livewire yang sudah lebih dari 24 jam
+        $schedule->command('livewire:configure-s3-temporary-file-upload-directory')->daily();
+
+        // Pembersihan manual folder livewire-tmp (file > 3 jam)
+        $schedule->exec('find ' . storage_path('app/livewire-tmp') . ' -type f -mmin +180 -delete')->hourly();
     }
 
     /**

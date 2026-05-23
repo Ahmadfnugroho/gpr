@@ -9,15 +9,17 @@
 /storage/framework/sessions/*
 /storage/framework/testing/*
 /storage/framework/views/*
-/storage/logs/*.log
 /vendor
 !storage/certs/isrgrootx1.pem
 !/storage/app/public
 !/storage/app/public/*
-/bootstrap/cache/*.php
 
 
 .env
+
+# Abaikan log dan cache internal server
+storage/logs/
+bootstrap/cache/*.php
 .env.backup
 .env.production
 .phpactor.json
@@ -34,6 +36,3 @@ yarn-error.log
 /.zed
 
 .vercel
-
-.vercel
-.env
