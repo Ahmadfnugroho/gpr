@@ -1,12 +1,9 @@
 name: Deploy
 
-# Trigger the workflow on push and
-# pull request events on the production branch
+# Trigger the workflow on push events on the production branch.
+# No pull_request trigger: a PR must never deploy.
 on:
   push:
-    branches:
-      - production
-  pull_request:
     branches:
       - production
 

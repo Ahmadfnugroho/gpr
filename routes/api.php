@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\SubCategoryController;
 use App\Http\Controllers\Api\TransactionController;
 use App\Http\Controllers\Api\AdvancedSearchController;
 use App\Http\Controllers\Api\AvailabilityController;
+use App\Http\Controllers\Api\ClusterStatusController;
 use App\Http\Controllers\Admin\WhatsAppController;
 use App\Http\Controllers\GoogleSheetSyncController;
 use App\Http\Controllers\TransactionCheckController;
@@ -110,6 +111,8 @@ Route::middleware(['api_key', 'throttle:60,1'])->group(function () {
     Route::apiResource('/transactions-check', TransactionCheckController::class);
     Route::post('/transaction', [TransactionController::class, 'store']);
     Route::post('/check-transaction', [TransactionController::class, 'DetailTransaction']);
+
+    Route::get('/cluster/status', ClusterStatusController::class)->middleware('throttle:30,1');
 });
 
 // Import Status API Routes (for checking async import progress)
