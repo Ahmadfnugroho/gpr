@@ -569,15 +569,15 @@
           $paymentStatus = $record->getPaymentStatus();
           @endphp
           
-          @if($record->getDownPaymentAmount() > 0)
+          @if($record->getStoredDownPaymentAmount() > 0)
           <tr style="background-color: #f0f9ff; border-top: 1px solid #e0e7ff;">
             <td class="summary-label">Down Payment (DP):</td>
-            <td class="summary-value">Rp{{ number_format($record->getDownPaymentAmount(), 0, ',', '.') }}</td>
+            <td class="summary-value">Rp{{ number_format($record->getStoredDownPaymentAmount(), 0, ',', '.') }}</td>
           </tr>
           @endif
           
           @php
-          $remainingPayment = $record->getRemainingPaymentAmount();
+          $remainingPayment = $record->getStoredRemainingPaymentAmount();
           @endphp
           
           @if($remainingPayment > 0)

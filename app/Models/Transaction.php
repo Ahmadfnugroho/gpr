@@ -112,8 +112,6 @@ class Transaction extends Model
                     ->addDays($duration)
                     ->format('Y-m-d H:i:s');
             }
-            
-            // Let TransactionObserver handle grand_total calculation to prevent conflicts
         });
 
 
@@ -506,100 +504,13 @@ class Transaction extends Model
     }
 
     /**
-     * Get detailed breakdown of total before discount for form display
-     */
-    public function getTotalBeforeDiscountBreakdown(): array
-    {
-        $breakdown = [];
-        $total = 0;
-        $duration = max(1, (int) ($this->duration ?? 1));
-        
-        foreach ($this->detailTransactions as $detail) {
-            $name = '';
-            $unitPrice = 0;
-            $quantity = (int) ($detail->quantity ?? 1);
-            
-            if ($detail->bundling_id && $detail->bundling) {
-                $name = $detail->bundling->name;
-                $unitPrice = (int) $detail->bundling->price;
-            } elseif ($detail->product_id && $detail->product) {
-                $name = $detail->product->name;
-                $unitPrice = (int) $detail->product->price;
-            }
-            
-            if ($name && $unitPrice > 0) {
-                $subtotal = $unitPrice * $quantity * $duration;
-                $breakdown[] = [
-                    'name' => $name,
-                    'unit_price' => $unitPrice,
-                    'quantity' => $quantity,
-                    'duration' => $duration,
-                    'subtotal' => $subtotal,
-                    'formatted' => "{$name}: Rp " . number_format($unitPrice, 0, ',', '.') . 
-                                  " × {$quantity}" . 
-                                  " × {$duration} hari = Rp " . number_format($subtotal, 0, ',', '.')
-                ];
-                $total += $subtotal;
-            }
-        }
-        
-        return [
-            'items' => $breakdown,
-            'total' => $total,
-            'formatted_total' => 'Rp ' . number_format($total, 0, ',', '.')
-        ];
-    }
-    
-    /**
-     * Get comprehensive grand total breakdown
-     */
-    public function getGrandTotalBreakdown(): array
-    {
-        $breakdown = $this->getTotalBeforeDiscountBreakdown();
-        $discountAmount = $this->getDiscountAmount();
-        $additionalServices = $this->getTotalAdditionalServices();
-        
-        $grandTotal = $breakdown['total'] - $discountAmount + $additionalServices;
-        
-        return [
-            'base_total' => $breakdown['total'],
-            'discount_amount' => $discountAmount,
-            'additional_services' => $additionalServices,
-            'grand_total' => $grandTotal,
-            'items_breakdown' => $breakdown['items'],
-            'formatted' => [
-                'base_total' => 'Rp ' . number_format($breakdown['total'], 0, ',', '.'),
-                'discount_amount' => 'Rp ' . number_format($discountAmount, 0, ',', '.'),
-                'additional_services' => 'Rp ' . number_format($additionalServices, 0, ',', '.'),
-                'grand_total' => 'Rp ' . number_format($grandTotal, 0, ',', '.')
-            ]
-        ];
-    }
-    
-    /**
-     * Get stored cancellation fee from database, or calculate as 50% of grand total
-     * This method ensures consistency between database and display
-     */
-    public function getCancellationFeeAmount(): int
-    {
-        // Use stored cancellation fee if available
-        if ($this->cancellation_fee && $this->cancellation_fee > 0) {
-            return (int) $this->cancellation_fee;
-        }
-        
-        // Calculate 50% of stored grand total (including additional services)
-        $grandTotal = (int) ($this->grand_total ?? 0);
-        return (int) floor($grandTotal * 0.5);
-    }
-    
-    /**
      * Get stored grand total from database (includes additional services)
      */
     public function getStoredGrandTotalAmount(): int
     {
         return (int) ($this->grand_total ?? 0);
     }
-    
+
     /**
      * Get stored down payment from database
      */
@@ -607,7 +518,7 @@ class Transaction extends Model
     {
         return (int) ($this->down_payment ?? 0);
     }
-    
+
     /**
      * Calculate remaining payment from database values only
      */
@@ -618,30 +529,6 @@ class Transaction extends Model
         return max(0, $grandTotal - $downPayment);
     }
     
-    /**
-     * Get down payment from database ONLY - NO CALCULATIONS
-     */
-    public function getDownPaymentAmount(): int
-    {
-        return (int) ($this->down_payment ?? 0);
-    }
-    
-    /**
-     * Get remaining payment from database ONLY - NO CALCULATIONS
-     */
-    public function getRemainingPaymentAmount(): int
-    {
-        return (int) ($this->remaining_payment ?? 0);
-    }
-    
-    /**
-     * Format currency for display
-     */
-    public function formatCurrency(int $amount): string
-    {
-        return 'Rp ' . number_format($amount, 0, ',', '.');
-    }
-
     /**
      * UNIFIED grand total calculation method
      * Formula: (base_price * duration) - discount + sum(additional_services.amount)
@@ -681,45 +568,15 @@ class Transaction extends Model
     }
     
     /**
-     * Calculate and SET grand total in the model attributes
-     * This method should be used to update grand_total in database
-     */
-    public function calculateAndSetGrandTotal(): int
-    {
-        $grandTotal = $this->calculateGrandTotal();
-        $this->attributes['grand_total'] = $grandTotal;
-        return $grandTotal;
-    }
-    
-    /**
-     * Get grand total directly from database (for display purposes)
-     */
-    public function getStoredGrandTotal(): int
-    {
-        return (int) ($this->grand_total ?? 0);
-    }
-    
-    /**
      * Get grand total with auto-calculation fallback
      * DOES NOT override existing database values
      */
     public function getGrandTotalWithFallback(): int
     {
-        // If grand_total is stored, use it
         if ($this->grand_total && $this->grand_total > 0) {
             return (int) $this->grand_total;
         }
-        
-        // Otherwise calculate it using unified method (but don't save to database)
-        return $this->calculateGrandTotal();
-    }
-    
-    /**
-     * Calculate grand total for display purposes only (does not save to database)
-     * Uses the unified calculateGrandTotal() method
-     */
-    public function calculateGrandTotalOnly(): int
-    {
+
         return $this->calculateGrandTotal();
     }
 
@@ -775,14 +632,7 @@ class Transaction extends Model
      */
     public function getGrandTotalAttribute()
     {
-        // If the attribute is set in database, return it as integer
-        if (isset($this->attributes['grand_total']) && $this->attributes['grand_total'] > 0) {
-            // MoneyCast will handle this, but we ensure it's an integer for calculations
-            return (int) $this->attributes['grand_total'];
-        }
-        
-        // Calculate if not stored
-        return $this->calculateAndSetGrandTotal();
+        return $this->getGrandTotalWithFallback();
     }
     
     /**
@@ -790,9 +640,7 @@ class Transaction extends Model
      */
     public function getRemainingPaymentAttribute(): int
     {
-        $grandTotal = $this->getGrandTotalWithFallback();
-        $downPayment = $this->getDownPaymentAmount();
-        return max(0, $grandTotal - $downPayment);
+        return max(0, $this->getGrandTotalWithFallback() - $this->getStoredDownPaymentAmount());
     }
     
     /**
@@ -802,13 +650,5 @@ class Transaction extends Model
     {
         $paymentStatus = $this->getPaymentStatus();
         return $paymentStatus['label'];
-    }
-    
-    /**
-     * Get cancellation fee amount (always calculated)
-     */
-    public function getCancellationFeeDisplayAttribute(): int
-    {
-        return $this->getCancellationFeeAmount();
     }
 }

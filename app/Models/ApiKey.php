@@ -23,15 +23,11 @@ class ApiKey extends Model
         'expires_at' => 'datetime',
     ];
 
-    protected $dates = [
-        'deleted_at',
-    ];
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
             ->logOnly([
                 'name',
-                'key',
                 'active',
             ]);
     }

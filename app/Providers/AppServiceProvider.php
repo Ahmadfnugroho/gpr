@@ -4,10 +4,8 @@ namespace App\Providers;
 
 use App\Models\DetailTransaction;
 use App\Models\ProductItem;
-use App\Models\Transaction;
 use App\Models\User;
 use App\Observers\DetailTransactionObserver;
-use App\Observers\TransactionObserver;
 use App\Observers\UserObserver;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -54,7 +52,6 @@ class AppServiceProvider extends ServiceProvider
         }, 'Ukuran file :attribute tidak boleh melebihi :max_server_size KB setelah kompresi.');
 
         DetailTransaction::observe(DetailTransactionObserver::class);
-        Transaction::observe(TransactionObserver::class);
 
         DetailTransaction::updated(function ($detailTransaction) {
             if ($detailTransaction->isDirty('booking_status')) {
@@ -77,12 +74,8 @@ class AppServiceProvider extends ServiceProvider
                                 'is_available' => true,
                                 'detail_transaction_id' => null
                             ]);
-
-                            // Hapus product transaction
                         }
                     }
-
-                    $detailTransaction->product->updateQuantity();
                 }
             }
         });

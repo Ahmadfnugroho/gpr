@@ -60,7 +60,6 @@ Route::middleware(['throttle:120,1'])->group(function () {
     // Transactions API for availability checking
     Route::prefix('transactions')->group(function () {
         Route::get('/', [TransactionController::class, 'index'])->middleware('throttle:120,1');
-        Route::post('/check-availability', [TransactionController::class, 'checkAvailability'])->middleware('throttle:120,1');
     });
     
     // Advanced Search API
@@ -114,7 +113,7 @@ Route::middleware(['api_key', 'throttle:60,1'])->group(function () {
 });
 
 // Import Status API Routes (for checking async import progress)
-Route::prefix('import')->group(function () {
+Route::prefix('import')->middleware(['api_key', 'throttle:30,1'])->group(function () {
     Route::get('status/{importId}', [ImportStatusController::class, 'getStatus']);
     Route::get('results/{importId}', [ImportStatusController::class, 'getResults']);
     Route::get('queue-status', [ImportStatusController::class, 'checkQueueStatus']);

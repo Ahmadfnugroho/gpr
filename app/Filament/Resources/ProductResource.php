@@ -10,33 +10,26 @@ use App\Models\Brand;
 use App\Models\SubCategory;
 use App\Models\Product;
 use App\Services\ProductImportExportService;
-use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Tables\Actions\Action;
-use Filament\Tables\Actions\HeaderActions;
-use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
-use App\Services\CustomNotificationService;
+use App\Services\ImageCompressionService;
 use App\Services\ResourceCacheService;
 use App\Repositories\ProductRepository;
 use App\Filament\Imports\ProductImporter;
 use App\Filament\Exports\ProductExporter;
-use Filament\Forms\Components\Checkbox;
 use Filament\Tables\Actions\ImportAction;
 use Filament\Tables\Actions\ExportAction;
 use Illuminate\Database\Eloquent\Builder;
-use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Forms\Components\Select;
 use Filament\Support\Enums\Alignment;
 use Filament\Tables\Columns\ColumnGroup;
 use Illuminate\Database\Eloquent\Model;
 use Rmsramos\Activitylog\Actions\ActivityLogTimelineTableAction;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\HtmlString;
 
 class ProductResource extends BaseOptimizedResource
@@ -124,9 +117,7 @@ class ProductResource extends BaseOptimizedResource
         }
 
         // Override default search behavior to search for exact phrase only
-        $query->where(function ($query) use ($searchTerm) {
-            $query->whereRaw('LOWER(name) LIKE ?', ['%' . $searchTerm . '%']);
-        });
+        $query->where('name', 'like', '%' . $searchTerm . '%');
     }
     public static function getGlobalSearchResultDetails(\Illuminate\Database\Eloquent\Model $record): array
     {
@@ -134,8 +125,6 @@ class ProductResource extends BaseOptimizedResource
         $cacheKey = "product_search_details_{$record->id}";
 
         return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addMinutes(5), function () use ($record) {
-            $today = Carbon::now();
-
             // Simplified query with select to reduce data transfer
             $latestTransaction = $record->detailTransactions()
                 ->select(['id', 'transaction_id', 'created_at'])
@@ -200,10 +189,8 @@ class ProductResource extends BaseOptimizedResource
                     ->maxSize(10240) // 10MB (will be compressed)
                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                     ->helperText('Upload satu foto utama untuk thumbnail produk. File akan dikompres otomatis.')
-                    ->saveUploadedFileUsing(function ($file, $record, $set, $get) {
-                        $compressionService = new \App\Services\ImageCompressionService();
-                        $compressedPath = $compressionService->compressAndStore($file, 'product-thumbnails');
-                        return $compressedPath;
+                    ->saveUploadedFileUsing(function ($file) {
+                        return (new ImageCompressionService())->compressAndStore($file, 'product-thumbnails');
                     })
                     ->nullable(),
 
@@ -222,14 +209,9 @@ class ProductResource extends BaseOptimizedResource
                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                     ->helperText('Upload beberapa foto sekaligus untuk galeri produk. Maksimal 10 file, 10MB per file. Foto akan dikompres otomatis.')
                     ->saveUploadedFileUsing(function ($file) {
-                        $compressionService = new \App\Services\ImageCompressionService();
-                        $compressedPath = $compressionService->compressAndStore($file, 'product-photos');
-                        return $compressedPath;
+                        return (new ImageCompressionService())->compressAndStore($file, 'product-photos');
                     })
-                    ->dehydrated(false) // Don't save to product table
-                    ->afterStateUpdated(function ($state, $record) {
-                        // This will be handled in the create/update hooks
-                    })
+                    ->dehydrated(false)
                     ->nullable()
                     ->columnSpanFull(),
 
@@ -246,14 +228,14 @@ class ProductResource extends BaseOptimizedResource
 
                         $photoHtml = '<div class="grid grid-cols-4 gap-4">';
                         foreach ($photos->take(8) as $photo) {
-                            $imageUrl = asset('storage/' . $photo->photo);
+                            $imageUrl = e(asset('storage/' . $photo->photo));
                             $photoHtml .= '
                                 <div class="relative">
                                     <img src="' . $imageUrl . '" 
                                          alt="Product Photo" 
                                          class="w-full h-10 object-cover rounded-lg border" />
                                     <div class="absolute top-1 right-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
-                                        #' . $photo->id . '
+                                        #' . (int) $photo->id . '
                                     </div>
                                 </div>';
                         }
@@ -280,7 +262,7 @@ class ProductResource extends BaseOptimizedResource
                     ])
                     ->formatStateUsing(function ($record) {
                         if (!$record) return 'available'; // Default saat create
-                        return $record->items()->where('is_available', true)->count() > 0
+                        return $record->items()->where('is_available', true)->exists()
                             ? 'available'
                             : 'unavailable';
                     })

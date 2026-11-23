@@ -5,8 +5,8 @@ namespace App\Http\Middleware;
 use App\Models\ApiKey;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Support\Facades\Log;
 
 class FrontApiKey
 {
@@ -27,7 +27,9 @@ class FrontApiKey
             ], 401);
         }
         
-        $keyRecord = ApiKey::where('key', $apiKey)->first();
+        $keyRecord = Cache::remember('api_key:' . hash('sha256', $apiKey), 60, function () use ($apiKey) {
+            return ApiKey::where('key', $apiKey)->first();
+        });
         
         if (!$keyRecord) {
             return response()->json([
@@ -49,14 +51,6 @@ class FrontApiKey
                 'error' => 'This API key expired on ' . $keyRecord->expires_at->format('Y-m-d')
             ], 401);
         }
-        
-        // Log API key usage for monitoring
-        Log::info('API key used', [
-            'key_name' => $keyRecord->name,
-            'endpoint' => $request->path(),
-            'method' => $request->method(),
-            'ip' => $request->ip()
-        ]);
         
         return $next($request);
     }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class SessionController extends Controller
@@ -50,26 +51,24 @@ class SessionController extends Controller
             'email.exists' => 'Email tidak terdaftar dalam sistem'
         ]);
 
-        try {
-            // Generate password baru yang random
-            $newPassword = Str::random(12);
-            
-            // Jalankan artisan command untuk reset password
-            $exitCode = Artisan::call('admin:reset-password', [
-                'email' => $request->email,
-                'password' => $newPassword
-            ]);
+        $newPassword = Str::random(12);
 
-            if ($exitCode === 0) {
-                return redirect()->route('forgot.password')
-                    ->with('success', "Password berhasil direset! Password baru Anda: <strong>{$newPassword}</strong><br>Silakan login dengan password baru dan segera ubah password Anda.");
-            } else {
-                return redirect()->route('forgot.password')
-                    ->withErrors('Gagal mereset password. Silakan coba lagi.');
-            }
-        } catch (\Exception $e) {
+        $exitCode = Artisan::call('admin:reset-password', [
+            'email' => $request->email,
+            'password' => $newPassword
+        ]);
+
+        if ($exitCode !== 0) {
             return redirect()->route('forgot.password')
-                ->withErrors('Terjadi kesalahan: ' . $e->getMessage());
+                ->withErrors('Gagal mereset password. Silakan coba lagi.');
         }
+
+        Mail::raw(
+            "Password baru Anda: {$newPassword}\n\nSilakan login dan segera ubah password Anda.",
+            fn ($message) => $message->to($request->email)->subject('Reset Password Admin')
+        );
+
+        return redirect()->route('forgot.password')
+            ->with('success', 'Password berhasil direset. Password baru telah dikirim ke email Anda.');
     }
 }

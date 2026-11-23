@@ -4,19 +4,15 @@ namespace App\Filament\Resources\ProductResource\RelationManagers;
 
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Forms\Components;
-use App\Services\ImageCompressionService;
 use Filament\Forms\Components\FileUpload;
+use App\Services\ImageCompressionService;
 use Filament\Resources\RelationManagers\RelationManager;
-use App\Models\ProductPhoto;
 use App\Filament\Imports\ProductPhotoImporter;
 use Filament\Tables\Actions\ImportAction;
 use Filament\Tables;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Actions\Action;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 
@@ -53,27 +49,6 @@ class ProductPhotoRelationManager extends RelationManager
                                     })
                                     ->required(),
                             ]),
-                        // Forms\Components\Tabs\Tab::make('Single Photo')
-                        //     ->schema([
-                        //         FileUpload::make('photo')
-                        //             ->label('Upload Single Photo')
-                        //             ->image()
-                        //             ->directory('product-photos')
-                        //             ->visibility('public')
-                        //             ->imageEditor()
-                        //             ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
-                        //             ->imageCropAspectRatio('16:9')
-                        //             ->imageResizeTargetWidth('1920')
-                        //             ->imageResizeTargetHeight('1080')
-                        //             ->maxSize(10240) // 10MB (will be compressed)
-                        //             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                        //             ->helperText('Upload a single photo. Files will be compressed automatically.')
-                        //             ->saveUploadedFileUsing(function ($file) {
-                        //                 $compressionService = new ImageCompressionService();
-                        //                 return $compressionService->compressAndStore($file, 'product-photos');
-                        //             })
-                        //             ->required(),
-                        //     ]),
                     ])
                     ->columnSpanFull(),
 
@@ -138,91 +113,26 @@ class ProductPhotoRelationManager extends RelationManager
                     ->modalHeading('Upload Product Photos')
                     ->modalDescription('Upload multiple photos for this product. Recommended size: 1920x1080px')
                     ->modalSubmitActionLabel('Upload Photos')
-                    ->mutateFormDataUsing(function (array $data): array {
-                        // Handle multiple photo uploads
-                        return $data;
-                    })
                     ->using(function (array $data, string $model): Model {
-                        $product = $this->ownerRecord;
-                        $uploadedCount = 0;
-                        $compressedCount = 0;
-                        $createdRecords = [];
+                        $photos = array_filter($data['photos'] ?? []);
 
-                        // Debug: Log received data
-                        \Log::info('ProductPhoto Upload Data:', [
-                            'data_keys' => array_keys($data),
-                            'photos_count' => isset($data['photos']) ? count($data['photos']) : 0,
-                            'photos_data' => $data['photos'] ?? 'not set',
-                            'product_id' => $product->id
-                        ]);
+                        if (empty($photos)) {
+                            throw new \RuntimeException('No photos were uploaded.');
+                        }
 
-                        // Handle multiple photos
-                        if (!empty($data['photos']) && is_array($data['photos'])) {
-                            foreach ($data['photos'] as $photo) {
-                                if ($photo) { // Ensure photo path is not empty
-                                    try {
-                                        $record = $model::create([
-                                            'product_id' => $product->id,
-                                            'photo' => $photo,
-                                        ]);
-                                        $createdRecords[] = $record;
-                                        $uploadedCount++;
-
-                                        // Check if file was compressed
-                                        $fullPath = storage_path('app/public/' . $photo);
-                                        if (file_exists($fullPath) && filesize($fullPath) < 2097152) {
-                                            $compressedCount++;
-                                        }
-                                        
-                                        \Log::info('ProductPhoto created successfully:', [
-                                            'id' => $record->id,
-                                            'product_id' => $record->product_id,
-                                            'photo' => $record->photo
-                                        ]);
-                                    } catch (\Exception $e) {
-                                        \Log::error('Error creating ProductPhoto:', [
-                                            'error' => $e->getMessage(),
-                                            'photo' => $photo,
-                                            'product_id' => $product->id
-                                        ]);
-                                        throw $e;
-                                    }
-                                }
-                            }
-                        } else {
-                            \Log::warning('No photos data received or invalid format:', [
-                                'data' => $data
+                        $first = null;
+                        foreach ($photos as $photo) {
+                            $first ??= $model::create([
+                                'product_id' => $this->ownerRecord->id,
+                                'photo' => $photo,
                             ]);
                         }
 
-                        // Store info for notification
-                        session([
-                            'uploaded_photos_count' => $uploadedCount,
-                            'compressed_photos_count' => $compressedCount
-                        ]);
-
-                        // Return the first created record or a new model instance
-                        if (!empty($createdRecords)) {
-                            return $createdRecords[0];
-                        }
-                        
-                        // If no records created, throw an error
-                        throw new \Exception('No photos were uploaded successfully');
+                        return $first;
                     })
-                    ->successNotificationTitle(function () {
-                        $uploadedCount = session('uploaded_photos_count', 0);
-                        $compressedCount = session('compressed_photos_count', 0);
-
-                        $message = "Successfully uploaded {$uploadedCount} photo(s)";
-                        if ($compressedCount > 0) {
-                            $message .= ". {$compressedCount} photo(s) were compressed to optimize file size.";
-                        }
-
-                        // Clear session data
-                        session()->forget(['uploaded_photos_count', 'compressed_photos_count']);
-
-                        return $message;
-                    }),
+                    ->successNotificationTitle(
+                        fn (): string => 'Foto berhasil diunggah ke galeri produk.'
+                    ),
 
                 ImportAction::make()
                     ->importer(ProductPhotoImporter::class)
@@ -241,8 +151,9 @@ class ProductPhotoRelationManager extends RelationManager
                             return new HtmlString('<p class="text-center text-gray-500">No photo available</p>');
                         }
 
-                        $imageUrl = asset('storage/' . $record->photo);
-                        $fileName = basename($record->photo);
+                        $imageUrl = e(asset('storage/' . $record->photo));
+                        $fileName = e(basename($record->photo));
+                        $productName = e($record->product->name ?? 'Unknown');
 
                         return new HtmlString('
                             <div class="text-center">
@@ -263,7 +174,7 @@ class ProductPhotoRelationManager extends RelationManager
                                         </div>
                                         <div>
                                             <span class="font-medium text-gray-600">Product:</span><br>
-                                            <span class="text-gray-800">' . ($record->product->name ?? 'Unknown') . '</span>
+                                            <span class="text-gray-800">' . $productName . '</span>
                                         </div>
                                         <div>
                                             <span class="font-medium text-gray-600">Direct URL:</span><br>

@@ -81,21 +81,6 @@ class Product extends Model
 
     // app/Models/Product.php
 
-    // public function getAvailableQuantityAttribute()
-    // {
-    //     $now = now();
-
-    //     $totalSerials = $this->items()->count();
-
-    //     $usedSerialsCount = $this->items()
-    //         ->whereHas('detailTransactions.transaction', function ($q) use ($now) {
-    //             $q->whereIn('booking_status', ['booking', 'paid', 'on_rented'])
-    //                 ->where('end_date', '>=', $now);
-    //         })
-    //         ->count();
-
-    //     return max(0, $totalSerials - $usedSerialsCount);
-    // }
     public function getAvailableQuantityForPeriod(Carbon $startDate, Carbon $endDate): int
     {
         $cacheKey = "product_availability_{$this->id}_{$startDate->format('Y-m-d')}_{$endDate->format('Y-m-d')}";
@@ -216,8 +201,7 @@ class Product extends Model
 
     public function getIsAvailableAttribute(): bool
     {
-        // Cache availability status for 10 minutes
-        $cacheKey = "product_availability_{$this->id}_" . now()->format('Y-m-d_H');
+        $cacheKey = "product_availability_{$this->id}";
 
         return Cache::remember($cacheKey, now()->addMinutes(10), function () {
             $today = Carbon::today();
@@ -237,11 +221,9 @@ class Product extends Model
 
     public function getStatusAttribute($value): string
     {
-        // Cache status calculation for better performance
-        $cacheKey = "product_status_{$this->id}_" . now()->format('Y-m-d_H');
+        $cacheKey = "product_status_{$this->id}";
 
         return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($value) {
-            // Use database value if explicitly set, otherwise calculate from availability
             if ($value && in_array($value, [self::STATUS_AVAILABLE, self::STATUS_UNAVAILABLE, 'maintenance'])) {
                 return $value;
             }

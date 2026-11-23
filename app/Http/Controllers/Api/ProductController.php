@@ -180,19 +180,6 @@ class ProductController extends Controller
 
         return new ProductResource($product);
     }
-    public function all(Product $product)
-    {
-        $product->load(
-            'category',
-            'brand',
-            'thumbnail',
-            'subCategory',
-            'rentalIncludes.includedProduct',
-            'productSpecifications',
-            'productPhotos'
-        );
-        return new ProductResource($product);
-    }
 
 
 

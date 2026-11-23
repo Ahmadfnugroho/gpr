@@ -6,23 +6,17 @@ use App\Http\Controllers\PdfController;
 use App\Http\Controllers\ProductSearchController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SessionController;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    Log::info('Test log entry from web.php');
     return view('welcome');
 });
 
-Route::get('/test-log', function () {
-    Log::info('Test log entry from /test-log route.');
-    return 'Log entry written from /test-log route.';
-});
 Route::post('/', [SessionController::class, 'login']);
 
 // Reset Password Routes
 Route::get('/forgot-password', [SessionController::class, 'showForgotPasswordForm'])->name('forgot.password');
-Route::post('/forgot-password', [SessionController::class, 'resetPassword'])->name('reset.password');
+Route::post('/forgot-password', [SessionController::class, 'resetPassword'])->middleware('throttle:5,1')->name('reset.password');
 
 Route::get('pdf/{order}', PdfController::class)->name('pdf');
 Route::get('/auth/google/callback', [GoogleSheetSyncController::class, 'handleCallback'])->name('google.callback');

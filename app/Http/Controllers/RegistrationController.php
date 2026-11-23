@@ -7,7 +7,6 @@ use App\Models\CustomerPhoto;
 use App\Models\CustomerPhoneNumber;
 use App\Services\WAHAService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -18,9 +17,6 @@ use Illuminate\Support\Facades\Log;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Imagick\Driver as ImagickDriver;
 use Intervention\Image\Drivers\Gd\Driver as GdDriver;
-use Intervention\Image\Format;
-use Intervention\Image\MediaType;
-use Intervention\Image\FileExtension;
 
 class RegistrationController extends Controller
 {
@@ -135,105 +131,7 @@ class RegistrationController extends Controller
             // Upload dan simpan foto KTP
             if ($request->hasFile('ktp_photo')) {
                 try {
-                    $ktpFile = $request->file('ktp_photo');
-                    
-                    // Validasi file upload
-                    if (!$ktpFile->isValid()) {
-                        throw new \Exception('File KTP tidak valid atau rusak');
-                    }
-                    
-                    $originalFileSize = $ktpFile->getSize(); // Simpan size sebelum move
-                    $originalFileName = $ktpFile->getClientOriginalName();
-                    $fileExtension = $ktpFile->getClientOriginalExtension();
-                    
-                    Log::info('Registration: Processing KTP photo', [
-                        'customer_id' => $customer->id, 
-                        'file_size' => $originalFileSize,
-                        'original_name' => $originalFileName,
-                        'extension' => $fileExtension
-                    ]);
-
-                    // Buat direktori temp jika belum ada
-                    $tempDir = storage_path('app/public/temp');
-                    if (!is_dir($tempDir)) {
-                        mkdir($tempDir, 0755, true);
-                        Log::info('Created temp directory: ' . $tempDir);
-                    }
-
-                    // Simpan file sementara dengan handling Windows path
-                    $tempFileName = 'ktp_temp_' . $customer->id . '_' . Str::random(10) . '.' . $fileExtension;
-                    $tempPath = $tempDir . DIRECTORY_SEPARATOR . $tempFileName;
-                    
-                    Log::info('Attempting to move file', ['from' => $ktpFile->getPathname(), 'to' => $tempPath]);
-                    
-                    // Gunakan move() method yang lebih reliable
-                    if (!$ktpFile->move($tempDir, $tempFileName)) {
-                        throw new \Exception('Gagal memindahkan file KTP ke direktori sementara');
-                    }
-                    
-                    // Verifikasi file tersimpan dengan benar
-                    if (!file_exists($tempPath)) {
-                        throw new \Exception('File KTP tidak ditemukan setelah upload: ' . $tempPath);
-                    }
-                    
-                    if (!is_readable($tempPath)) {
-                        throw new \Exception('File KTP tidak dapat dibaca setelah upload: ' . $tempPath);
-                    }
-                    
-                    $actualFileSize = filesize($tempPath);
-                    if ($actualFileSize !== $originalFileSize) {
-                        Log::warning('File size mismatch after move', [
-                            'original' => $originalFileSize,
-                            'actual' => $actualFileSize
-                        ]);
-                    }
-                    
-                    Log::info('File moved successfully', ['temp_path' => $tempPath, 'size' => $actualFileSize]);
-
-                    // Kompresi gambar jika ukurannya > 1MB
-                    if ($originalFileSize > 1024 * 1024) {
-                        // Gunakan fungsi compressImage untuk kompresi
-                        $compressedFileName = $this->compressImage($tempPath);
-                        $compressedPath = storage_path('app/public/' . $compressedFileName);
-
-                        // Hapus file temp asli
-                        if (file_exists($tempPath)) {
-                            @unlink($tempPath);
-                        }
-
-                        $tempPath = $compressedPath;
-                    }
-
-                    $ktpFileName = 'ktp_' . $customer->id . '_' . time() . '.' . pathinfo($tempPath, PATHINFO_EXTENSION);
-
-                    // Buat instance UploadedFile dari file yang sudah dikompres
-                    $compressedFile = new UploadedFile(
-                        $tempPath,
-                        $ktpFileName,
-                        mime_content_type($tempPath),
-                        null,
-                        false
-                    );
-
-                    // Simpan ke storage
-                    $ktpPath = $compressedFile->storeAs('customer_photos', $ktpFileName, 'public');
-
-                    // Hapus file temp
-                    if (file_exists($tempPath)) {
-                        @unlink($tempPath);
-                    }
-
-                    if (!$ktpPath) {
-                        throw new \Exception('Gagal menyimpan foto KTP.');
-                    }
-
-                    CustomerPhoto::create([
-                        'customer_id' => $customer->id,
-                        'photo_type' => 'ktp',
-                        'photo' => $ktpPath,
-                    ]);
-
-                    Log::info('Registration: KTP photo uploaded successfully', ['path' => $ktpPath]);
+                    $this->storeUploadedImage($request->file('ktp_photo'), $customer->id, 'ktp', null);
                 } catch (\Exception $e) {
                     Log::error('Registration: Failed to upload KTP photo', [
                         'error' => $e->getMessage(),
@@ -244,81 +142,9 @@ class RegistrationController extends Controller
             }
 
             // Upload dan simpan foto ID tambahan 1
-
-
-            // ...
-
-            // Upload dan simpan foto ID tambahan 1
             if ($request->hasFile('id_photo')) {
                 try {
-                    $idFile = $request->file('id_photo');
-                    $originalIdFileSize = $idFile->getSize(); // Simpan size sebelum move
-                    Log::info('Registration: Processing ID photo 1', [
-                        'customer_id' => $customer->id,
-                        'original_size' => $originalIdFileSize,
-                        'id_type' => $request->id_type,
-                        'extension' => $idFile->getClientOriginalExtension()
-                    ]);
-
-                    // Simpan file sementara dengan handling Windows path
-                    $tempFileName = 'id1_temp_' . Str::random(20) . '.' . $idFile->getClientOriginalExtension();
-                    $tempPath = storage_path('app/public/temp') . DIRECTORY_SEPARATOR . $tempFileName;
-                    
-                    if (!$idFile->move(storage_path('app/public/temp'), $tempFileName)) {
-                        throw new \Exception('Gagal menyimpan file sementara ID 1');
-                    }
-                    
-                    if (!file_exists($tempPath) || !is_readable($tempPath)) {
-                        throw new \Exception('File ID 1 tidak dapat diakses setelah upload');
-                    }
-
-                    // Kompresi gambar jika ukurannya > 1MB
-                    if ($originalIdFileSize > 1024 * 1024) {
-                        // Gunakan fungsi compressImage untuk kompresi
-                        $compressedFileName = $this->compressImage($tempPath);
-                        $compressedPath = storage_path('app/public/' . $compressedFileName);
-
-                        // Hapus file temp asli
-                        if (file_exists($tempPath)) {
-                            @unlink($tempPath);
-                        }
-
-                        $tempPath = $compressedPath;
-                    }
-
-                    $idFileName = 'id_1_' . $customer->id . '_' . time() . '.' . pathinfo($tempPath, PATHINFO_EXTENSION);
-
-                    // Buat instance UploadedFile dari file yang sudah dikompres
-                    $compressedFile = new UploadedFile(
-                        $tempPath,
-                        $idFileName,
-                        mime_content_type($tempPath),
-                        null,
-                        false
-                    );
-
-                    $idPath = $compressedFile->storeAs('customer_photos', $idFileName, 'public');
-
-                    // Hapus file sementara
-                    if (file_exists($tempPath)) {
-                        @unlink($tempPath);
-                    }
-
-                    if (!$idPath) {
-                        throw new \Exception('Failed to store ID photo 1');
-                    }
-
-                    CustomerPhoto::create([
-                        'customer_id' => $customer->id,
-                        'photo_type' => 'additional_id_1',
-                        'photo' => $idPath,
-                        'id_type' => $request->id_type,
-                    ]);
-
-                    Log::info('Registration: ID photo 1 uploaded successfully', [
-                        'path' => $idPath,
-                        'id_type' => $request->id_type
-                    ]);
+                    $this->storeUploadedImage($request->file('id_photo'), $customer->id, 'additional_id_1', $request->id_type);
                 } catch (\Exception $e) {
                     Log::error('Registration: Failed to upload ID photo 1', [
                         'error' => $e->getMessage(),
@@ -326,80 +152,12 @@ class RegistrationController extends Controller
                     ]);
                     throw new \Exception('Gagal mengunggah foto ID tambahan 1: ' . $e->getMessage());
                 }
-            } else {
-                Log::warning('Registration: No ID photo 1 provided', ['customer_id' => $customer->id]);
             }
 
             // Upload dan simpan foto ID tambahan 2
-            // Upload dan simpan foto ID tambahan 2
             if ($request->hasFile('id_photo_2')) {
                 try {
-                    $idFile2 = $request->file('id_photo_2');
-                    $originalIdFile2Size = $idFile2->getSize(); // Simpan size sebelum move
-                    Log::info('Registration: Processing ID photo 2', [
-                        'customer_id' => $customer->id,
-                        'original_size' => $originalIdFile2Size,
-                        'id_type' => $request->id_type_2,
-                        'extension' => $idFile2->getClientOriginalExtension()
-                    ]);
-
-                    // Simpan file sementara dengan handling Windows path
-                    $tempFileName2 = 'id2_temp_' . Str::random(20) . '.' . $idFile2->getClientOriginalExtension();
-                    $tempPath2 = storage_path('app/public/temp') . DIRECTORY_SEPARATOR . $tempFileName2;
-                    
-                    if (!$idFile2->move(storage_path('app/public/temp'), $tempFileName2)) {
-                        throw new \Exception('Gagal menyimpan file sementara ID 2');
-                    }
-                    
-                    if (!file_exists($tempPath2) || !is_readable($tempPath2)) {
-                        throw new \Exception('File ID 2 tidak dapat diakses setelah upload');
-                    }
-
-                    // Kompresi gambar jika ukurannya > 1MB
-                    if ($originalIdFile2Size > 1024 * 1024) {
-                        // Gunakan fungsi compressImage untuk kompresi
-                        $compressedFileName = $this->compressImage($tempPath2);
-                        $compressedPath = storage_path('app/public/' . $compressedFileName);
-
-                        // Hapus file temp asli
-                        if (file_exists($tempPath2)) {
-                            @unlink($tempPath2);
-                        }
-
-                        $tempPath2 = $compressedPath;
-                    }
-
-                    $idFileName2 = 'id_2_' . $customer->id . '_' . time() . '.' . pathinfo($tempPath2, PATHINFO_EXTENSION);
-
-                    $compressedFile2 = new UploadedFile(
-                        $tempPath2,
-                        $idFileName2,
-                        mime_content_type($tempPath2),
-                        null,
-                        false
-                    );
-
-                    $idPath2 = $compressedFile2->storeAs('customer_photos', $idFileName2, 'public');
-
-                    if (file_exists($tempPath2)) {
-                        @unlink($tempPath2);
-                    }
-
-                    if (!$idPath2) {
-                        throw new \Exception('Failed to store ID photo 2');
-                    }
-
-                    CustomerPhoto::create([
-                        'customer_id' => $customer->id,
-                        'photo_type' => 'additional_id_2',
-                        'photo' => $idPath2,
-                        'id_type' => $request->id_type_2,
-                    ]);
-
-                    Log::info('Registration: ID photo 2 uploaded successfully', [
-                        'path' => $idPath2,
-                        'id_type' => $request->id_type_2
-                    ]);
+                    $this->storeUploadedImage($request->file('id_photo_2'), $customer->id, 'additional_id_2', $request->id_type_2);
                 } catch (\Exception $e) {
                     Log::error('Registration: Failed to upload ID photo 2', [
                         'error' => $e->getMessage(),
@@ -407,8 +165,6 @@ class RegistrationController extends Controller
                     ]);
                     throw new \Exception('Gagal mengunggah foto ID tambahan 2: ' . $e->getMessage());
                 }
-            } else {
-                Log::warning('Registration: No ID photo 2 provided', ['customer_id' => $customer->id]);
             }
 
             // Trigger event untuk verifikasi email
@@ -486,6 +242,10 @@ class RegistrationController extends Controller
                     ->subject($subject);
             });
         } catch (\Exception $e) {
+            Log::error('Registration: Failed to send admin email notification', [
+                'customer_id' => $customer->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -526,11 +286,12 @@ class RegistrationController extends Controller
 
             $message .= "\n✅ Silakan lakukan verifikasi dan ubah status customer.";
 
-            $result = $wahaService->sendMessage($adminPhone, $message);
-
-            if ($result) {
-            }
+            $wahaService->sendMessage($adminPhone, $message);
         } catch (\Exception $e) {
+            Log::error('Registration: Failed to send admin WhatsApp notification', [
+                'customer_id' => $customer->id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -580,155 +341,70 @@ class RegistrationController extends Controller
     }
 
     /**
-     * Kompres gambar untuk mengurangi ukuran file
-     * Target ukuran: < 1MB (800-900KB)
-     * Mendukung format WebP jika browser mendukung
-     * 
-     * @param string $imagePath Path ke file gambar yang akan dikompresi
-     * @return string Path relatif ke file hasil kompresi
+     * Validate, compress, and persist a registration photo.
+     *
+     * @throws \RuntimeException when the upload is invalid or storage fails.
      */
-    /**
-     * Deteksi apakah browser mendukung format WebP
-     * 
-     * @return bool True jika browser mendukung WebP, false jika tidak
-     */
-    protected function browserSupportsWebP()
+    private function storeUploadedImage(UploadedFile $file, int $customerId, string $photoType, ?string $idType): void
     {
-        // Deteksi dukungan WebP berdasarkan header User-Agent
-        $userAgent = request()->header('User-Agent');
-
-        // Browser yang mendukung WebP
-        $supportsWebP = false;
-
-        // Chrome 9+, Opera 12+, Firefox 65+, Edge 18+, Safari 14+
-        if (
-            preg_match('/Chrome\/[9-9][0-9]|Chrome\/[1-9][0-9]{2,}/', $userAgent) ||
-            preg_match('/Opera\/[1-9][2-9]|Opera\/[2-9][0-9]/', $userAgent) ||
-            preg_match('/Firefox\/[6-9][5-9]|Firefox\/[7-9][0-9]/', $userAgent) ||
-            preg_match('/Edg\/[1-9][8-9]|Edg\/[2-9][0-9]/', $userAgent) ||
-            preg_match('/Version\/1[4-9].*Safari/', $userAgent)
-        ) {
-            $supportsWebP = true;
+        if (!$file->isValid()) {
+            throw new \RuntimeException('File tidak valid atau rusak');
         }
 
-        // Jika header Accept tersedia, periksa apakah mencakup image/webp
-        if (request()->header('Accept') && strpos(request()->header('Accept'), 'image/webp') !== false) {
-            $supportsWebP = true;
-        }
-
-        return $supportsWebP;
+        CustomerPhoto::create([
+            'customer_id' => $customerId,
+            'photo_type' => $photoType,
+            'photo' => $this->compressImage($file),
+            'id_type' => $idType,
+        ]);
     }
 
-    private function compressImage($imagePath)
-    {
-        try {
-            // Check if Imagick is available and create manager with new syntax
-            $useImagick = extension_loaded('imagick');
-            $manager = $useImagick ? 
-                new ImageManager(new ImagickDriver()) : 
-                new ImageManager(new GdDriver());
-
-            $originalSize = filesize($imagePath);
-            Log::info('Starting image compression', ['original_size' => $originalSize, 'use_imagick' => $useImagick]);
-
-            // Read image
-            $image = $manager->read($imagePath);
-
-            // 1. Resize to max width of 800px to reduce file size significantly
-            if ($image->width() > 800) {
-                $image->scale(width: 800);
-                Log::info('Image resized to 800px width');
-            }
-
-            // 2. Determine output format: prefer WebP if supported, otherwise JPG
-            $supportsWebP = $this->browserSupportsWebP();
-            $outputFormat = $supportsWebP ? 'webp' : 'jpg';
-            $outputExtension = $supportsWebP ? '.webp' : '.jpg';
-
-            $tempDir = storage_path('app/public/temp');
-            if (!is_dir($tempDir)) mkdir($tempDir, 0755, true);
-
-            $compressedFileName = 'compressed_' . Str::random(10) . $outputExtension;
-            $compressedPath = $tempDir . DIRECTORY_SEPARATOR . $compressedFileName;
-
-            // 3. Apply progressive compression with quality reduction until file < 1MB
-            $qualities = [85, 75, 65, 55, 45, 35, 25, 15];
-            $targetSize = 1024 * 1024; // 1MB
-            $finalQuality = 85;
-
-            foreach ($qualities as $quality) {
-                if ($outputFormat === 'webp') {
-                    $image->toWebp($quality)->save($compressedPath);
-                } else {
-                    $image->toJpeg($quality)->save($compressedPath);
-                }
-
-                $currentSize = filesize($compressedPath);
-                $finalQuality = $quality;
-
-                if ($currentSize < $targetSize) {
-                    break;
-                }
-            }
-
-            // 4. If still > 1MB, try more aggressive resize
-            if (filesize($compressedPath) >= $targetSize) {
-                Log::info('File still too large, applying aggressive resize');
-                $image = $manager->read($imagePath);
-                $image->scale(width: 600);
-
-                if ($outputFormat === 'webp') {
-                    $image->toWebp(20)->save($compressedPath);
-                } else {
-                    $image->toJpeg(20)->save($compressedPath);
-                }
-                $finalQuality = 20;
-            }
-
-            // 5. Apply native Imagick optimization if available (skip custom Imagick code)
-            // The new Intervention Image v3 handles optimization internally
-
-            $finalSize = filesize($compressedPath);
-            $compressionRatio = round(($originalSize - $finalSize) / $originalSize * 100);
-            $compressionInfo = [
-                'original_size' => $originalSize,
-                'final_size' => $finalSize,
-                'compression_ratio' => $compressionRatio,
-                'format' => $outputFormat,
-                'quality' => $finalQuality,
-                'final_width' => 'N/A'
-            ];
-
-            // Get final width for logging
-            try {
-                $finalImage = $manager->read($compressedPath);
-                $compressionInfo['final_width'] = $finalImage->width();
-            } catch (\Exception $e) {
-                // Ignore if we can't read final dimensions
-            }
-
-            Log::info("Image compression completed", $compressionInfo);
-
-            return 'temp/' . $compressedFileName;
-        } catch (\Exception $e) {
-            Log::error('Image compression failed: ' . $e->getMessage(), [
-                'original_path' => $imagePath,
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            // Fallback: copy original file
-            $copyName = 'temp/original_' . Str::random(10) . '.' . pathinfo($imagePath, PATHINFO_EXTENSION);
-            $fallbackPath = storage_path('app/public/' . $copyName);
-            if (!is_dir(dirname($fallbackPath))) {
-                mkdir(dirname($fallbackPath), 0755, true);
-            }
-            copy($imagePath, $fallbackPath);
-            return $copyName;
-        }
-    }
     /**
-     * Deteksi apakah browser mendukung format WebP
-     * 
-     * @return bool True jika browser mendukung WebP, false jika tidak
+     * Kompres gambar ke < 1MB dan simpan di disk public.
+     * Format WebP dipakai bila browser mendukung, selain itu JPEG.
      */
+    private function compressImage(UploadedFile $file): string
+    {
+        $manager = new ImageManager(extension_loaded('imagick') ? new ImagickDriver() : new GdDriver());
+        $image = $manager->read($file->getPathname());
+
+        if ($image->width() > 800) {
+            $image->scale(width: 800);
+        }
+
+        $format = $this->browserSupportsWebP() ? 'webp' : 'jpg';
+        $targetSize = 1024 * 1024;
+
+        $encoded = null;
+        foreach ([85, 75, 65, 55, 45, 35, 25, 15] as $quality) {
+            $encoded = $format === 'webp' ? $image->toWebp($quality) : $image->toJpeg($quality);
+
+            if ($encoded->size() < $targetSize) {
+                break;
+            }
+        }
+
+        $path = 'customer_photos/' . Str::random(40) . '.' . $format;
+
+        if (!Storage::disk('public')->put($path, $encoded->toString())) {
+            throw new \RuntimeException('Gagal menyimpan foto.');
+        }
+
+        return $path;
+    }
+
+    /**
+     * Deteksi apakah browser mendukung format WebP.
+     */
+    protected function browserSupportsWebP(): bool
+    {
+        $accept = request()->header('Accept', '');
+        if (str_contains($accept, 'image/webp')) {
+            return true;
+        }
+
+        $userAgent = request()->header('User-Agent', '');
+
+        return (bool) preg_match('/Chrome\/[1-9][0-9]+|Firefox\/(?:[7-9][0-9]|[6-9][5-9])|Edg\/[1-9][0-9]+|Version\/1[4-9].*Safari/', $userAgent);
+    }
 }

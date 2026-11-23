@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\TransactionRequest;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
@@ -17,42 +17,47 @@ class TransactionController extends Controller
 {
     public function store(TransactionRequest $request)
     {
-        // Ambil data yang sudah tervalidasi
-        // Mengambil data yang sudah tervalidasi
         $validatedData = $request->validated();
 
-        // Cari produk berdasarkan ID
         $product = Product::find($validatedData['product_id']);
-
-        // Pastikan produk ditemukan
         if (!$product) {
             return response()->json(['error' => 'Product not found'], 404);
         }
 
-        // Set status transaksi dan booking transaction ID menggunakan Transaction model
-        $validatedData['status'] = 'booking';
-
-        // Panggil generateUniqueBookingTrxId() dari model Transaction
-        $transaction = new Transaction($validatedData);
-        $validatedData['booking_transaction_id'] = $transaction->generateUniqueBookingTrxId();
-
-        // Cek apakah 'duration' adalah angka valid
-        $duration = (int) $validatedData['duration']; // Pastikan menjadi integer
+        $duration = (int) $validatedData['duration'];
         if ($duration <= 0) {
-            return response()->json(['error' => 'Invalid duration'], 400); // Jika duration tidak valid, kembalikan error
+            return response()->json(['error' => 'Invalid duration'], 400);
         }
 
-        // Set durasi dan tanggal selesai
-        $startDate = new \DateTime($validatedData['started_at']);
-        $interval = new \DateInterval('P' . $duration . 'D'); // Format yang benar: P{X}D
-        $endDate = $startDate->add($interval);
-        $validatedData['end_date'] = $endDate->format('Y-m-d'); // Format tanggal yang benar
+        $bookingStatus = 'booking';
 
-        // Simpan transaksi baru
-        $transaction = Transaction::create($validatedData);
+        $customer = Customer::firstOrCreate(
+            ['email' => $validatedData['email']],
+            ['name' => $validatedData['name']]
+        );
 
-        // Kembalikan response JSON jika berhasil
-        return response()->json($transaction, 201); // Contoh response JSON
+        $transaction = Transaction::create([
+            'customer_id' => $customer->id,
+            'booking_status' => $bookingStatus,
+            'start_date' => $validatedData['start_date'],
+            'duration' => $duration,
+            'note' => null,
+        ]);
+
+        if (!empty($validatedData['phone'])) {
+            $customer->customerPhoneNumbers()->updateOrCreate(
+                ['phone_number' => $validatedData['phone']],
+                ['is_primary' => true]
+            );
+        }
+
+        $transaction->detailTransactions()->create([
+            'product_id' => $product->id,
+            'quantity' => (int) $validatedData['quantity'],
+            'price' => $product->price,
+        ]);
+
+        return response()->json($transaction->fresh(['detailTransactions']), 201);
     }
 
     /**
@@ -103,8 +108,6 @@ class TransactionController extends Controller
         } catch (\Exception $e) {
             Log::error('Error fetching active transactions', [
                 'error' => $e->getMessage(),
-                'request' => $request->all(),
-                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
@@ -133,7 +136,12 @@ class TransactionController extends Controller
                 'created_at',
                 'updated_at'
             ])
-            ->with(['customer:id,name,email', 'user:id,name,email']);
+            ->with([
+                'customer:id,name,email',
+                'user:id,name,email',
+                'detailTransactions.product:id,name',
+                'detailTransactions.bundling:id,name',
+            ]);
 
         // Filter by status
         $status = $request->get('status', 'active');
@@ -171,12 +179,7 @@ class TransactionController extends Controller
     private function transformTransactions($transactions)
     {
         return $transactions->map(function ($transaction) {
-            // Load detail transactions for this transaction
-            $detailTransactions = \App\Models\DetailTransaction::where('transaction_id', $transaction->id)
-                ->with(['product:id,name', 'bundling:id,name'])
-                ->get();
-
-            $details = $detailTransactions->map(function ($detail) {
+            $details = $transaction->detailTransactions->map(function ($detail) {
                 return [
                     'id' => $detail->id,
                     'product_id' => $detail->product_id,
@@ -199,170 +202,5 @@ class TransactionController extends Controller
                 'details_count' => $details->count()
             ];
         });
-    }
-
-    /**
-     * Check availability for specific item and date range
-     *
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function checkAvailability(Request $request): JsonResponse
-    {
-        try {
-            $request->validate([
-                'type' => 'required|string|in:product,bundling',
-                'id' => 'required|integer',
-                'start_date' => 'required|date_format:Y-m-d',
-                'end_date' => 'required|date_format:Y-m-d|after_or_equal:start_date',
-                'quantity' => 'integer|min:1|max:100'
-            ]);
-
-            $type = $request->get('type');
-            $itemId = $request->get('id');
-            $startDate = Carbon::parse($request->get('start_date'));
-            $endDate = Carbon::parse($request->get('end_date'));
-            $requestedQuantity = $request->get('quantity', 1);
-
-            // For now, only support product checking (bundling can be added later)
-            if ($type !== 'product') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Bundling availability checking not yet implemented'
-                ], 400);
-            }
-
-            // Validate product exists
-            $product = DB::table('products')->where('id', $itemId)->first();
-            
-            if (!$product) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Product not found'
-                ], 404);
-            }
-
-            // Get conflicting transactions
-            $conflictingTransactions = $this->getConflictingTransactions($itemId, $startDate, $endDate);
-            
-            // Calculate used quantity
-            $usedQuantity = $conflictingTransactions->sum('total_quantity');
-            
-            // Get total stock
-            $totalStock = $product->quantity ?? 10; // Default to 10 if not specified
-            
-            // Calculate availability
-            $availableQuantity = max(0, $totalStock - $usedQuantity);
-            $available = $availableQuantity >= $requestedQuantity;
-
-            // Get unavailable dates in the range
-            $unavailableDates = $this->getUnavailableDates($itemId, $startDate, $endDate);
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'available' => $available,
-                    'available_quantity' => $availableQuantity,
-                    'total_stock' => $totalStock,
-                    'used_quantity' => $usedQuantity,
-                    'requested_quantity' => $requestedQuantity,
-                    'conflicting_transactions' => $conflictingTransactions,
-                    'unavailable_dates' => $unavailableDates,
-                    'period' => [
-                        'start_date' => $startDate->format('Y-m-d'),
-                        'end_date' => $endDate->format('Y-m-d'),
-                        'duration' => $startDate->diffInDays($endDate) + 1
-                    ],
-                    'item' => [
-                        'id' => $product->id,
-                        'name' => $product->name,
-                        'type' => 'product',
-                        'status' => $product->status ?? 'available'
-                    ]
-                ]
-            ]);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-
-        } catch (\Exception $e) {
-            Log::error('Error checking availability', [
-                'error' => $e->getMessage(),
-                'request' => $request->all()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to check availability',
-                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error'
-            ], 500);
-        }
-    }
-
-    /**
-     * Get conflicting transactions for item and date range
-     */
-    private function getConflictingTransactions(int $productId, Carbon $startDate, Carbon $endDate)
-    {
-        return DB::table('transactions as t')
-            ->select([
-                't.id',
-                't.booking_transaction_id',
-                't.started_at as start_date',
-                't.end_date',
-                't.status as booking_status',
-                't.customer_name',
-                't.quantity as total_quantity',
-                DB::raw('1 as details_count')
-            ])
-            ->where('t.product_id', $productId)
-            ->whereIn('t.status', ['booking', 'confirmed', 'active', 'ongoing'])
-            ->where(function ($query) use ($startDate, $endDate) {
-                $query->where(function ($q) use ($startDate, $endDate) {
-                    // Transaction starts before our end date and ends after our start date
-                    $q->whereDate('t.started_at', '<=', $endDate->format('Y-m-d'))
-                      ->whereDate('t.end_date', '>=', $startDate->format('Y-m-d'));
-                });
-            })
-            ->get();
-    }
-
-    /**
-     * Get unavailable dates for a product
-     */
-    private function getUnavailableDates(int $productId, Carbon $startDate = null, Carbon $endDate = null): array
-    {
-        $query = DB::table('transactions as t')
-            ->select('t.started_at as start_date', 't.end_date')
-            ->where('t.product_id', $productId)
-            ->whereIn('t.status', ['booking', 'confirmed', 'active', 'ongoing'])
-            ->where('t.end_date', '>=', Carbon::today()->format('Y-m-d'));
-
-        if ($startDate && $endDate) {
-            $query->where(function ($q) use ($startDate, $endDate) {
-                $q->whereDate('t.started_at', '<=', $endDate->format('Y-m-d'))
-                  ->whereDate('t.end_date', '>=', $startDate->format('Y-m-d'));
-            });
-        }
-
-        $transactions = $query->get();
-        
-        $unavailableDates = [];
-        
-        foreach ($transactions as $transaction) {
-            $current = Carbon::parse($transaction->start_date);
-            $end = Carbon::parse($transaction->end_date);
-            
-            while ($current <= $end) {
-                $unavailableDates[] = $current->format('Y-m-d');
-                $current->addDay();
-            }
-        }
-
-        return array_unique($unavailableDates);
     }
 }

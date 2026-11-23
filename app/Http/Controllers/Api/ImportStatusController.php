@@ -83,7 +83,7 @@ class ImportStatusController extends Controller
                 'data' => [
                     'pending_jobs' => $pendingJobs,
                     'failed_jobs' => $failedJobs,
-                    'queue_working' => $pendingJobs >= 0 // Simple check
+                    'queue_working' => $pendingJobs === 0 && $failedJobs === 0
                 ]
             ]);
             

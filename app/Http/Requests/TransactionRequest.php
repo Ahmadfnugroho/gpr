@@ -22,14 +22,13 @@ class TransactionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'required|string',
-            'email' => 'required|string|email',
-            'phone' => 'required|string',
-            'start_date' => 'required|date',
-            'duration' => 'required|integer',
-            'quantity' => 'required|integer',
-            'product_id' => 'required|string|exists:products,id',
-            'totalamount' => 'required|integer',
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255',
+            'phone' => 'required|string|max:20',
+            'start_date' => ['required', 'date', 'after_or_equal:today'],
+            'duration' => 'required|integer|min:1',
+            'quantity' => 'required|integer|min:1',
+            'product_id' => 'required|integer|exists:products,id',
         ];
-}
+    }
 }

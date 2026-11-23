@@ -20,15 +20,11 @@ trait HasSuccessNotification
      */
     protected function getSavedNotification(): ?Notification
     {
-        // Get entity name from resource class
-        $resourceClass = $this->getResource();
-        $entityName = class_basename($resourceClass);
-        $entityName = str_replace('Resource', '', $entityName);
+        $entityName = str_replace('Resource', '', class_basename($this->getResource()));
 
         return Notification::make()
             ->success()
             ->title($entityName . ' berhasil disimpan!')
-            ->body('Data ' . strtolower($entityName) . ' telah berhasil diperbaruigit.')
-            ->send();
+            ->body('Data ' . strtolower($entityName) . ' telah berhasil diperbarui.');
     }
 }
