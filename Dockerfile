@@ -3,12 +3,18 @@
 ARG PHP_VERSION=8.4
 
 # ---------- vendor ----------
-FROM composer:2 AS vendor
+# Pin the vendor stage to the same PHP minor as runtime. composer:2 now ships
+# PHP 8.5, which the lock file (php 8.1 - 8.4) rejects.
+FROM php:${PHP_VERSION}-cli-alpine AS vendor
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --prefer-dist --no-scripts --no-autoloader
+RUN composer install --no-dev --no-interaction --prefer-dist --no-scripts --no-autoloader \
+      --ignore-platform-reqs
 COPY . .
-RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
+# --no-scripts: package:discover needs runtime extensions/DB that this stage lacks.
+# Laravel rebuilds bootstrap/cache/packages.php on first boot in the runtime stage.
+RUN composer dump-autoload --no-dev --optimize --classmap-authoritative --no-scripts
 
 # ---------- runtime ----------
 FROM php:${PHP_VERSION}-fpm-alpine AS runtime
@@ -26,10 +32,10 @@ COPY docker/php.ini /usr/local/etc/php/conf.d/zz-app.ini
 COPY docker/supervisord.conf /etc/supervisord.conf
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint
 
-RUN rm -f /usr/local/etc/php-fpm.d/www.conf \
+RUN rm -f /usr/local/etc/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/zz-docker.conf /usr/local/etc/php-fpm.d/docker.conf \
  && chmod +x /usr/local/bin/entrypoint \
- && mkdir -p storage/app/public storage/framework/{cache,sessions,views} storage/logs bootstrap/cache \
- && chown -R 10001:10001 /var/www/html
+ && mkdir -p storage/app/public storage/framework/{cache,sessions,views} storage/logs bootstrap/cache /var/lib/nginx/logs /var/log/nginx \
+ && chown -R 10001:10001 /var/www/html /var/lib/nginx /var/log/nginx
 
 ENV APP_ENV=production \
     APP_DEBUG=false \
