@@ -34,6 +34,9 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint
 
 RUN rm -f /usr/local/etc/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/zz-docker.conf /usr/local/etc/php-fpm.d/docker.conf \
  && chmod +x /usr/local/bin/entrypoint \
+ # Laravel's schema-dump loader shells out to the mysql CLI; the loopback
+ # bridge makes the server present a self-signed cert that the client rejects.
+ && printf '[client]\nskip-ssl\n' > /etc/my.cnf \
  && mkdir -p storage/app/public storage/framework/{cache,sessions,views} storage/logs bootstrap/cache /var/lib/nginx/logs /var/log/nginx \
  && chown -R 10001:10001 /var/www/html /var/lib/nginx /var/log/nginx
 
