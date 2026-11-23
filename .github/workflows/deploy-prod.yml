@@ -9,7 +9,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/gpr-backend
+  # Docker requires a lowercase repository path; the GitHub owner is mixed-case.
+  IMAGE: ghcr.io/ahmadfnugroho/gpr-backend
 
 jobs:
   deploy:
@@ -38,16 +39,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Roll out over SSH so the cluster API on 6443 stays closed to the
+      # internet. kubectl runs on the node against the local k3s kubeconfig.
       - name: Roll out to gpr-prod
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-        run: |
-          set -euo pipefail
-          tag="sha-${GITHUB_SHA}"
-          mkdir -p "$HOME/.kube"
-          echo "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
-          kubectl -n gpr-prod set image deployment/gpr-backend web="$IMAGE:$tag"
-          kubectl -n gpr-prod set image deployment/gpr-worker worker="$IMAGE:$tag"
-          kubectl -n gpr-prod rollout status deployment/gpr-backend --timeout=180s
-          kubectl -n gpr-prod rollout status deployment/gpr-worker --timeout=180s
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          port: ${{ secrets.PORT }}
+          key: ${{ secrets.SSHKEY }}
+          script: |
+            set -euo pipefail
+            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+            IMAGE=ghcr.io/ahmadfnugroho/gpr-backend
+            TAG=sha-${{ github.sha }}
+            kubectl -n gpr-prod set image deployment/gpr-backend web="$IMAGE:$TAG"
+            kubectl -n gpr-prod set image deployment/gpr-worker worker="$IMAGE:$TAG"
+            kubectl -n gpr-prod rollout status deployment/gpr-backend --timeout=180s
+            kubectl -n gpr-prod rollout status deployment/gpr-worker --timeout=180s
