@@ -48,10 +48,10 @@
     </style>
 </head>
 <script>
-    // WebSocket Configuration
-    const wsApiKey = 'gbTnWu4oBizYlgeZ0OPJlgeZ0OPJlbpnG11ARjsf'; // Ganti jika berbeda
-    const wsBaseUrl = 'wss://whatsapp.globalphotorental.com/ws';
-    const sessionName = 'default';
+    // WebSocket Configuration (sourced from config/services.php)
+    const wsApiKey = @json((string) config('services.waha.ws_api_key'));
+    const wsBaseUrl = @json(preg_replace('#^http#i', 'ws', rtrim((string) config('services.waha.base_url'), '/')) . '/ws');
+    const sessionName = @json((string) config('services.waha.session'));
     const events = ['session.status', 'message']; // Event yang ingin didengar
 
     // Buat URL WebSocket dengan parameter
@@ -194,7 +194,7 @@
                     <div class="flex-1">
                         <h3 class="text-lg font-semibold text-gray-800">Server Info</h3>
                         <div id="server-info" class="mt-2 text-sm text-gray-600">
-                            <div>Server: whatsapp.globalphotorental.com</div>
+                            <div>Server: {{ parse_url((string) config('services.waha.base_url'), PHP_URL_HOST) }}</div>
                             <div id="version-info">Version: Loading...</div>
                         </div>
                     </div>

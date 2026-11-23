@@ -86,16 +86,23 @@ Route::prefix('whatsapp')->name('whatsapp.')->group(function () {
     })->name('login.form');
 
     Route::post('/login', function (\Illuminate\Http\Request $request) {
-        $username = $request->input('username');
-        $password = $request->input('password');
+        $expectedUser = (string) config('services.waha.admin_user');
+        $expectedPass = (string) config('services.waha.admin_password');
+        $username = (string) $request->input('username', '');
+        $password = (string) $request->input('password', '');
 
-        if ($username === 'wahaadmin' && $password === 'Infrasglobal@100') {
+        $valid = $expectedUser !== '' && $expectedPass !== ''
+            && hash_equals($expectedUser, $username)
+            && hash_equals($expectedPass, $password);
+
+        if ($valid) {
+            $request->session()->regenerate();
             $request->session()->put('whatsapp_authenticated', true);
             return redirect()->route('whatsapp.dashboard');
-        } else {
-            return redirect()->back()->withErrors(['Invalid credentials']);
         }
-    })->name('login');
+
+        return redirect()->back()->withErrors(['Invalid credentials']);
+    })->middleware('throttle:5,1')->name('login');
 
     Route::post('/auth-logout', function (\Illuminate\Http\Request $request) {
         $request->session()->forget('whatsapp_authenticated');

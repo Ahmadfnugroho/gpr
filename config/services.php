@@ -45,5 +45,13 @@ return [
         'token' => env('ACCOUNT_TOKEN'),
     ],
 
+    'waha' => [
+        'base_url'       => env('WAHA_BASE_URL'),
+        'api_key'        => env('WAHA_API_KEY'),
+        'ws_api_key'     => env('WAHA_WS_API_KEY', env('WAHA_API_KEY')),
+        'session'        => env('WAHA_SESSION', 'default'),
+        'admin_user'     => env('WAHA_ADMIN_USER'),
+        'admin_password' => env('WAHA_ADMIN_PASSWORD'),
+    ],
 
 ];

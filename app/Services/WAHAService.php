@@ -13,9 +13,9 @@ class WAHAService
 
     public function __construct()
     {
-        $this->baseUrl = 'https://whatsapp.globalphotorental.com/api';
-        $this->apiKey = 'gbTnWu4oBizYlgeZ0OPJlbpnG11ARjsf';
-        $this->session = 'default';
+        $this->baseUrl = rtrim((string) config('services.waha.base_url'), '/');
+        $this->apiKey = (string) config('services.waha.api_key');
+        $this->session = (string) config('services.waha.session');
     }
 
     /**
@@ -180,7 +180,7 @@ class WAHAService
                         //     'events': ['message', 'message.any']
                         //     'secret': 'your_webhook_secret',
                         //     'headers': {
-                        //         'Authorization': 'Basic ' . base64_encode('wahaadmin:Infrasglobal@100')
+                        //         'Authorization': 'Basic ' . base64_encode('user:password')
                         //     }
                         // }
                     ]
