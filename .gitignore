@@ -20,6 +20,7 @@
 # Abaikan log dan cache internal server
 storage/logs/
 bootstrap/cache/*.php
+bootstrap/cache/*.tmp
 .env.backup
 .env.production
 .phpactor.json

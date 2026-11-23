@@ -4,7 +4,7 @@ IFS=$'\n\t'
 
 # ---------- CONFIG ----------
 ENV_FILE="/var/www/gpr/.env"
-STAGING="/tmp/backup_staging"
+STAGING="/var/backups/gpr-staging"
 OUTDIR="/var/backups"
 RCLONE_REMOTE="backup:backups/gpr"
 LOGFILE="/var/log/backup.log"
@@ -70,6 +70,10 @@ rclone copy "$OUTDIR/$BACKUP_NAME" "$RCLONE_REMOTE" \
 # ---------- Delete local backup ----------
 log "Deleting local backup file..."
 rm -f "$OUTDIR/$BACKUP_NAME"
+rm -rf "$STAGING"
+
+# ---------- Local retention: keep last 7 archives ----------
+ls -1t "$OUTDIR"/backup-*.tar.gz 2>/dev/null | tail -n +$((RETENTION_DAYS + 1)) | xargs -r rm -f
 
 # ---------- Retention: delete backups older than 7 days ----------
 log "Removing old backups on Google Drive (older than $RETENTION_DAYS days)..."
