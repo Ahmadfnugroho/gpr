@@ -27,7 +27,13 @@ log() { echo "[$(TZ=$TIMEZONE date '+%Y-%m-%d %H:%M:%S %Z')] $*" | tee -a "$LOGF
 mkdir -p "$STAGING" "$OUTDIR"
 touch "$LOGFILE"
 
-# ---------- Parse DB credentials ----------
+DATE=$(TZ=$TIMEZONE date +%F)
+BACKUP_NAME="backup-${DATE}.tar.gz"
+
+# ---------- Dump the databases the cluster actually uses ----------
+# ENV_FILE (/var/www/gpr/.env) belongs to the retired VM app (db "gpr").
+# The namespaces talk to gpr_prod / gpr_dev with their own users, read
+# from the gpr-secrets secret. Keep ENV_FILE only as DB_HOST source.
 get_env() {
   local key="$1" file="$2"
   local val=$(grep -m1 -E "^${key}=" "$file" || true)
@@ -35,22 +41,24 @@ get_env() {
   val="${val%\'}"; val="${val#\'}"
   echo "$val"
 }
-
 DB_HOST=$(get_env "DB_HOST" "$ENV_FILE"); DB_HOST=${DB_HOST:-127.0.0.1}
 DB_PORT=$(get_env "DB_PORT" "$ENV_FILE"); DB_PORT=${DB_PORT:-3306}
-DB_NAME=$(get_env "DB_DATABASE" "$ENV_FILE")
-DB_USER=$(get_env "DB_USERNAME" "$ENV_FILE")
-DB_PASS=$(get_env "DB_PASSWORD" "$ENV_FILE")
 
-DATE=$(TZ=$TIMEZONE date +%F)
-SQL_FILE="db-${DATE}.sql"
-BACKUP_NAME="backup-${DATE}.tar.gz"
+dump_ns_db() {
+  local ns="$1" secret="gpr-secrets"
+  local u p d out
+  u=$(kubectl -n "$ns" get secret "$secret" -o jsonpath='{.data.DB_USERNAME}' | base64 -d)
+  p=$(kubectl -n "$ns" get secret "$secret" -o jsonpath='{.data.DB_PASSWORD}' | base64 -d)
+  d=$(kubectl -n "$ns" get secret "$secret" -o jsonpath='{.data.DB_DATABASE}' | base64 -d)
+  out="$STAGING/db-${d}-${DATE}.sql"
+  log "Dumping MySQL ${d} (namespace ${ns})..."
+  MYSQL_PWD="$p" mysqldump --single-transaction --quick --lock-tables=false --no-tablespaces \
+      -h "$DB_HOST" -P "$DB_PORT" -u "$u" "$d" > "$out"
+  log "  dumped ${d} ($(du -h "$out" | cut -f1))"
+}
 
-log "Dumping MySQL database..."
-export MYSQL_PWD="$DB_PASS"
-mysqldump --single-transaction --quick --lock-tables=false --no-tablespaces \
-    -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" "$DB_NAME" > "$STAGING/$SQL_FILE"
-unset MYSQL_PWD
+dump_ns_db gpr-prod
+dump_ns_db gpr-dev
 
 # ---------- Stage Kubernetes PVC data + nginx configs ----------
 log "Staging Kubernetes PVC data..."
