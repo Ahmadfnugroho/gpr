@@ -13,6 +13,9 @@ fi
 echo "==> clear stale caches"
 php artisan optimize:clear >/dev/null 2>&1 || true
 
+echo "==> storage symlink"
+php artisan storage:link --force >/dev/null 2>&1 || true
+
 echo "==> cache config"
 php artisan config:cache
 

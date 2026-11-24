@@ -176,6 +176,7 @@ class ProductResource extends BaseOptimizedResource
                     ->label('Harga Produk')
                     ->required()
                     ->numeric()
+                    ->minValue(1)
                     ->prefix('Rp'),
                 \Filament\Forms\Components\FileUpload::make('thumbnail')
                     ->label('Thumbnail Produk (Utama)')

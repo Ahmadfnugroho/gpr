@@ -58,11 +58,6 @@ Route::middleware(['throttle:120,1'])->group(function () {
     Route::get('/sub-categories/{subCategory:slug}', [SubCategoryController::class, 'show']);
     Route::get('/search-suggestions', [ProductController::class, 'searchSuggestions'])->middleware('throttle:60,1');
     
-    // Transactions API for availability checking
-    Route::prefix('transactions')->group(function () {
-        Route::get('/', [TransactionController::class, 'index'])->middleware('throttle:120,1');
-    });
-    
     // Advanced Search API
     Route::prefix('search')->group(function () {
         Route::get('/', [AdvancedSearchController::class, 'search'])->middleware('throttle:120,1');
@@ -109,6 +104,7 @@ Route::middleware(['api_key', 'throttle:60,1'])->group(function () {
     Route::post('/google-sheet-sync', [GoogleSheetSyncController::class, 'sync']);
     Route::get('/google-sheet-export', [GoogleSheetSyncController::class, 'export']);
     Route::apiResource('/transactions-check', TransactionCheckController::class);
+    Route::get('/transactions', [TransactionController::class, 'index']);
     Route::post('/transaction', [TransactionController::class, 'store']);
     Route::post('/check-transaction', [TransactionController::class, 'DetailTransaction']);
 

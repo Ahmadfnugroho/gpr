@@ -1,11 +1,9 @@
-name: Deploy
+name: Deploy Legacy VM
 
-# Trigger the workflow on push events on the production branch.
-# No pull_request trigger: a PR must never deploy.
+# Legacy VM deployment. Triggered manually only: the k3s rollout lives in
+# deploy-prod.yml, and a push trigger here would deploy the same commit twice.
 on:
-  push:
-    branches:
-      - production
+  workflow_dispatch:
 
 # Authenticate to the the server via ssh
 # and run our deployment script

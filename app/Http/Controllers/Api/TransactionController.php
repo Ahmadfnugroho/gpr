@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class TransactionController extends Controller
@@ -36,26 +37,35 @@ class TransactionController extends Controller
             ['name' => $validatedData['name']]
         );
 
-        $transaction = Transaction::create([
-            'customer_id' => $customer->id,
-            'booking_status' => $bookingStatus,
-            'start_date' => $validatedData['start_date'],
-            'duration' => $duration,
-            'note' => null,
-        ]);
+        $transaction = DB::transaction(function () use ($validatedData, $customer, $product, $duration, $bookingStatus) {
+            $transaction = Transaction::create([
+                'customer_id' => $customer->id,
+                'booking_status' => $bookingStatus,
+                'start_date' => $validatedData['start_date'],
+                'duration' => $duration,
+                'note' => null,
+            ]);
 
-        if (!empty($validatedData['phone'])) {
-            $customer->customerPhoneNumbers()->updateOrCreate(
-                ['phone_number' => $validatedData['phone']],
-                ['is_primary' => true]
-            );
-        }
+            if (!empty($validatedData['phone'])) {
+                $customer->customerPhoneNumbers()->updateOrCreate(
+                    ['phone_number' => $validatedData['phone']],
+                    ['is_primary' => true]
+                );
+            }
 
-        $transaction->detailTransactions()->create([
-            'product_id' => $product->id,
-            'quantity' => (int) $validatedData['quantity'],
-            'price' => $product->price,
-        ]);
+            $transaction->detailTransactions()->create([
+                'product_id' => $product->id,
+                'quantity' => (int) $validatedData['quantity'],
+                'price' => $product->price,
+            ]);
+
+            // grand_total is a stored column; without it every read falls back to
+            // calculateGrandTotal() which needs the detail rows - persist it here.
+            $transaction->grand_total = $transaction->calculateGrandTotal();
+            $transaction->save();
+
+            return $transaction;
+        });
 
         return response()->json($transaction->fresh(['detailTransactions']), 201);
     }

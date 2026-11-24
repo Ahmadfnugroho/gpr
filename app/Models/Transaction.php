@@ -573,8 +573,8 @@ class Transaction extends Model
      */
     public function getGrandTotalWithFallback(): int
     {
-        if ($this->grand_total && $this->grand_total > 0) {
-            return (int) $this->grand_total;
+        if ($this->getStoredGrandTotalAmount() > 0) {
+            return $this->getStoredGrandTotalAmount();
         }
 
         return $this->calculateGrandTotal();
