@@ -59,8 +59,10 @@ class TransactionController extends Controller
                 'price' => $product->price,
             ]);
 
-            // grand_total is a stored column; without it every read falls back to
-            // calculateGrandTotal() which needs the detail rows - persist it here.
+            // The created event notifies the customer, which loads
+            // detailTransactions while it is still empty. Drop that cached
+            // relation or calculateGrandTotal() sums nothing and stores 0.
+            $transaction->unsetRelation('detailTransactions');
             $transaction->grand_total = $transaction->calculateGrandTotal();
             $transaction->save();
 
