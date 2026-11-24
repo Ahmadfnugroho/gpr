@@ -17,6 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // TLS terminates at the host nginx, so the app only sees plain HTTP from
+        // ingress-nginx. Without this every URL() renders http:// and session
+        // cookies lose the Secure flag.
+        $middleware->trustProxies(at: ['10.42.0.0/16', '127.0.0.1']);
+
         $middleware->alias([
             'api_key' => FrontApiKey::class,
             'whatsapp.auth' => WhatsAppAuth::class
