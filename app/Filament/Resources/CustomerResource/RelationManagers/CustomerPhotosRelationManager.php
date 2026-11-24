@@ -130,7 +130,7 @@ class CustomerPhotosRelationManager extends RelationManager
                         default => ucfirst($record->photo_type)
                     })
                     ->modalContent(function ($record) {
-                        $photoUrl = Storage::disk('public')->url($record->photo);
+                        $photoUrl = $record->photo ? Storage::disk('public')->url($record->photo) : url('/images/no-image.svg');
                         return view('filament.components.large-image-modal', [
                             'imageUrl' => $photoUrl,
                             'title' => match($record->photo_type) {

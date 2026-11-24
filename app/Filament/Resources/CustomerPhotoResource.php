@@ -66,7 +66,7 @@ class CustomerPhotoResource extends Resource
                     ->disk('public')
                     ->height(80)
                     ->width(80)
-                    ->defaultImageUrl('/images/placeholder.png'),
+                    ->defaultImageUrl(url('/images/no-image.svg')),
                 Tables\Columns\TextColumn::make('customer.name')
                     ->label('Customer')
                     ->searchable()

@@ -72,8 +72,9 @@ class BundlingPhotoResource extends Resource
                     ->sortable(),
                 ImageColumn::make('photo')
                     ->label('Photo')
-                    ->getStateUsing(fn($record) => asset('storage/' . $record->photo))
-                    ->size(400) // ukuran dalam piksel (default biasanya 40)
+                    ->disk('public')
+                    ->defaultImageUrl(url('/images/no-image.svg'))
+                    ->size(400)
 
 
             ])

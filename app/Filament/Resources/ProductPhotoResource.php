@@ -71,8 +71,9 @@ class ProductPhotoResource extends Resource
 
                 ImageColumn::make('photo')
                     ->label('Photo')
-                    ->getStateUsing(fn($record) => asset('storage/' . $record->photo))
-                    ->size(640) // ukuran dalam piksel (default biasanya 40)
+                    ->disk('public')
+                    ->defaultImageUrl(url('/images/no-image.svg'))
+                    ->size(640)
 
             ])
             ->filters([

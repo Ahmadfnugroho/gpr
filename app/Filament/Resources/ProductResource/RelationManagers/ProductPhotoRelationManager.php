@@ -77,15 +77,10 @@ class ProductPhotoRelationManager extends RelationManager
 
                 ImageColumn::make('photo')
                     ->label('Photo Preview')
+                    ->disk('public')
                     ->size(80)
                     ->square()
-                    ->getStateUsing(function ($record) {
-                        if ($record->photo) {
-                            return asset('storage/' . $record->photo);
-                        }
-                        return null;
-                    })
-                    ->defaultImageUrl('https://via.placeholder.com/150x150/e5e7eb/9ca3af?text=No+Photo'),
+                    ->defaultImageUrl(url('/images/no-image.svg')),
 
                 Tables\Columns\TextColumn::make('photo')
                     ->label('File Name')

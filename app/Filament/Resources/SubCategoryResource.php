@@ -90,7 +90,8 @@ class SubCategoryResource extends Resource
                     ->sortable(),
                 ImageColumn::make('photo')
                     ->label('Photo')
-                    ->getStateUsing(fn($record) => asset('storage/' . $record->photo)),
+                    ->disk('public')
+                    ->defaultImageUrl(url('/images/no-image.svg')),
 
 
             ])

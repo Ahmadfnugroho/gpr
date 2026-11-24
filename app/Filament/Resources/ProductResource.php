@@ -229,7 +229,7 @@ class ProductResource extends BaseOptimizedResource
 
                         $photoHtml = '<div class="grid grid-cols-4 gap-4">';
                         foreach ($photos->take(8) as $photo) {
-                            $imageUrl = e(asset('storage/' . $photo->photo));
+                            $imageUrl = e($photo->photo ? asset('storage/' . $photo->photo) : url('/images/no-image.svg'));
                             $photoHtml .= '
                                 <div class="relative">
                                     <img src="' . $imageUrl . '" 
@@ -407,6 +407,8 @@ class ProductResource extends BaseOptimizedResource
                             }),
                         Tables\Columns\ImageColumn::make('productPhotos.0.photo')
                             ->label('Foto')
+                            ->disk('public')
+                            ->defaultImageUrl(url('/images/no-image.svg'))
                             ->circular()
                             ->size(50)
                             ->alignCenter(),
