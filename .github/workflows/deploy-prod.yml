@@ -64,6 +64,8 @@ jobs:
             IMAGE=ghcr.io/ahmadfnugroho/gpr-backend
             TAG=sha-${{ github.sha }}
             kubectl -n gpr-prod set image deployment/gpr-backend web="$IMAGE:$TAG"
+            kubectl -n gpr-prod set image deployment/gpr-backend storage-perms="$IMAGE:$TAG"
             kubectl -n gpr-prod set image deployment/gpr-worker worker="$IMAGE:$TAG"
+            kubectl -n gpr-prod set image deployment/gpr-worker storage-perms="$IMAGE:$TAG"
             kubectl -n gpr-prod rollout status deployment/gpr-backend --timeout=180s
             kubectl -n gpr-prod rollout status deployment/gpr-worker --timeout=180s
