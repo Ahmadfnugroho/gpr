@@ -178,43 +178,39 @@ class ProductResource extends BaseOptimizedResource
                     ->numeric()
                     ->minValue(1)
                     ->prefix('Rp'),
-                \Filament\Forms\Components\FileUpload::make('thumbnail')
-                    ->label('Thumbnail Produk (Utama)')
-                    ->image()
-                    ->directory('product-thumbnails')
-                    ->visibility('public')
-                    ->imageEditor()
-                    ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
-                    ->imageResizeTargetWidth('800')
-                    ->imageResizeTargetHeight('600')
-                    ->maxSize(10240) // 10MB (will be compressed)
-                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                    ->helperText('Upload satu foto utama untuk thumbnail produk. File akan dikompres otomatis.')
-                    ->saveUploadedFileUsing(function ($file) {
-                        return (new ImageCompressionService())->compressAndStore($file, 'product-thumbnails');
-                    })
-                    ->nullable(),
+                ImageCompressionService::apply(
+                    \Filament\Forms\Components\FileUpload::make('thumbnail')
+                        ->label('Thumbnail Produk (Utama)')
+                        ->image()
+                        ->visibility('public')
+                        ->imageEditor()
+                        ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
+                        ->maxSize(10240) // 10MB (will be compressed)
+                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                        ->helperText('Upload satu foto utama untuk thumbnail produk. File akan dikompres ke WebP otomatis.')
+                        ->nullable(),
+                    'product-thumbnails',
+                    1200,
+                ),
 
-                \Filament\Forms\Components\FileUpload::make('product_photos')
-                    ->label('Galeri Foto Produk')
-                    ->image()
-                    ->multiple()
-                    ->directory('product-photos')
-                    ->visibility('public')
-                    ->imageEditor()
-                    ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
-                    ->imageResizeTargetWidth('1920')
-                    ->imageResizeTargetHeight('1080')
-                    ->maxSize(10240) // 10MB per file (will be compressed)
-                    ->maxFiles(10) // Maximum 10 files
-                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                    ->helperText('Upload beberapa foto sekaligus untuk galeri produk. Maksimal 10 file, 10MB per file. Foto akan dikompres otomatis.')
-                    ->saveUploadedFileUsing(function ($file) {
-                        return (new ImageCompressionService())->compressAndStore($file, 'product-photos');
-                    })
-                    ->dehydrated(false)
-                    ->nullable()
-                    ->columnSpanFull(),
+                ImageCompressionService::apply(
+                    \Filament\Forms\Components\FileUpload::make('product_photos')
+                        ->label('Galeri Foto Produk')
+                        ->image()
+                        ->multiple()
+                        ->visibility('public')
+                        ->imageEditor()
+                        ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
+                        ->maxSize(10240) // 10MB per file (will be compressed)
+                        ->maxFiles(10) // Maximum 10 files
+                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                        ->helperText('Upload beberapa foto sekaligus untuk galeri produk. Maksimal 10 file, 10MB per file. Foto dikompres ke WebP otomatis.')
+                        ->dehydrated(false)
+                        ->nullable()
+                        ->columnSpanFull(),
+                    'product-photos',
+                    1200,
+                ),
 
                 Forms\Components\Placeholder::make('existing_photos_display')
                     ->label('Foto yang Sudah Ada')

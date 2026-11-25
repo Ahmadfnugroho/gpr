@@ -7,6 +7,7 @@ use App\Filament\Imports\ProductPhotoImporter;
 use App\Filament\Resources\ProductPhotoResource\Pages;
 use App\Filament\Resources\ProductPhotoResource\RelationManagers;
 use App\Models\ProductPhoto;
+use App\Services\ImageCompressionService;
 use App\Models\Product;
 use Filament\Forms\Components;
 use Filament\Forms\Form;
@@ -38,10 +39,14 @@ class ProductPhotoResource extends Resource
     {
         return $form
             ->schema([
-                \Filament\Forms\Components\FileUpload::make('photo')
-                    ->label('Foto Produk')
-                    ->image()
-                    ->required(),
+                ImageCompressionService::apply(
+                    Components\FileUpload::make('photo')
+                        ->label('Foto Produk')
+                        ->image()
+                        ->required(),
+                    'product-photos',
+                    1200,
+                ),
                 Components\Select::make('product_id')
                     ->label('Produk')
                     ->relationship('product', 'name')

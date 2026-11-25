@@ -176,6 +176,106 @@ class KubernetesService
         ];
     }
 
+    /**
+     * Rollout restart via the restartedAt annotation, then drop the status cache
+     * so the page reflects the new rollout on its next poll.
+     *
+     * @throws \RuntimeException
+     */
+    public function restart(string $environment, string $deployment): void
+    {
+        [$namespace, $client] = $this->writeClient($environment);
+
+        $response = $client->withHeaders(['Content-Type' => 'application/merge-patch+json'])
+            ->patch("/apis/apps/v1/namespaces/{$namespace}/deployments/{$deployment}", [
+                'spec' => ['template' => ['metadata' => ['annotations' => [
+                    'kubectl.kubernetes.io/restartedAt' => now()->toIso8601String(),
+                ]]]],
+            ]);
+
+        $this->assertOk($response, 'restart');
+        Cache::forget("k8s:status:{$namespace}");
+    }
+
+    /**
+     * @throws \RuntimeException
+     */
+    public function scale(string $environment, string $deployment, int $replicas): void
+    {
+        [$namespace, $client] = $this->writeClient($environment);
+
+        $response = $client->withHeaders(['Content-Type' => 'application/merge-patch+json'])
+            ->patch("/apis/apps/v1/namespaces/{$namespace}/deployments/{$deployment}", [
+                'spec' => ['replicas' => $replicas],
+            ]);
+
+        $this->assertOk($response, 'scale');
+        Cache::forget("k8s:status:{$namespace}");
+    }
+
+    /**
+     * @throws \RuntimeException
+     */
+    public function logs(string $environment, string $pod, string $container, int $tail = 100): string
+    {
+        [$namespace, $client] = $this->writeClient($environment);
+
+        $response = $client->get("/api/v1/namespaces/{$namespace}/pods/{$pod}/log", [
+            'container' => $container,
+            'tailLines' => $tail,
+        ]);
+
+        $this->assertOk($response, 'logs');
+
+        return $response->body();
+    }
+
+    /**
+     * @param  list<string>  $command
+     *
+     * @throws \RuntimeException
+     */
+    public function exec(string $environment, string $pod, string $container, array $command): string
+    {
+        $namespace = self::ENVIRONMENTS[$environment] ?? null;
+
+        if ($namespace === null) {
+            throw new \RuntimeException('unknown environment');
+        }
+
+        return (new KubernetesExec())->run($namespace, $pod, $container, $command);
+    }
+
+    /**
+     * @return array{0:string,1:\Illuminate\Http\Client\PendingRequest}
+     */
+    private function writeClient(string $environment): array
+    {
+        $namespace = self::ENVIRONMENTS[$environment] ?? null;
+
+        if ($namespace === null) {
+            throw new \RuntimeException('unknown environment');
+        }
+
+        $token = $this->token();
+
+        if ($token === null) {
+            throw new \RuntimeException('service account token not found');
+        }
+
+        return [$namespace, Http::withToken($token)
+            ->withOptions(['verify' => $this->caPath()])
+            ->timeout(10)
+            ->baseUrl('https://kubernetes.default.svc')];
+    }
+
+    private function assertOk(\Illuminate\Http\Client\Response $response, string $action): void
+    {
+        if ($response->failed()) {
+            throw new \RuntimeException("{$action} failed: HTTP {$response->status()}");
+        }
+    }
+
     private function token(): ?string
     {
         $path = self::SA_PATH.'/token';

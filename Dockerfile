@@ -19,8 +19,8 @@ RUN composer dump-autoload --no-dev --optimize --classmap-authoritative --no-scr
 # ---------- runtime ----------
 FROM php:${PHP_VERSION}-fpm-alpine AS runtime
 
-RUN apk add --no-cache nginx supervisor mariadb-client icu-dev libpng-dev libjpeg-turbo-dev freetype-dev libzip-dev oniguruma-dev \
- && docker-php-ext-configure gd --with-freetype --with-jpeg \
+RUN apk add --no-cache nginx supervisor mariadb-client icu-dev libpng-dev libjpeg-turbo-dev freetype-dev libwebp-dev libzip-dev oniguruma-dev \
+ && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
  && docker-php-ext-install -j"$(nproc)" pdo_mysql bcmath gd intl zip exif opcache pcntl
 
 WORKDIR /var/www/html

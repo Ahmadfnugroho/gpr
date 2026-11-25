@@ -7,6 +7,7 @@ use App\Filament\Imports\BundlingPhotoImporter;
 use App\Filament\Resources\BundlingPhotoResource\Pages;
 use App\Filament\Resources\BundlingPhotoResource\RelationManagers;
 use App\Models\BundlingPhoto;
+use App\Services\ImageCompressionService;
 use Filament\Forms;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -41,10 +42,14 @@ class BundlingPhotoResource extends Resource
     {
         return $form
             ->schema([
-                FileUpload::make('photo')
-                    ->label('Foto Bundling')
-                    ->image()
-                    ->required(),
+                ImageCompressionService::apply(
+                    FileUpload::make('photo')
+                        ->label('Foto Bundling')
+                        ->image()
+                        ->required(),
+                    'bundling-photos',
+                    1200,
+                ),
                 Select::make('bundling_id')
                     ->label('Bundling')
                     ->relationship('bundling', 'name')

@@ -28,26 +28,22 @@ class ProductPhotoRelationManager extends RelationManager
                     ->tabs([
                         Forms\Components\Tabs\Tab::make('Multiple Photos')
                             ->schema([
-                                FileUpload::make('photos')
-                                    ->label('Upload Multiple Photos')
-                                    ->image()
-                                    ->multiple()
-                                    ->directory('product-photos')
-                                    ->visibility('public')
-                                    ->imageEditor()
-                                    ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
-                                    ->imageCropAspectRatio('16:9')
-                                    ->imageResizeTargetWidth('1920')
-                                    ->imageResizeTargetHeight('1080')
-                                    ->maxSize(10240) // 10MB per file (will be compressed)
-                                    ->maxFiles(10) // Maximum 10 files
-                                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                                    ->helperText('Upload multiple photos at once. Maximum 10 files, 10MB each. Photos will be compressed automatically.')
-                                    ->saveUploadedFileUsing(function ($file) {
-                                        $compressionService = new ImageCompressionService();
-                                        return $compressionService->compressAndStore($file, 'product-photos');
-                                    })
-                                    ->required(),
+                                ImageCompressionService::apply(
+                                    FileUpload::make('photos')
+                                        ->label('Upload Multiple Photos')
+                                        ->image()
+                                        ->multiple()
+                                        ->visibility('public')
+                                        ->imageEditor()
+                                        ->imageEditorAspectRatios(['16:9', '4:3', '1:1'])
+                                        ->maxSize(10240) // 10MB per file (will be compressed)
+                                        ->maxFiles(10) // Maximum 10 files
+                                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                                        ->helperText('Upload multiple photos at once. Maximum 10 files, 10MB each. Photos are converted to WebP automatically.')
+                                        ->required(),
+                                    'product-photos',
+                                    1200,
+                                ),
                             ]),
                     ])
                     ->columnSpanFull(),
