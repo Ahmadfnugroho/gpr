@@ -24,13 +24,17 @@ class KubernetesExec
             throw new RuntimeException('service account token not found');
         }
 
+        // The apiserver wants the argv as repeated `command=` params; an array
+        // here would serialise as command[0]=… and be silently ignored.
         $query = http_build_query([
             'container' => $container,
             'stdout' => 'true',
             'stderr' => 'true',
             'tty' => 'false',
-            'command' => $command,
         ]);
+        foreach ($command as $arg) {
+            $query .= '&command='.rawurlencode($arg);
+        }
         $path = "/api/v1/namespaces/{$namespace}/pods/{$pod}/exec?{$query}";
         $key = base64_encode(random_bytes(16));
 
