@@ -44,10 +44,18 @@ class ConvertMediaToWebp extends Command
         foreach (self::TARGETS as $model => [$column, $maxWidth]) {
             $this->info($model.' :: '.$column);
 
-            $model::query()
+            $query = $model::query()
                 ->whereNotNull($column)
                 ->where($column, '!=', '')
-                ->where($column, 'not like', '%.webp')
+                ->where($column, 'not like', '%.webp');
+
+            // Soft-deleted rows keep their files; convert them too so restored
+            // records never point at a deleted original.
+            if (in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, class_uses_recursive($model), true)) {
+                $query->withTrashed();
+            }
+
+            $query
                 ->chunkById(100, function ($rows) use ($column, $maxWidth, $disk, $service, $dry, $limit, &$done, &$skipped, &$failed, &$saved) {
                     foreach ($rows as $row) {
                         if ($limit > 0 && $done >= $limit) {
