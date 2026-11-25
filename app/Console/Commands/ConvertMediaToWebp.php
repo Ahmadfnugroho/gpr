@@ -56,6 +56,11 @@ class ConvertMediaToWebp extends Command
 
                         $old = $row->{$column};
 
+                        if (! in_array(strtolower(pathinfo($old, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png'], true)) {
+                            $skipped++;
+                            continue;
+                        }
+
                         if (! $disk->exists($old)) {
                             $skipped++;
                             continue;
