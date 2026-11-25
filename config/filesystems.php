@@ -67,7 +67,10 @@ return [
          */
         'media' => [
             'driver' => env('MEDIA_DRIVER', 'local'),
-            'root' => storage_path('app/public'),
+            // The S3 adapter prefixes every key with root. Leaving it set to the
+            // local path would push objects under /var/www/html/..., so S3 mode
+            // uses no prefix and keys match the stored DB paths exactly.
+            'root' => env('MEDIA_DRIVER') === 's3' ? '' : storage_path('app/public'),
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
             'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
