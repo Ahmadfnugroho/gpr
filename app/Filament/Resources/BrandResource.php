@@ -6,6 +6,7 @@ use App\Filament\Resources\BrandResource\Pages;
 use App\Filament\Resources\BrandResource\RelationManagers;
 use App\Models\Brand;
 use App\Services\BrandImportExportService;
+use App\Services\ImageCompressionService;
 use Filament\Tables\Actions\ImportAction;
 use Filament\Tables\Actions\ExportAction;
 use App\Filament\Imports\BrandImporter;
@@ -47,10 +48,14 @@ class BrandResource extends Resource
                     ->label('Nama Brand')
                     ->required()
                     ->maxLength(255),
-                forms\Components\FileUpload::make('logo')
-                    ->label('Logo')
-                    ->nullable()
-                    ->image(),
+                ImageCompressionService::apply(
+                    FileUpload::make('logo')
+                        ->label('Logo')
+                        ->nullable()
+                        ->image(),
+                    'brands',
+                    1200,
+                ),
                 Forms\Components\Toggle::make('premiere')
                     ->label('Brand Premiere')
                     ->default(false),

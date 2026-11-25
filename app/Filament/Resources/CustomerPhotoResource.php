@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CustomerPhotoResource\Pages;
 use App\Filament\Resources\CustomerPhotoResource\RelationManagers;
 use App\Models\CustomerPhoto;
+use App\Services\ImageCompressionService;
 use App\Models\Customer;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -28,9 +29,13 @@ class CustomerPhotoResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\FileUpload::make('photo')
-                    ->image()
-                    ->required(),
+                ImageCompressionService::apply(
+                    Forms\Components\FileUpload::make('photo')
+                        ->image()
+                        ->required(),
+                    'customer_photos',
+                    1600,
+                ),
                 Forms\Components\Select::make('photo_type')
                     ->options([
                         'Kartu Keluarga' => 'Kartu Keluarga',

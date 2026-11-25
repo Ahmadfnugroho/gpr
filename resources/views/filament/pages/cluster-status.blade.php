@@ -49,19 +49,49 @@
                             <th class="px-3 py-2">Ready</th>
                             <th class="px-3 py-2">Updated</th>
                             <th class="px-3 py-2">Image</th>
+                            <th class="px-3 py-2">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @forelse ($status['apps'] as $app)
-                            <tr>
+                            <tr wire:key="deploy-{{ $app['name'] }}">
                                 <td class="px-3 py-2 font-medium text-gray-900">{{ $app['name'] }}</td>
                                 <td class="px-3 py-2">{{ $app['ready'] }}/{{ $app['desired'] }}</td>
                                 <td class="px-3 py-2">{{ $app['updated'] }}</td>
                                 <td class="px-3 py-2 font-mono text-xs break-all">{{ implode(', ', $app['images']) }}</td>
+                                <td class="px-3 py-2">
+                                    @if ($writable)
+                                        <div class="flex flex-wrap gap-1">
+                                            <button
+                                                type="button"
+                                                class="rounded border border-primary-300 px-2 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-50"
+                                                wire:click="restart('{{ $app['name'] }}')"
+                                                wire:confirm="Restart deployment {{ $app['name'] }}? Pod akan dibuat ulang bergiliran."
+                                            >Restart</button>
+                                            @if ($app['desired'] > 0)
+                                                <button
+                                                    type="button"
+                                                    class="rounded border border-danger-300 px-2 py-1 text-xs font-semibold text-danger-700 hover:bg-danger-50"
+                                                    wire:click="stop('{{ $app['name'] }}')"
+                                                    wire:confirm="Scale {{ $app['name'] }} ke 0? Layanan ini akan berhenti melayani."
+                                                >Stop</button>
+                                            @else
+                                                <button
+                                                    type="button"
+                                                    class="rounded border border-success-300 px-2 py-1 text-xs font-semibold text-success-700 hover:bg-success-50"
+                                                    wire:click="start('{{ $app['name'] }}')"
+                                                    wire:confirm="Scale up {{ $app['name'] }}?"
+                                                >Start</button>
+                                            @endif
+                                        </div>
+                                    @else
+                                        <span class="text-xs text-gray-500">read-only</span>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="px-3 py-4 text-center text-gray-500">Belum ada Deployment.</td>
+                                <td colspan="5" class="px-3 py-4 text-center text-gray-500">Belum ada Deployment.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -81,11 +111,12 @@
                             <th class="px-3 py-2">Restart</th>
                             <th class="px-3 py-2">Node</th>
                             <th class="px-3 py-2">Container</th>
+                            <th class="px-3 py-2">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @forelse ($status['pods'] as $pod)
-                            <tr @class(['bg-danger-50' => $pod['crash_loop']])>
+                            <tr @class(['bg-danger-50' => $pod['crash_loop']]) wire:key="pod-{{ $pod['name'] }}">
                                 <td class="px-3 py-2 font-mono text-xs">{{ $pod['name'] }}</td>
                                 <td class="px-3 py-2">{{ $pod['phase'] }}</td>
                                 <td class="px-3 py-2">{{ $pod['ready'] }}</td>
@@ -98,10 +129,28 @@
                                         </div>
                                     @endforeach
                                 </td>
+                                <td class="px-3 py-2">
+                                    @foreach ($pod['containers'] as $container)
+                                        <div class="flex flex-wrap gap-1 pb-1">
+                                            <button
+                                                type="button"
+                                                class="rounded border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                                wire:click="showLogs('{{ $pod['name'] }}', '{{ $container['name'] }}')"
+                                            >Logs</button>
+                                            @if ($writable)
+                                                <button
+                                                    type="button"
+                                                    class="rounded border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                                    wire:click="showTerminal('{{ $pod['name'] }}', '{{ $container['name'] }}')"
+                                                >Terminal</button>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-3 py-4 text-center text-gray-500">Belum ada Pod.</td>
+                                <td colspan="7" class="px-3 py-4 text-center text-gray-500">Belum ada Pod.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -115,5 +164,42 @@
             &middot; pending {{ $status['summary']['pending'] }}
             &middot; gagal {{ $status['summary']['failing'] }}
         </p>
+    @endif
+
+    @if ($panelMode)
+        <div
+            class="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
+            wire:key="panel-{{ $panelPod }}-{{ $panelContainer }}"
+        >
+            <div class="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-900">
+                <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $panelTitle }}</h3>
+                    <button
+                        type="button"
+                        class="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        wire:click="closePanel"
+                    >Tutup</button>
+                </div>
+
+                <div class="flex-1 overflow-auto bg-gray-950 p-4">
+                    <pre class="whitespace-pre-wrap break-all font-mono text-xs text-gray-100">{{ $panelBody !== '' ? $panelBody : 'Belum ada output.' }}</pre>
+                </div>
+
+                @if ($panelMode === 'terminal')
+                    <form wire:submit="runCommand" class="flex gap-2 border-t border-gray-200 p-3 dark:border-gray-700">
+                        <input
+                            type="text"
+                            wire:model="command"
+                            placeholder="ls -la /data"
+                            class="flex-1 rounded border border-gray-300 px-3 py-2 font-mono text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+                        >
+                        <button
+                            type="submit"
+                            class="rounded bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-500"
+                        >Jalankan</button>
+                    </form>
+                @endif
+            </div>
+        </div>
     @endif
 </x-filament-panels::page>

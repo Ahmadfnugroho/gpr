@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\CustomerResource\RelationManagers;
 
+use App\Services\ImageCompressionService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -45,19 +46,17 @@ class CustomerPhotosRelationManager extends RelationManager
                     ->placeholder('KK, SIM, NPWP, STNK, BPKB, Passport, BPJS, ID_Kerja')
                     ->visible(fn (Forms\Get $get) => in_array($get('photo_type'), ['additional_id_1', 'additional_id_2'])),
                     
-                FileUpload::make('photo')
-                    ->label('Upload Foto')
-                    ->image()
-                    ->directory('customer_photos')
-                    ->disk('media')
-                    ->imageResizeMode('force')
-                    ->imageCropAspectRatio(null)
-                    ->imageResizeTargetWidth('1920')
-                    ->imageResizeTargetHeight('1080')
-                    ->maxSize(10240) // 10MB
-                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'])
-                    ->required()
-                    ->columnSpanFull(),
+                ImageCompressionService::apply(
+                    FileUpload::make('photo')
+                        ->label('Upload Foto')
+                        ->image()
+                        ->maxSize(10240)
+                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/jpg', 'image/webp'])
+                        ->required()
+                        ->columnSpanFull(),
+                    'customer_photos',
+                    1600,
+                ),
             ]);
     }
 

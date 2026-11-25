@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\SubCategoryResource\Pages;
 use App\Filament\Resources\SubCategoryResource\RelationManagers;
 use App\Services\SubCategoryImportExportService;
+use App\Services\ImageCompressionService;
 use Filament\Tables\Actions\ImportAction;
 use Filament\Tables\Actions\ExportAction;
 use App\Filament\Imports\SubCategoryImporter;
@@ -46,10 +47,14 @@ class SubCategoryResource extends Resource
                     ->label('Nama Sub Kategori')
                     ->required()
                     ->maxLength(255),
-                Forms\Components\FileUpload::make('photo')
-                    ->label('Foto Sub Kategori')
-                    ->image()
-                    ->nullable(),
+                ImageCompressionService::apply(
+                    FileUpload::make('photo')
+                        ->label('Foto Sub Kategori')
+                        ->image()
+                        ->nullable(),
+                    'sub-categories',
+                    1200,
+                ),
             ]);
     }
 

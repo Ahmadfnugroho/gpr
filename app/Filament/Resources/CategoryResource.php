@@ -6,6 +6,7 @@ use App\Filament\Resources\CategoryResource\Pages;
 use Filament\Tables\Table;
 use App\Models\Category;
 use App\Services\CategoryImportExportService;
+use App\Services\ImageCompressionService;
 use Filament\Tables\Actions\ImportAction;
 use Filament\Tables\Actions\ExportAction;
 use App\Filament\Imports\CategoryImporter;
@@ -47,14 +48,16 @@ class CategoryResource extends Resource
                     ->required()
                     ->maxLength(255),
 
-                Forms\Components\FileUpload::make('photo')
-                    ->disk('media')
-                    ->directory('categories')
-                    ->visibility('public')
-                    ->maxSize(1024) // optional: 1MB
-                    ->label('Photo')
-                    ->required()
-                    ->image(),
+                ImageCompressionService::apply(
+                    FileUpload::make('photo')
+                        ->visibility('public')
+                        ->maxSize(10240)
+                        ->label('Photo')
+                        ->required()
+                        ->image(),
+                    'categories',
+                    1200,
+                ),
             ]);
     }
 
