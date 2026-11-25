@@ -90,7 +90,7 @@ class SubCategoryResource extends Resource
                     ->sortable(),
                 ImageColumn::make('photo')
                     ->label('Photo')
-                    ->disk('public')
+                    ->disk('media')
                     ->defaultImageUrl(url('/images/no-image.svg')),
 
 

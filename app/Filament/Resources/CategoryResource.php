@@ -48,7 +48,7 @@ class CategoryResource extends Resource
                     ->maxLength(255),
 
                 Forms\Components\FileUpload::make('photo')
-                    ->disk('public')
+                    ->disk('media')
                     ->directory('categories')
                     ->visibility('public')
                     ->maxSize(1024) // optional: 1MB
@@ -94,7 +94,7 @@ class CategoryResource extends Resource
                     ->sortable(),
                 ImageColumn::make('photo')
                     ->label('Photo')
-                    ->disk('public')
+                    ->disk('media')
                     ->defaultImageUrl(url('/images/no-image.svg')),
 
             ])

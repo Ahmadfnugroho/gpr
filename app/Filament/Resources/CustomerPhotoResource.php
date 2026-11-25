@@ -63,7 +63,7 @@ class CustomerPhotoResource extends Resource
             ->columns([
                 Tables\Columns\ImageColumn::make('photo')
                     ->label('Preview')
-                    ->disk('public')
+                    ->disk('media')
                     ->height(80)
                     ->width(80)
                     ->defaultImageUrl(url('/images/no-image.svg')),

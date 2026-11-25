@@ -38,12 +38,20 @@ class ImageCompressionService
         $extension = $this->getOptimalExtension($file);
         $path = $directory . '/' . $this->generateUniqueFilename($extension);
 
-        if (!Storage::disk('public')->put($path, $this->compressImage($image, $extension))) {
-            throw new RuntimeException('Failed to store compressed image');
+        $payload = $this->compressImage($image, $extension);
+
+        // Shrink in memory before writing: the media disk may be S3, where
+        // rewriting an object in place via path() is not possible.
+        if (strlen($payload) > self::MAX_FILE_SIZE) {
+            $image = $image->resize(
+                (int) ($image->width() * 0.8),
+                (int) ($image->height() * 0.8)
+            );
+            $payload = $this->compressImage($image, $extension, 70);
         }
 
-        if (Storage::disk('public')->size($path) > self::MAX_FILE_SIZE) {
-            $this->compressMoreAggressively($path, $extension);
+        if (!Storage::disk('media')->put($path, $payload)) {
+            throw new RuntimeException('Failed to store compressed image');
         }
 
         return $path;
@@ -79,29 +87,12 @@ class ImageCompressionService
         };
     }
 
-    private function compressImage($image, string $extension): string
+    private function compressImage($image, string $extension, int $quality = self::JPEG_QUALITY): string
     {
         return match ($extension) {
             'png' => $image->toPng()->toString(),
-            'webp' => $image->toWebp(self::JPEG_QUALITY)->toString(),
-            default => $image->toJpeg(self::JPEG_QUALITY)->toString(),
-        };
-    }
-
-    private function compressMoreAggressively(string $path, string $extension): void
-    {
-        $fullPath = Storage::disk('public')->path($path);
-        $image = (new ImageManager(new Driver()))->read($fullPath);
-
-        $image = $image->resize(
-            (int) ($image->width() * 0.8),
-            (int) ($image->height() * 0.8)
-        );
-
-        match ($extension) {
-            'png' => $image->toPng()->save($fullPath),
-            'webp' => $image->toWebp(70)->save($fullPath),
-            default => $image->toJpeg(70)->save($fullPath),
+            'webp' => $image->toWebp($quality)->toString(),
+            default => $image->toJpeg($quality)->toString(),
         };
     }
 

@@ -95,7 +95,7 @@ class BrandResource extends Resource
                     ->label('Brand Premiere'),
                 ImageColumn::make('logo')
                     ->label('logo')
-                    ->disk('public')
+                    ->disk('media')
                     ->defaultImageUrl(url('/images/no-image.svg')),
 
             ])

@@ -49,7 +49,7 @@ class CustomerPhotosRelationManager extends RelationManager
                     ->label('Upload Foto')
                     ->image()
                     ->directory('customer_photos')
-                    ->disk('public')
+                    ->disk('media')
                     ->imageResizeMode('force')
                     ->imageCropAspectRatio(null)
                     ->imageResizeTargetWidth('1920')
@@ -92,7 +92,7 @@ class CustomerPhotosRelationManager extends RelationManager
                     
                 ImageColumn::make('photo')
                     ->label('Preview')
-                    ->disk('public')
+                    ->disk('media')
                     ->width(80)
                     ->height(60)
                     ->extraAttributes(['class' => 'rounded-lg'])
@@ -130,7 +130,7 @@ class CustomerPhotosRelationManager extends RelationManager
                         default => ucfirst($record->photo_type)
                     })
                     ->modalContent(function ($record) {
-                        $photoUrl = $record->photo ? Storage::disk('public')->url($record->photo) : url('/images/no-image.svg');
+                        $photoUrl = $record->photo ? Storage::disk('media')->url($record->photo) : url('/images/no-image.svg');
                         return view('filament.components.large-image-modal', [
                             'imageUrl' => $photoUrl,
                             'title' => match($record->photo_type) {

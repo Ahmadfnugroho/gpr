@@ -77,7 +77,7 @@ class ProductPhotoRelationManager extends RelationManager
 
                 ImageColumn::make('photo')
                     ->label('Photo Preview')
-                    ->disk('public')
+                    ->disk('media')
                     ->size(80)
                     ->square()
                     ->defaultImageUrl(url('/images/no-image.svg')),

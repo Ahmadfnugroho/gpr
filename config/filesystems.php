@@ -57,6 +57,28 @@ return [
             'throw' => false,
         ],
 
+        /*
+         * Public media (product photos, categories, brand logos).
+         * MEDIA_DRIVER=local  -> same directory as the "public" disk.
+         * MEDIA_DRIVER=s3     -> MinIO bucket, objects keyed exactly like the
+         *                        local paths so URLs stay identical.
+         * The "public" disk itself must stay local: the Excel import/export
+         * services rely on Storage::disk('public')->path().
+         */
+        'media' => [
+            'driver' => env('MEDIA_DRIVER', 'local'),
+            'root' => storage_path('app/public'),
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+            'bucket' => env('AWS_BUCKET', 'storage'),
+            'url' => env('MEDIA_URL', env('APP_URL').'/storage'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+
     ],
 
     /*

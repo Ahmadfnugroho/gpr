@@ -386,7 +386,7 @@ class RegistrationController extends Controller
 
         $path = 'customer_photos/' . Str::random(40) . '.' . $format;
 
-        if (!Storage::disk('public')->put($path, $encoded->toString())) {
+        if (!Storage::disk('media')->put($path, $encoded->toString())) {
             throw new \RuntimeException('Gagal menyimpan foto.');
         }
 

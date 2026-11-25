@@ -15,17 +15,31 @@ NGINX_SITES_AVAILABLE="/etc/nginx/sites-available"
 NGINX_SITES_ENABLED="/etc/nginx/sites-enabled"
 # Kubernetes PVCs (k3s local-path provisioner). Uploads and WhatsApp
 # sessions now live here; /var/www/gpr/storage no longer receives uploads.
+# Paths are resolved by namespace+PVC name because the directory prefix is the
+# PVC uid, which changes whenever a PVC is recreated.
 K8S_STORAGE="/var/lib/rancher/k3s/storage"
-PVC_PROD_STORAGE="${K8S_STORAGE}/pvc-416854fe-9fdb-46b7-9d65-9bd5a8cb2496_gpr-prod_gpr-storage"
-PVC_PROD_WAHA="${K8S_STORAGE}/pvc-cf699a51-143d-463c-b63b-4fbc9a9df1c9_gpr-prod_waha-sessions"
-PVC_DEV_STORAGE="${K8S_STORAGE}/pvc-909bddf0-c65b-45c9-a29c-27aab11d0d45_gpr-dev_gpr-storage"
-PVC_DEV_WAHA="${K8S_STORAGE}/pvc-5fca0a72-b6b0-4dd7-b79f-f2c60b29c450_gpr-dev_waha-sessions"
+pvc_path() {
+  ls -d "${K8S_STORAGE}"/pvc-*_"$1"_"$2" 2>/dev/null | head -1
+}
 # -----------------------------
 
 log() { echo "[$(TZ=$TIMEZONE date '+%Y-%m-%d %H:%M:%S %Z')] $*" | tee -a "$LOGFILE"; }
 
+# Anything that leaves half-written staging behind (ENOSPC, kubectl pipe death,
+# SIGTERM from cron) must not leak. This is what produced the 196k "No space
+# left on device" lines and the stale /tmp/backup_staging in the first place.
+cleanup() { rm -rf "$STAGING" /tmp/backup_staging; }
+trap cleanup EXIT INT TERM
+
 mkdir -p "$STAGING" "$OUTDIR"
 touch "$LOGFILE"
+
+# Refuse to run into a full disk: a half backup is worse than none.
+AVAIL_KB=$(df --output=avail "$OUTDIR" | tail -1 | tr -d ' ')
+if [ "$AVAIL_KB" -lt 5242880 ]; then
+  log "ABORT: only $((AVAIL_KB / 1024 / 1024))GiB free on $OUTDIR (need 5GiB)"
+  exit 1
+fi
 
 DATE=$(TZ=$TIMEZONE date +%F)
 BACKUP_NAME="backup-${DATE}.tar.gz"
@@ -67,18 +81,20 @@ mkdir -p "$STAGING/pvc" "$STAGING/nginx"
 
 stage_pvc() {
   local src="$1" name="$2"
-  if [ -d "$src" ]; then
+  if [ -n "$src" ] && [ -d "$src" ]; then
     tar -C "$src" -czf "$STAGING/pvc/${name}.tar.gz" . && \
       log "  staged ${name} ($(du -sh "$src" | cut -f1))"
   else
-    log "  WARN missing PVC path for ${name}: ${src}"
+    log "  WARN missing PVC path for ${name}: ${src:-<not found>}"
   fi
 }
 
-stage_pvc "$PVC_PROD_STORAGE" "gpr-prod-storage"
-stage_pvc "$PVC_PROD_WAHA" "gpr-prod-waha-sessions"
-stage_pvc "$PVC_DEV_STORAGE" "gpr-dev-storage"
-stage_pvc "$PVC_DEV_WAHA" "gpr-dev-waha-sessions"
+# Media lives in the MinIO buckets on these PVCs. The old gpr-storage PVCs still
+# hold framework caches and logs only, so they are no longer archived.
+stage_pvc "$(pvc_path gpr-prod minio-data)" "gpr-prod-minio-data"
+stage_pvc "$(pvc_path gpr-prod waha-sessions)" "gpr-prod-waha-sessions"
+stage_pvc "$(pvc_path gpr-dev minio-data)" "gpr-dev-minio-data"
+stage_pvc "$(pvc_path gpr-dev waha-sessions)" "gpr-dev-waha-sessions"
 
 cp -r "$NGINX_SITES_AVAILABLE" "$STAGING/nginx/sites-available"
 cp -r "$NGINX_SITES_ENABLED" "$STAGING/nginx/sites-enabled"
@@ -95,10 +111,12 @@ rclone copy "$OUTDIR/$BACKUP_NAME" "$RCLONE_REMOTE" \
 # ---------- Delete local backup ----------
 log "Deleting local backup file..."
 rm -f "$OUTDIR/$BACKUP_NAME"
-rm -rf "$STAGING"
 
-# ---------- Local retention: keep last 7 archives ----------
-ls -1t "$OUTDIR"/backup-*.tar.gz 2>/dev/null | tail -n +$((RETENTION_DAYS + 1)) | xargs -r rm -f
+# ---------- Local retention by AGE ----------
+# Counting files is useless here: the archive we just made was deleted two lines
+# up, so `ls -1t | tail -n +8` never had a 8th entry to remove. Age is the only
+# signal that actually reflects what is stale.
+find "$OUTDIR" -maxdepth 1 -name 'backup-*.tar.gz' -mtime +"$RETENTION_DAYS" -print -delete
 
 # ---------- Retention: delete backups older than 7 days ----------
 log "Removing old backups on Google Drive (older than $RETENTION_DAYS days)..."

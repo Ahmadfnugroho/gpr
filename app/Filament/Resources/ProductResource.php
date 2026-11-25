@@ -407,7 +407,7 @@ class ProductResource extends BaseOptimizedResource
                             }),
                         Tables\Columns\ImageColumn::make('productPhotos.0.photo')
                             ->label('Foto')
-                            ->disk('public')
+                            ->disk('media')
                             ->defaultImageUrl(url('/images/no-image.svg'))
                             ->circular()
                             ->size(50)
