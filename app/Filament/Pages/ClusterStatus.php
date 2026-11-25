@@ -66,7 +66,7 @@ class ClusterStatus extends Page
 
     public function restart(string $deployment): void
     {
-        $this->guard();
+        $this->guardWrite();
 
         try {
             app(KubernetesService::class)->restart($this->environment, $deployment);
@@ -79,7 +79,7 @@ class ClusterStatus extends Page
 
     public function stop(string $deployment): void
     {
-        $this->guard();
+        $this->guardWrite();
 
         if (in_array($deployment, self::PROTECTED_DEPLOYMENTS, true)) {
             Notification::make()
@@ -101,7 +101,7 @@ class ClusterStatus extends Page
 
     public function start(string $deployment): void
     {
-        $this->guard();
+        $this->guardWrite();
 
         try {
             app(KubernetesService::class)->scale(
@@ -131,7 +131,7 @@ class ClusterStatus extends Page
 
     public function showTerminal(string $pod, string $container): void
     {
-        $this->guard();
+        $this->guardWrite();
 
         $this->command = '';
         $this->panelBody = '';
@@ -140,7 +140,7 @@ class ClusterStatus extends Page
 
     public function runCommand(): void
     {
-        $this->guard();
+        $this->guardWrite();
 
         $argv = $this->parseCommand($this->command);
 
@@ -180,7 +180,12 @@ class ClusterStatus extends Page
 
     protected function getViewData(): array
     {
-        return ['status' => app(KubernetesService::class)->status($this->environment)];
+        $kubernetes = app(KubernetesService::class);
+
+        return [
+            'status' => $kubernetes->status($this->environment),
+            'writable' => $kubernetes->isLocal($this->environment),
+        ];
     }
 
     /**
@@ -220,6 +225,16 @@ class ClusterStatus extends Page
     private function guard(): void
     {
         abort_unless(static::canAccess(), 403);
+    }
+
+    /**
+     * Write verbs exist only in the namespace the dashboard runs in; the
+     * cross-namespace binding is read-only by design.
+     */
+    private function guardWrite(): void
+    {
+        $this->guard();
+        abort_unless(app(KubernetesService::class)->isLocal($this->environment), 403);
     }
 
     private function audit(string $action, string $target, string $container = '', string $detail = ''): void

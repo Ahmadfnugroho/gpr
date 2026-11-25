@@ -231,6 +231,20 @@ class KubernetesService
     }
 
     /**
+     * The dashboard only holds write verbs in the namespace it runs in, so
+     * anything else must render read-only to avoid guaranteed 403s.
+     */
+    public function isLocal(string $environment): bool
+    {
+        $namespace = self::ENVIRONMENTS[$environment] ?? null;
+        $path = self::SA_PATH.'/namespace';
+
+        return $namespace !== null
+            && is_readable($path)
+            && trim((string) file_get_contents($path)) === $namespace;
+    }
+
+    /**
      * @param  list<string>  $command
      *
      * @throws \RuntimeException

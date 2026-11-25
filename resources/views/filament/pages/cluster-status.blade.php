@@ -60,29 +60,33 @@
                                 <td class="px-3 py-2">{{ $app['updated'] }}</td>
                                 <td class="px-3 py-2 font-mono text-xs break-all">{{ implode(', ', $app['images']) }}</td>
                                 <td class="px-3 py-2">
-                                    <div class="flex flex-wrap gap-1">
-                                        <button
-                                            type="button"
-                                            class="rounded border border-primary-300 px-2 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-50"
-                                            wire:click="restart('{{ $app['name'] }}')"
-                                            wire:confirm="Restart deployment {{ $app['name'] }}? Pod akan dibuat ulang bergiliran."
-                                        >Restart</button>
-                                        @if ($app['desired'] > 0)
+                                    @if ($writable)
+                                        <div class="flex flex-wrap gap-1">
                                             <button
                                                 type="button"
-                                                class="rounded border border-danger-300 px-2 py-1 text-xs font-semibold text-danger-700 hover:bg-danger-50"
-                                                wire:click="stop('{{ $app['name'] }}')"
-                                                wire:confirm="Scale {{ $app['name'] }} ke 0? Layanan ini akan berhenti melayani."
-                                            >Stop</button>
-                                        @else
-                                            <button
-                                                type="button"
-                                                class="rounded border border-success-300 px-2 py-1 text-xs font-semibold text-success-700 hover:bg-success-50"
-                                                wire:click="start('{{ $app['name'] }}')"
-                                                wire:confirm="Scale up {{ $app['name'] }}?"
-                                            >Start</button>
-                                        @endif
-                                    </div>
+                                                class="rounded border border-primary-300 px-2 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-50"
+                                                wire:click="restart('{{ $app['name'] }}')"
+                                                wire:confirm="Restart deployment {{ $app['name'] }}? Pod akan dibuat ulang bergiliran."
+                                            >Restart</button>
+                                            @if ($app['desired'] > 0)
+                                                <button
+                                                    type="button"
+                                                    class="rounded border border-danger-300 px-2 py-1 text-xs font-semibold text-danger-700 hover:bg-danger-50"
+                                                    wire:click="stop('{{ $app['name'] }}')"
+                                                    wire:confirm="Scale {{ $app['name'] }} ke 0? Layanan ini akan berhenti melayani."
+                                                >Stop</button>
+                                            @else
+                                                <button
+                                                    type="button"
+                                                    class="rounded border border-success-300 px-2 py-1 text-xs font-semibold text-success-700 hover:bg-success-50"
+                                                    wire:click="start('{{ $app['name'] }}')"
+                                                    wire:confirm="Scale up {{ $app['name'] }}?"
+                                                >Start</button>
+                                            @endif
+                                        </div>
+                                    @else
+                                        <span class="text-xs text-gray-500">read-only</span>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
@@ -133,11 +137,13 @@
                                                 class="rounded border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
                                                 wire:click="showLogs('{{ $pod['name'] }}', '{{ $container['name'] }}')"
                                             >Logs</button>
-                                            <button
-                                                type="button"
-                                                class="rounded border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                                                wire:click="showTerminal('{{ $pod['name'] }}', '{{ $container['name'] }}')"
-                                            >Terminal</button>
+                                            @if ($writable)
+                                                <button
+                                                    type="button"
+                                                    class="rounded border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                                    wire:click="showTerminal('{{ $pod['name'] }}', '{{ $container['name'] }}')"
+                                                >Terminal</button>
+                                            @endif
                                         </div>
                                     @endforeach
                                 </td>
