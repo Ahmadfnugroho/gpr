@@ -38,7 +38,24 @@ class ImageCompressionService
             throw new RuntimeException('File is not a valid image');
         }
 
-        $image = (new ImageManager(new Driver()))->read($file->getPathname());
+        $payload = $this->encodeBinary($file->getPathname(), $maxWidth, $quality);
+
+        $path = $directory.'/'.date('Y/m/d/').Str::random(40).'.webp';
+
+        if (! Storage::disk('media')->put($path, $payload)) {
+            throw new RuntimeException('Failed to store compressed image');
+        }
+
+        return $path;
+    }
+
+    /**
+     * Encode any readable image path to WebP bytes. Shared by the upload field
+     * and the backfill command so both produce identical output.
+     */
+    public function encodeBinary(string $pathname, int $maxWidth = 1200, int $quality = self::QUALITY): string
+    {
+        $image = (new ImageManager(new Driver()))->read($pathname);
 
         // scaleDown never upscales, so small originals keep their pixels.
         if ($image->width() > $maxWidth) {
@@ -52,13 +69,7 @@ class ImageCompressionService
             $payload = $image->toWebp(70)->toString();
         }
 
-        $path = $directory.'/'.date('Y/m/d/').Str::random(40).'.webp';
-
-        if (! Storage::disk('media')->put($path, $payload)) {
-            throw new RuntimeException('Failed to store compressed image');
-        }
-
-        return $path;
+        return $payload;
     }
 
     private function isValidImage(UploadedFile $file): bool
